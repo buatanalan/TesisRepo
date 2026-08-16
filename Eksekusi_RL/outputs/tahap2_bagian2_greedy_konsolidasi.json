@@ -1,0 +1,62 @@
+{
+  "trust=0.3_queue": {
+    "gini": 0.09308912386706948,
+    "throughput": 5296.0,
+    "acceptance": 0.524546827794562,
+    "wait_ratio": 0.1730292281241807,
+    "trust_shadow_mean": 0.4788251413435268,
+    "trust_shadow_std": 0.11215469794085328,
+    "gap_mean": -4.333762193884143,
+    "n_reneged": 0
+  },
+  "trust=0.3_utilization": {
+    "gini": 0.0799949609473419,
+    "throughput": 5292.0,
+    "acceptance": 0.5383597883597884,
+    "wait_ratio": 0.21093184741014764,
+    "trust_shadow_mean": 0.48776754717457826,
+    "trust_shadow_std": 0.1110982394984742,
+    "gap_mean": -4.796742130917712,
+    "n_reneged": 0
+  },
+  "trust=0.5_queue": {
+    "gini": 0.09194859194859195,
+    "throughput": 5291.0,
+    "acceptance": 0.6698166698166698,
+    "wait_ratio": 0.35466344899986774,
+    "trust_shadow_mean": 0.4551647018000711,
+    "trust_shadow_std": 0.133059064408535,
+    "gap_mean": -5.762485544704408,
+    "n_reneged": 0
+  },
+  "trust=0.5_utilization": {
+    "gini": 0.08771764410082343,
+    "throughput": 5303.0,
+    "acceptance": 0.6635866490665661,
+    "wait_ratio": 0.29998444449819345,
+    "trust_shadow_mean": 0.47405467469439777,
+    "trust_shadow_std": 0.12486083690995195,
+    "gap_mean": -5.708383737018211,
+    "n_reneged": 0
+  },
+  "trust=0.7_queue": {
+    "gini": 0.08534743202416918,
+    "throughput": 5296.0,
+    "acceptance": 0.800226586102719,
+    "wait_ratio": 0.48923559437542496,
+    "trust_shadow_mean": 0.43498168895451367,
+    "trust_shadow_std": 0.14672460780764557,
+    "gap_mean": -7.161485662599692,
+    "n_reneged": 0
+  },
+  "trust=0.7_utilization": {
+    "gini": 0.09537754266641477,
+    "throughput": 5293.0,
+    "acceptance": 0.8014358586812772,
+    "wait_ratio": 0.4407249806253457,
+    "trust_shadow_mean": 0.45912988720313086,
+    "trust_shadow_std": 0.13606868696045293,
+    "gap_mean": -6.627800902416368,
+    "n_reneged": 0
+  }
+}

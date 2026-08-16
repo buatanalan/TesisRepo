@@ -5,6 +5,16 @@ Eksekusi_RL/outputs/
 outputs/
 *.pt
 
+# PENGECUALIAN: ringkasan hasil eval IKUT git (beberapa puluh KB) supaya ada jejak
+# audit "kode versi X menghasilkan angka Y" -- penting krn hasil training di sini
+# terbukti sensitif thd perubahan kode/presisi. Checkpoint .pt & log per-iterasi
+# TETAP dikecualikan (puluhan MB, ditarik lewat rsync bila perlu).
+!Eksekusi_RL/outputs/
+Eksekusi_RL/outputs/*
+!Eksekusi_RL/outputs/*_konsolidasi.json
+!Eksekusi_RL/outputs/kalibrasi_*.json
+!Eksekusi_RL/outputs/uji_*.json
+
 # ============ Dokumen & bahan tulisan (TETAP LOKAL) ============
 Dokumen_Penting/
 Dokumen tambahan/

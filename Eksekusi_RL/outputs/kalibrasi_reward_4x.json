@@ -1,0 +1,54 @@
+{
+  "std_mentah": {
+    "prox": 0.15789297683295442,
+    "gini": 0.04076443422978452,
+    "flock": 5.108669744782465,
+    "improvement": 32.40049814035811
+  },
+  "hasil": {
+    "gabungan_lama": {
+      "kw": {
+        "alpha_wait": 0.0,
+        "beta_prox": 0.4467,
+        "alpha_gini": 0.3672,
+        "alpha_flock": 0.0795,
+        "use_delta_gini": true
+      },
+      "frac_individual": 0.026297846973660954,
+      "frac_gini_dlm_global": 0.0009152903897176859
+    },
+    "seimbang_lama": {
+      "kw": {
+        "alpha_wait": 0.0897,
+        "beta_prox": 0.1,
+        "alpha_gini": 0.5785,
+        "alpha_flock": 0.1252,
+        "use_delta_gini": true
+      },
+      "frac_individual": 0.9519045203839878,
+      "frac_gini_dlm_global": 0.0008493088872950903
+    },
+    "opsi_A": {
+      "kw": {
+        "alpha_wait": 0.004629558451546143,
+        "beta_prox": 0.1,
+        "alpha_gini": 0.13557745496710216,
+        "alpha_flock": 0.029341914195127383,
+        "use_delta_gini": true
+      },
+      "frac_individual": 0.5021922452054981,
+      "frac_gini_dlm_global": 0.0013016542554649426
+    },
+    "opsi_B": {
+      "kw": {
+        "alpha_wait": 0.004629558451546143,
+        "beta_prox": 0.1,
+        "alpha_gini": 2.601925408313039,
+        "alpha_flock": 0.020761963970426622,
+        "use_delta_gini": true
+      },
+      "frac_individual": 0.5590513893160514,
+      "frac_gini_dlm_global": 0.39747683209663537
+    }
+  }
+}
