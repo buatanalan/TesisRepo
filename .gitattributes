@@ -1,0 +1,4 @@
+# Normalkan akhir-baris: repo disunting di Windows, dijalankan di server Linux.
+# Tanpa ini setiap berkas akan tampak 'berubah' hanya karena CRLF vs LF.
+* text=auto eol=lf
+*.json text eol=lf

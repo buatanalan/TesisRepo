@@ -1,0 +1,42 @@
+# ============ Keluaran eksperimen (BESAR, tak perlu di git) ============
+# outputs/ berisi checkpoint .pt + log + meta -- puluhan MB dan terus bertambah.
+# Hasil ditarik dari server lewat rsync/scp, BUKAN lewat git.
+Eksekusi_RL/outputs/
+outputs/
+*.pt
+
+# ============ Dokumen & bahan tulisan (TETAP LOKAL) ============
+Dokumen_Penting/
+Dokumen tambahan/
+Data_dan_Analisis/
+Validasi_Generik/
+Validasi_Simulasi/
+Perbaikan_Sirkularitas_Kalibrasi/
+Synthetic Model/
+*.docx
+*.pdf
+
+# ============ Arsip kode lama ============
+archive/
+
+# ============ Lingkungan & cache ============
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+*.egg-info/
+
+# ============ Dataset besar ============
+# Dataset 4x DIIKUTKAN (dipakai seluruh eksperimen, 2,4 MB -- masih wajar untuk git).
+# Varian lain dikecualikan; kirim manual bila diperlukan.
+# Hanya `scenario_dataset_klaster12_4x.json` (rezim operasi yang DIBEKUKAN Tahap 1)
+# yang diikutkan. Sisanya ~16 MB dan tak dipakai eksperimen aktif.
+scenario_dataset_*.json
+!scenario_dataset_klaster12_4x.json
+
+# Konfigurasi sesi lokal & berkas sementara
+.claude/
+temp_*
+*.png

@@ -1,0 +1,37 @@
+# Contoh konfigurasi utk experiments/run_from_config.py
+#
+# Jalankan:
+#   python experiments/run_from_config.py experiments/configs/contoh.yaml
+#   python experiments/run_from_config.py experiments/configs/contoh.yaml --run solusi_utama_smoke
+#   python experiments/run_from_config.py experiments/configs/contoh.yaml --dry-run
+
+defaults:
+  dataset: scenario_dataset_calibrated_main.json   # relatif ke root repo, atau path absolut
+  updates: 200
+  rollout_steps: 96
+  k: 3
+  eval_seeds: 5
+  collect_steps: 500
+  max_steps: null
+  out_dir: outputs/results        # hasil disimpan ke {out_dir}/{run.name}_seed{seed}.json
+
+runs:
+  # Smoke test cepat -- verifikasi pipeline jalan sebelum commit ke run penuh.
+  - name: solusi_utama_smoke
+    params:
+      updates: 5
+      rollout_steps: 60
+      eval_seeds: 1
+      collect_steps: 200
+    seeds: [0]
+
+  # Skenario utama (III.2 / IV.2) -- run penuh, multi-seed sesuai Bagian 5
+  # rencana_pengujian_demonstrasi_evaluasi.md (median + CI95% dari 3 seed).
+  - name: solusi_utama
+    seeds: [0, 1, 2]
+
+  # Contoh skenario variasi kondisi: chunk size (rollout_steps) berbeda dari default.
+  - name: rollout_steps_60
+    params:
+      rollout_steps: 60
+    seeds: [0, 1, 2]
