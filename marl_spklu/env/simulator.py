@@ -32,6 +32,14 @@ class Simulator:
         # Index ternormalisasi). Hanya terisi saat ada agen yang merekomendasikan.
         self.rec_distribution_log = []
 
+        # Jejak PER-KEPUTUSAN (bukan per-trip-selesai spt `logs`). Diperlukan untuk
+        # menjawab MENGAPA satu kebijakan mengungguli yang lain: `logs` hanya mencatat
+        # hasil akhir (stasiun mana, tunggu berapa), tidak mencatat APA YANG DITAWARKAN,
+        # seberapa jauh pengguna DIDORONG dari pilihan alaminya, dan berapa trust-nya
+        # SAAT memutuskan. Hanya operasi append -- tidak menyentuh RNG, tidak mengubah
+        # perilaku simulasi.
+        self.decision_log = []
+
         # Trace state per-aktor per-step (OPSIONAL; bisa besar untuk horizon
         # panjang). Nonaktif secara default -> nol overhead untuk run validasi.
         #   log_actor_states : hidupkan perekaman snapshot aktor.
@@ -440,6 +448,41 @@ class Simulator:
                     "location": spawn_loc,
                     "soc": soc,
                     "target_spklu": chosen_spklu_id,
+                })
+
+                # --- Jejak per-keputusan (append murni; tidak menyentuh RNG) ---
+                # `trust_effective` yang dicatat, BUKAN `trust` mentah: itulah yang
+                # benar-benar menggerakkan keputusan (di rezim beku keduanya berbeda).
+                def _jarak(sid):
+                    loc = self.spklu_features.get(sid, {}).get("loc")
+                    if loc is None or spawn_loc is None:
+                        return None
+                    return math.dist(spawn_loc, loc)
+
+                jarak_feasible = {sid: _jarak(sid) for sid in feasible_ids}
+                terdekat = min((v, k) for k, v in jarak_feasible.items() if v is not None) \
+                    if any(v is not None for v in jarak_feasible.values()) else (None, None)
+                d_terdekat, sid_terdekat = terdekat
+                d_pilih = _jarak(chosen_spklu_id) if chosen_spklu_id else None
+                d_rec = _jarak(recs[0]) if recs else None
+                self.decision_log.append({
+                    "step": step, "time": time_now, "user_id": user.user_id,
+                    "trust": float(getattr(user, "trust_effective", user.trust)),
+                    "recs": list(recs), "chosen": chosen_spklu_id,
+                    "patuh": bool(recs) and chosen_spklu_id in recs,
+                    "n_feasible": len(feasible_ids),
+                    "sid_terdekat": sid_terdekat,
+                    "d_terdekat": d_terdekat, "d_pilih": d_pilih, "d_rec": d_rec,
+                    # Seberapa jauh pengguna BERGESER dari stasiun terdekatnya, dan
+                    # seberapa jauh sistem MENAWARKAN pergeseran itu. Selisih keduanya
+                    # memisahkan "didorong jauh" dari "mau bergerak jauh".
+                    "dorong_pilih": (None if None in (d_pilih, d_terdekat)
+                                     else d_pilih - d_terdekat),
+                    "dorong_rec": (None if None in (d_rec, d_terdekat)
+                                   else d_rec - d_terdekat),
+                    "est_pilih": float(est_waits.get(chosen_spklu_id, float("nan"))),
+                    "est_terdekat": float(est_waits.get(sid_terdekat, float("nan")))
+                    if sid_terdekat else float("nan"),
                 })
             else:
                 # (Fix Bug C) User masih sibuk -> TUNDA event ke step berikutnya,

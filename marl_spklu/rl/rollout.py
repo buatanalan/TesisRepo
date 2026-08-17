@@ -515,8 +515,24 @@ class RLRolloutAgent:
 
 
 class InferenceAgent:
-    """Bungkus policy untuk INFERENSI saja (tanpa rekam transisi) — dipakai mode C
-    mengumpulkan dataset forecaster di bawah distribusi policy terkini."""
+    """Bungkus policy untuk INFERENSI (tanpa memakai reward) — dipakai evaluasi bersih dan
+    mode C pengumpulan dataset forecaster.
+
+    PERBAIKAN (2026-08-17) — ketidakcocokan latih-uji yang membuat encoder riwayat MATI:
+    versi sebelumnya hanya mengekspos `get_recommendation` dan `predict_waits`. Simulator
+    memanggil `on_decision`/`on_charge_complete` hanya bila agen memilikinya (hasattr), jadi
+    keduanya TAK PERNAH terpanggil saat evaluasi. Akibatnya:
+
+      * `user.interaction_history` tak pernah terisi -> `_build_hist` selalu nol
+        (encoder riwayat H-PPO mati; terukur: 0 dari 2.636 pengguna terisi)
+      * `_pref_hist` tak pernah terisi -> `_build_pref_hist` selalu nol
+        (modul preferensi P-PPO tak pernah menerima masukan sama sekali)
+
+    Kebijakan DILATIH dengan riwayat nyata lalu DIEVALUASI dengan riwayat kosong — yakni
+    dievaluasi di luar distribusi pelatihannya. Meneruskan kedua kait ini menyamakan jalur
+    observasi evaluasi dengan pelatihan. Reward tetap tak dipakai (RewardCalculatorStub
+    mengembalikan nol), sehingga tak ada pembelajaran yang terjadi di sini.
+    """
 
     def __init__(self, policy, sim, forecaster=None, k: int = 3, epsilon: float = 0.0,
                 threshold: float = 0.20):
@@ -529,9 +545,29 @@ class InferenceAgent:
     def predict_waits(self, feasible_spklus):
         return self._roll.predict_waits(feasible_spklus)
 
+    def on_decision(self, user, chosen_spklu_id, recs, feasible_spklus):
+        # Mengisi `user.interaction_history` dan `_pref_hist` -- syarat agar encoder
+        # riwayat & modul preferensi menerima masukan yang sama seperti saat pelatihan.
+        self._roll.on_decision(user, chosen_spklu_id, recs, feasible_spklus)
+        # Transisi tak dipakai saat inferensi; buang supaya memori tak tumbuh sepanjang
+        # horizon evaluasi (90 hari bisa puluhan ribu transisi).
+        self._roll.transitions.clear()
+
+    def on_charge_complete(self, user):
+        # Mem-backfill elemen ke-4 riwayat interaksi (realized_gap_norm) dgn akurasi janji
+        # yang SESUNGGUHNYA -- tanpa ini encoder hanya melihat placeholder 0,0.
+        self._roll.on_charge_complete(user)
+        self._roll.transitions.clear()
+
 
 class RewardCalculatorStub:
-    """Reward tak dipakai saat inferensi; sediakan API minimal yang disentuh RLRolloutAgent."""
+    """Reward tak dipakai saat inferensi; sediakan API minimal yang disentuh RLRolloutAgent.
+
+    Sejak `InferenceAgent` meneruskan `on_decision`/`on_charge_complete` (perbaikan
+    ketidakcocokan latih-uji), stub ini ikut menyentuh suku flocking dan gini -- keduanya
+    WAJIB ada di sini, kalau tidak evaluasi akan gagal dgn AttributeError. Semuanya
+    mengembalikan nol: tak ada reward, tak ada pembelajaran saat inferensi.
+    """
     alpha_wait = 0.0
     beta_prox = 0.0
     alpha_gini = 0.0
@@ -545,6 +581,18 @@ class RewardCalculatorStub:
 
     def wait_reward(self, wait_default, wait_actual, disp_estwait):
         return 0.0
+
+    def flock_reward_rolling(self, recent_rec_count):
+        return 0.0
+
+    def flocking_penalty_rolling(self, recent_rec_count):
+        return 0.0
+
+    def gini_reward(self, *args, **kwargs):
+        return 0.0
+
+    def reset_episode_state(self):
+        return None
 
     def global_reward(self, utilizations, n_same=0, n_window=0):
         return 0.0
