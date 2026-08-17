@@ -47,7 +47,19 @@ DELTAW_TOL_HIGH = DELTAW_K2 * BASELINE_WAIT_MEAN_MINUTES  # = 6.27
 #   di cabang reward, est yang sangat besar (delta_w -> sangat negatif) lolos uji
 #   `<= TOL_LOW` dan memberi alpha TANPA BATAS -- persis eksploit yang dulu diperbaiki
 #   dengan memperkenalkan abs(). Implementasi di update_trust menjaga invarian ini.
-TRUST_PENALTY_MODE = "abs"
+#
+# RIWAYAT SPESIFIKASI (wajib disebut di laporan -- ini spesifikasi KETIGA, bukan
+# pembatalan perbaikan sebelumnya):
+#   v1 bertanda penuh   -> zona reward ikut bertanda; est besar memanen alpha tak terbatas
+#   v2 absolut penuh    -> eksploit tertutup, TAPI diskonfirmasi POSITIF ikut dihukum
+#   v3 (ini)            -> reward tetap absolut & terbatas, penalti bertanda
+# v3 menutup eksploit v1 sekaligus memulihkan asimetri yang didukung Expectation-
+# Disconfirmation Theory (Oliver 1980): hasil LEBIH BAIK dari janji tidak merusak
+# kepercayaan. Terverifikasi: est=999 memberi alpha +0.000 pada kedua mode.
+#
+# DIUBAH 2026-08-17 dari "abs" ke "signed" sebagai model utama. Seluruh hasil sebelum
+# tanggal ini dijalankan pada "abs"; perbandingan lintas-tanggal WAJIB menyebut mode.
+TRUST_PENALTY_MODE = "signed"
 
 # Patience default (menit) -- 1 hari, renege nonaktif efektif (Model_Simulasi_Inti.md
 # §4 & Pemodelan_Variasi_Distribusi.md §9). Dataset per-user boleh menimpa nilai ini.
