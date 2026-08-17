@@ -47,7 +47,7 @@ DELTAW_TOL_HIGH = DELTAW_K2 * BASELINE_WAIT_MEAN_MINUTES  # = 6.27
 #   di cabang reward, est yang sangat besar (delta_w -> sangat negatif) lolos uji
 #   `<= TOL_LOW` dan memberi alpha TANPA BATAS -- persis eksploit yang dulu diperbaiki
 #   dengan memperkenalkan abs(). Implementasi di update_trust menjaga invarian ini.
-TRUST_PENALTY_MODE = "abs"
+TRUST_PENALTY_MODE = "signed"
 
 # Patience default (menit) -- 1 hari, renege nonaktif efektif (Model_Simulasi_Inti.md
 # §4 & Pemodelan_Variasi_Distribusi.md §9). Dataset per-user boleh menimpa nilai ini.
