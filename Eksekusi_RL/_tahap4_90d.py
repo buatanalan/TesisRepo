@@ -22,7 +22,18 @@ from marl_spklu.rl.p_ppo_policy import PPPOPolicy
 import _tahap2_jalankan as T2
 
 DATASET_90D = "scenario_dataset_klaster12_4x_90d.json"
-SEED = 0
+
+# Seed dapat ditimpa dari baris perintah supaya seed tambahan bisa dijalankan di server
+# tanpa mengedit berkas:  python _tahap4_90d.py 1,2,3
+# SEED (tunggal) dipertahankan agar _tahap4_90d_eval.py yang mengimpornya tetap jalan;
+# nilainya = seed PERTAMA pada daftar.
+def _seeds_dari_argv(default=(0,)):
+    if len(sys.argv) > 1:
+        return [int(s) for s in sys.argv[1].replace(" ", "").split(",") if s]
+    return list(default)
+
+SEEDS = _seeds_dari_argv()
+SEED = SEEDS[0]
 
 
 @contextlib.contextmanager
@@ -49,21 +60,23 @@ def main():
         jobs.append((f"pppo_90d_{tag}", PPPOPolicy, mode))
 
     t_all = time.time()
-    for nama, pcls, mode in jobs:
-        print(f"\n{'='*64}\n[{nama}] aturan-trust={mode} dataset={DATASET_90D}\n{'='*64}",
-              flush=True)
-        t0 = time.time()
-        with mode_trust(mode):
-            T2.jalankan(nama, SEED, policy_cls=pcls, trust_dinamis=True)
-        # Aturan yang dipakai saat training HARUS ikut tercatat: checkpoint tak bisa
-        # ditafsirkan tanpa mengetahui lingkungan yang melatihnya.
-        mp = os.path.join(common.OUTDIR, f"t2_{nama}_seed{SEED}_meta.json")
-        if os.path.exists(mp):
-            m = json.load(open(mp))
-            m["trust_penalty_mode"] = mode
-            m["dataset"] = DATASET_90D
-            json.dump(m, open(mp, "w"), indent=1)
-        print(f"[{nama}] selesai {(time.time()-t0)/60:.1f} mnt", flush=True)
+    print(f"seed yang dijalankan: {SEEDS}", flush=True)
+    for sd in SEEDS:
+        for nama, pcls, mode in jobs:
+            print(f"\n{'='*64}\n[{nama}] seed={sd} aturan-trust={mode} "
+                  f"dataset={DATASET_90D}\n{'='*64}", flush=True)
+            t0 = time.time()
+            with mode_trust(mode):
+                T2.jalankan(nama, sd, policy_cls=pcls, trust_dinamis=True)
+            # Aturan yang dipakai saat training HARUS ikut tercatat: checkpoint tak bisa
+            # ditafsirkan tanpa mengetahui lingkungan yang melatihnya.
+            mp = os.path.join(common.OUTDIR, f"t2_{nama}_seed{sd}_meta.json")
+            if os.path.exists(mp):
+                m = json.load(open(mp))
+                m["trust_penalty_mode"] = mode
+                m["dataset"] = DATASET_90D
+                json.dump(m, open(mp, "w"), indent=1)
+            print(f"[{nama}] seed={sd} selesai {(time.time()-t0)/60:.1f} mnt", flush=True)
 
     print(f"\nSEMUA TRAINING SELESAI dalam {(time.time()-t_all)/60:.1f} mnt", flush=True)
 

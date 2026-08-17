@@ -199,9 +199,14 @@ if __name__ == "__main__":
         raise SystemExit(f"tahap tak dikenal: {arg} (pilih {list(TAHAP)})")
     tahap = cocok[arg.upper()]
     daftar = TAHAP[tahap]
-    print(f"=== TAHAP {tahap}: {len(daftar)} lengan x {len(SEEDS)} seed ===", flush=True)
+    # Argumen KEDUA (opsional) menimpa daftar seed, spy seed tambahan bisa dijalankan di
+    # server tanpa mengedit berkas:  python _tahap2_jalankan.py T3 3,4
+    seeds = ([int(s) for s in sys.argv[2].replace(" ", "").split(",") if s]
+             if len(sys.argv) > 2 else SEEDS)
+    print(f"=== TAHAP {tahap}: {len(daftar)} lengan x {len(seeds)} seed {seeds} ===",
+          flush=True)
     for nama, pcls, pkw, tkw in daftar:
-        for sd in SEEDS:
+        for sd in seeds:
             jalankan(nama, sd, policy_cls=pcls, policy_kw=pkw,
                      trust_dinamis=(tahap in TAHAP_TRUST_DINAMIS), **tkw)
     print(f"=== TAHAP {tahap} SELESAI ===", flush=True)
