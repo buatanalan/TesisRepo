@@ -1,0 +1,19 @@
+# Dependensi ANALISIS -- hanya untuk mesin LOKAL (notebook, visualisasi,
+# uji statistik). TIDAK perlu dipasang di server: alur kerjanya adalah
+# run (server) -> pull -> analisis (lokal).
+#
+# Tak satu pun paket di sini diimpor oleh marl_spklu/ atau Eksekusi_RL/;
+# semuanya dipakai di experiments/visualization/, Synthetic Model/, dan notebook.
+#
+# Pasang bersama runtime:
+#     pip install -r requirements.txt -r requirements-analisis.txt
+
+-r requirements.txt
+
+pandas==2.3.3
+matplotlib==3.10.9
+scikit-learn==1.7.2      # Synthetic Model/main.py
+statsmodels==0.14.6      # Synthetic Model/run_regional_causality.py
+seaborn==0.13.2
+pyyaml==6.0.3            # experiments/run_from_config.py
+ipykernel==7.3.0         # menjalankan notebook .ipynb

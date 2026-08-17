@@ -1,12 +1,34 @@
-simpy>=4.0.1
-numpy>=1.22.0
-scipy>=1.8.0
-pettingzoo>=1.23.0
-gymnasium>=0.28.1
-pytest>=7.0.0
-pyyaml>=6.0
+# Dependensi RUNTIME -- cukup untuk menjalankan seluruh jalur RL di server
+# (marl_spklu/ + Eksekusi_RL/). Untuk analisis/notebook di lokal, lihat
+# requirements-analisis.txt.
+#
+# Daftar ini diverifikasi lewat pemindaian AST atas seluruh impor di marl_spklu/
+# dan Eksekusi_RL/ (2026-08-17): HANYA tiga paket eksternal yang benar-benar
+# diimpor. Entri lama simpy/pettingzoo/gymnasium/pyyaml DIHAPUS -- tak satu pun
+# muncul di luar archive/, dan gymnasium+pettingzoo menarik dependensi transitif
+# yang memperlambat instalasi server tanpa manfaat.
+#
+# Versi DIPATOK PERSIS, bukan minimum. Hasil training sensitif terhadap presisi
+# numerik dan urutan operasi: pergantian minor torch/numpy pernah mengubah hasil
+# yang seharusnya deterministik (lihat bug presisi float32/float64 di
+# rl/ppo.py::compute_gae). Reproduktibilitas lintas mesin menuntut pin keras.
+#
+# Diverifikasi pada Python 3.10.4.
 
-# WAJIB utk seluruh jalur RL (ppo.py, policy.py, dqn_trainer.py).
-# Versi dicatat karena hasil training sensitif terhadap presisi numerik --
-# lihat catatan reproduktibilitas. Versi lokal saat ini: 2.12.1+cpu
-torch>=2.12.1
+numpy==2.2.6
+scipy==1.15.3
+
+# torch: WAJIB untuk seluruh jalur RL (rl/ppo.py, rl/policy.py, rl/pdqn_agent.py).
+# Di lokal terpasang varian 2.12.1+cpu. Di server Linux tanpa GPU, pasang varian
+# CPU secara eksplisit agar pip tidak menarik seluruh paket CUDA (~2 GB):
+#
+#     pip install torch==2.12.1 --index-url https://download.pytorch.org/whl/cpu
+#     pip install -r requirements.txt
+#
+# Bila server punya GPU dan Anda ingin memakainya, hapus baris index-url di atas
+# -- tetapi CATAT perubahannya: hasil training GPU tidak bit-identik dengan CPU.
+torch==2.12.1
+
+# Hanya diperlukan bila menjalankan uji regresi (`pytest tests/`).
+# Tidak dibutuhkan untuk menjalankan eksperimen.
+pytest==9.1.1
