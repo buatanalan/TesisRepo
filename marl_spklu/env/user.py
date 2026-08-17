@@ -36,6 +36,19 @@ DELTAW_K2 = 0.506
 DELTAW_TOL_LOW = DELTAW_K1 * BASELINE_WAIT_MEAN_MINUTES   # = 2.10
 DELTAW_TOL_HIGH = DELTAW_K2 * BASELINE_WAIT_MEAN_MINUTES  # = 6.27
 
+# Mode zona PENALTI trust (zona reward SELALU absolut & terbatas, tak terpengaruh flag ini):
+#   "abs"    -- default, keputusan final Pemodelan_Variasi_Distribusi.md 7.2. Meleset ke
+#               arah manapun mengikis trust; yang dinilai AKURASI prediksi.
+#   "signed" -- hanya (actual - est) >= TOL_HIGH yang dihukum; over-estimasi (user tiba
+#               dan menunggu jauh lebih singkat dari janji) NETRAL, tak menghukum & tak
+#               memberi reward. Landasan: expectation-disconfirmation -- diskonfirmasi
+#               POSITIF tidak merusak kepercayaan.
+#   CATATAN: "signed" TIDAK boleh diterapkan ke zona reward. Bila delta_w bertanda dipakai
+#   di cabang reward, est yang sangat besar (delta_w -> sangat negatif) lolos uji
+#   `<= TOL_LOW` dan memberi alpha TANPA BATAS -- persis eksploit yang dulu diperbaiki
+#   dengan memperkenalkan abs(). Implementasi di update_trust menjaga invarian ini.
+TRUST_PENALTY_MODE = "abs"
+
 # Patience default (menit) -- 1 hari, renege nonaktif efektif (Model_Simulasi_Inti.md
 # §4 & Pemodelan_Variasi_Distribusi.md §9). Dataset per-user boleh menimpa nilai ini.
 DEFAULT_PATIENCE_MINUTES = 24 * 60
@@ -318,10 +331,15 @@ class User:
         batas untuk estimasi yang jauh meleset ke arah lebih cepat.
           DeltaW <= 5   -> alpha += eps_alpha*(1 - DeltaW/5)   (zona reward, estimasi akurat)
           DeltaW >= 15  -> beta  += eps_beta*(DeltaW/15)        (zona penalti, tumbuh tanpa batas)
-          5 < DeltaW < 15 -> netral, tak ada update (zona toleransi)."""
-        delta_w = abs(actual_wait - est_wait)
+          5 < DeltaW < 15 -> netral, tak ada update (zona toleransi).
+
+        Zona PENALTI dapat dialihkan ke mode bertanda via TRUST_PENALTY_MODE (lihat
+        catatan di sana). Zona REWARD sengaja TETAP absolut di kedua mode -- itu yang
+        mencegah eksploit "janjikan wait sangat besar utk memanen alpha tak terbatas"."""
+        signed = actual_wait - est_wait
+        delta_w = abs(signed)
         if delta_w <= DELTAW_TOL_LOW:
             self.trust_alpha += TRUST_EPS_ALPHA * (1.0 - delta_w / DELTAW_TOL_LOW)
-        elif delta_w >= DELTAW_TOL_HIGH:
+        elif (signed if TRUST_PENALTY_MODE == "signed" else delta_w) >= DELTAW_TOL_HIGH:
             self.trust_beta += TRUST_EPS_BETA * (delta_w / DELTAW_TOL_HIGH)
         # else: zona netral, tak ada perubahan
