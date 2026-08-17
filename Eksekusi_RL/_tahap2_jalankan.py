@@ -23,7 +23,7 @@ from marl_spklu.rl.p_ppo_policy import PPPOPolicy
 from marl_spklu.experiments.ablations import constant_trust_shadow
 
 SEEDS = [0, 1, 2]
-N_UPDATES = 300
+N_UPDATES = 200
 ROLLOUT_STEPS = 288
 TRUST = 0.5
 DATASET = "scenario_dataset_klaster12_4x.json"
