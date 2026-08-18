@@ -55,20 +55,54 @@ def test_update_trust_reward_zone_small_deviation_either_direction():
     assert u_late.trust_alpha == pytest.approx(u_early.trust_alpha)  # simetris
 
 
-def test_update_trust_penalty_zone_large_deviation_either_direction():
-    """|DeltaW| besar (>= tol_high) -> zona penalti simetris juga: estimasi yang jauh
-    meleset ke arah lebih cepat SEKARANG mengikis trust juga (bukan reward tanpa batas
-    seperti versi lama)."""
-    from marl_spklu.env.user import DELTAW_TOL_HIGH
-    big = DELTAW_TOL_HIGH + 5.0
+def test_update_trust_zona_penalti_mode_abs_simetris(monkeypatch):
+    """Mode `abs` (versi ke-2 spesifikasi): |DeltaW| besar menghukum ke DUA arah.
+
+    Dipertahankan sbg tes karena `abs` masih dipakai sbg lengan pembanding pada faktorial
+    aturan-trust (`_uji_aturan_trust.py`) -- bukan spesifikasi mati.
+    """
+    import marl_spklu.env.user as U
+    monkeypatch.setattr(U, "TRUST_PENALTY_MODE", "abs")
+    big = U.DELTAW_TOL_HIGH + 5.0
+
     u_much_earlier = make_user()
     b0 = u_much_earlier.trust_beta
-    u_much_earlier.update_trust(est_wait=big, actual_wait=0.0)  # |DeltaW| = big (jauh lebih cepat)
+    u_much_earlier.update_trust(est_wait=big, actual_wait=0.0)   # jauh lebih CEPAT
     assert u_much_earlier.trust_beta > b0
 
     u_much_later = make_user()
-    u_much_later.update_trust(est_wait=0.0, actual_wait=big)  # |DeltaW| = big (jauh lebih lambat)
-    assert u_much_later.trust_beta == pytest.approx(u_much_earlier.trust_beta)  # simetris
+    u_much_later.update_trust(est_wait=0.0, actual_wait=big)     # jauh lebih LAMBAT
+    assert u_much_later.trust_beta == pytest.approx(u_much_earlier.trust_beta)
+
+
+def test_update_trust_zona_penalti_mode_signed_asimetris(monkeypatch):
+    """Mode `signed` (BAKU, versi ke-3): hanya KETERLAMBATAN yang menghukum.
+
+    Over-estimasi (tiba lebih cepat dari janji) bersifat netral pada zona penalti -- inilah
+    perubahan yang menghentikan erosi trust (Tahap 4). Dilaporkan sebagai ablasi
+    metodologis, bukan kontribusi; lihat RENCANA_PENELITIAN_MENYELURUH.md §4/H3.
+    """
+    import marl_spklu.env.user as U
+    monkeypatch.setattr(U, "TRUST_PENALTY_MODE", "signed")
+    big = U.DELTAW_TOL_HIGH + 5.0
+
+    u_much_earlier = make_user()
+    b0 = u_much_earlier.trust_beta
+    u_much_earlier.update_trust(est_wait=big, actual_wait=0.0)   # jauh lebih CEPAT
+    assert u_much_earlier.trust_beta == pytest.approx(b0), (
+        "over-estimasi tak boleh menghukum pada mode signed")
+
+    u_much_later = make_user()
+    b0_late = u_much_later.trust_beta
+    u_much_later.update_trust(est_wait=0.0, actual_wait=big)     # jauh lebih LAMBAT
+    assert u_much_later.trust_beta > b0_late
+
+
+def test_update_trust_mode_baku_adalah_signed():
+    """Gerbang regresi: baku BERUBAH dari `abs` ke `signed` (2026). Bila ada yang
+    mengembalikannya diam-diam, seluruh hasil Tahap 4 jadi tak dapat ditafsirkan."""
+    import marl_spklu.env.user as U
+    assert U.TRUST_PENALTY_MODE == "signed"
 
 
 def test_update_trust_reward_zone_at_boundary():

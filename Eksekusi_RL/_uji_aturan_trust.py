@@ -26,6 +26,7 @@ import marl_spklu.env.user as U
 from marl_spklu.rl.p_ppo_policy import PPPOPolicy
 from marl_spklu.rl.master_policy import (MasterPolicy, MasterPolicyEqCap,
                                          MasterPrefPolicy)
+from marl_spklu.rl.master_bidding_policy import MasterBiddingPolicy
 import _tahap2_jalankan as T2
 
 # Horizon yang tersedia. Kuncinya ikut jadi bagian nama berkas keluaran.
@@ -92,10 +93,29 @@ def main():
         jobs.append((nama_lengan("master", mode), MasterPolicy, mode))
         jobs.append((nama_lengan("mastereq", mode), MasterPolicyEqCap, mode))
         jobs.append((nama_lengan("masterp", mode), MasterPrefPolicy, mode))
+        # T2 (2026-08-19): STASIUN-SEBAGAI-AGEN + bidding, tulang punggung PPO DITAHAN
+        # KONSTAN. Menguji klaim arsitektural inti tesis -- transposisi peran agen --
+        # dgn satu faktor berubah thd lengan `master`: distribusi kebijakan Gaussian
+        # independen per stasiun (bid) vs softmax gabungan lintas stasiun.
+        jobs.append((nama_lengan("masterbid", mode), MasterBiddingPolicy, mode))
+
+    # argv[3] (opsional): saring lengan, dipisah koma -- mis. `masterbid` untuk menjalankan
+    # HANYA lengan T2 tanpa melatih ulang lengan yang sudah selesai. Dicocokkan pada nama
+    # METODE (sebelum horizon/aturan ditempelkan), jadi `masterbid` menangkap kedua
+    # aturan-trust sekaligus.
+    if len(sys.argv) > 3:
+        pilih = {s for s in sys.argv[3].replace(" ", "").split(",") if s}
+        tak_dikenal = pilih - {"hppo", "pppo", "master", "mastereq", "masterp", "masterbid"}
+        if tak_dikenal:
+            raise SystemExit(f"lengan tak dikenal: {sorted(tak_dikenal)}")
+        jobs = [j for j in jobs if j[0].split("_")[0] in pilih]
+        if not jobs:
+            raise SystemExit("penyaring lengan menyisakan 0 pekerjaan")
 
     t_all = time.time()
     print(f"horizon={TAG_HORIZON} ({DATASET})", flush=True)
     print(f"seed yang dijalankan: {SEEDS}", flush=True)
+    print(f"lengan: {[j[0] for j in jobs]}", flush=True)
     for sd in SEEDS:
         for nama, pcls, mode in jobs:
             print(f"\n{'='*64}\n[{nama}] seed={sd} aturan-trust={mode} "

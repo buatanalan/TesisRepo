@@ -51,11 +51,16 @@ class Transition:
     EstWait selalu jujur (lihat Spesifikasi_Teknis_RL.md).
 
     pref_hist: (K,2N) riwayat pasangan (a_hat,a) one-hot, HANYA diisi bila policy punya
-    modul preferensi PDQN (lihat RLRolloutAgent._use_pref) -- None untuk H-PPO biasa."""
+    modul preferensi PDQN (lihat RLRolloutAgent._use_pref) -- None untuk H-PPO biasa.
+
+    bids: (N,) float32 -- HANYA untuk lengan stasiun-sebagai-agen (MasterBiddingPolicy).
+    Pada lengan itu AKSI SESUNGGUHNYA adalah vektor *bid*, bukan himpunan terpilih:
+    seleksi k-terendah bersifat deterministik begitu bid diketahui, sehingga rasio PPO
+    harus dihitung atas bid. None untuk seluruh lengan lain."""
     __slots__ = ("obs", "critic_obs", "hist", "mask", "chosen_indices", "n_rec",
                  "logp", "value", "step", "reward_streams", "done",
                  "complied", "disp_estwait", "wait_default", "resolved", "flock_penalty",
-                 "pref_hist")
+                 "pref_hist", "bids")
 
     def __init__(self, obs, critic_obs, hist, mask, chosen_indices, n_rec, logp, value, step,
                 pref_hist=None):
@@ -74,6 +79,7 @@ class Transition:
         self.done = False
         self.flock_penalty = 0.0
         self.pref_hist = pref_hist
+        self.bids = None
         # resolved=True bila reward wait (delayed) sudah di-emit saat sesi user selesai.
         # Trainer continuing hanya memakai transisi resolved (§ppo).
         self.resolved = False
@@ -399,6 +405,9 @@ class RLRolloutAgent:
 
         tr = Transition(obs, critic_obs, hist, mask, idx_arr, n_rec,
                         act["logp"], act["value"], self.sim.current_step, pref_hist=pref_hist)
+        # Lengan stasiun-sebagai-agen: simpan vektor bid sbg AKSI sesungguhnya (lihat
+        # Transition.__doc__). None untuk seluruh lengan lain -- `act` tak memuat kunci ini.
+        tr.bids = act.get("bids")
         tr.disp_estwait = primary_disp
         tr.wait_default = float(self.sim.compute_virtual_wait(
             user, self.sim.spklus[self.sids[default_idx]], time_now)

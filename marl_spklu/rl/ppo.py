@@ -206,6 +206,18 @@ class PPOTrainer:
         pref_hist_b = (torch.as_tensor(np.stack([t.pref_hist for t in transitions]), dtype=torch.float32)
                       if use_pref else None)
 
+        # Lengan stasiun-sebagai-agen (MasterBiddingPolicy): AKSI sesungguhnya adalah
+        # vektor bid, bukan himpunan terpilih -- seleksi k-terendah deterministik begitu
+        # bid diketahui. Rasio PPO karenanya dihitung atas bid. Deteksi lewat `bid_log_std`
+        # (parameter yang hanya dimiliki kebijakan bidding), pola yg sama dgn `use_pref`.
+        use_bids = hasattr(self.policy, "bid_log_std")
+        if use_bids and any(t.bids is None for t in transitions):
+            raise ValueError(
+                "kebijakan bidding tetapi ada transisi tanpa `bids` -- cek "
+                "rollout.py::get_recommendation (tr.bids = act.get('bids')).")
+        bids_b = (torch.as_tensor(np.stack([t.bids for t in transitions]), dtype=torch.float32)
+                  if use_bids else None)
+
         B = len(transitions)
         idx = np.arange(B)
         last = {}
@@ -219,6 +231,8 @@ class PPOTrainer:
                 eval_kwargs = {"critic_obs_b": critic_obs_b[mb]}
                 if use_pref:
                     eval_kwargs["pref_hist_b"] = pref_hist_b[mb]
+                if use_bids:
+                    eval_kwargs["bids_b"] = bids_b[mb]
                 logp, ent, value = self.policy.evaluate(
                     obs_b[mb], mask_b[mb], chosen_b[mb], n_rec_b[mb], hist_b[mb],
                     **eval_kwargs)
@@ -247,6 +261,8 @@ class PPOTrainer:
                     full_kwargs = {"critic_obs_b": critic_obs_b}
                     if use_pref:
                         full_kwargs["pref_hist_b"] = pref_hist_b
+                    if use_bids:
+                        full_kwargs["bids_b"] = bids_b
                     nlp, _, _ = self.policy.evaluate(obs_b, mask_b, chosen_b, n_rec_b, hist_b, **full_kwargs)
                     kl = float((old_logp - nlp).mean())
                 if kl > 1.5 * self.target_kl:
@@ -256,6 +272,8 @@ class PPOTrainer:
         full_kwargs = {"critic_obs_b": critic_obs_b}
         if use_pref:
             full_kwargs["pref_hist_b"] = pref_hist_b
+        if use_bids:
+            full_kwargs["bids_b"] = bids_b
         with torch.no_grad():
             new_logp, new_ent, new_val = self.policy.evaluate(obs_b, mask_b, chosen_b, n_rec_b, hist_b, **full_kwargs)
             ratio = torch.exp(new_logp - old_logp)

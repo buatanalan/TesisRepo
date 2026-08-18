@@ -30,10 +30,7 @@ import numpy as np, torch, common
 import marl_spklu.env.user as U
 from marl_spklu.rl.forecaster import ForecasterBase
 from marl_spklu.agents.greedy_agent import GreedyAgent
-from marl_spklu.rl.policy import HPPOPolicy
-from marl_spklu.rl.p_ppo_policy import PPPOPolicy
-from marl_spklu.rl.master_policy import (MasterPolicy, MasterPolicyEqCap,
-                                         MasterPrefPolicy)
+from marl_spklu.rl.registry import bangun_kebijakan
 from marl_spklu.rl.rollout import InferenceAgent
 from marl_spklu.experiments.ablations import constant_trust_shadow
 from marl_spklu.experiments import metrics as M
@@ -75,17 +72,9 @@ def pol(stem, seed):
     if not (os.path.exists(ck) and os.path.exists(mp)):
         return None
     m = json.load(open(mp))
-    # Kelas kebijakan dibaca dari meta -- lengan MASTER (2026-08-18) memakai kelas yang
-    # berbeda, dan memuatnya dengan kelas keliru akan gagal pada bentuk bobot.
-    KELAS = {"HPPOPolicy": HPPOPolicy, "PPPOPolicy": PPPOPolicy,
-             "MasterPolicy": MasterPolicy, "MasterPolicyEqCap": MasterPolicyEqCap,
-             "MasterPrefPolicy": MasterPrefPolicy}
-    c = KELAS.get(m.get("policy_cls"), HPPOPolicy)
-    kw = dict(n_critics=m.get("n_critics", 1))
-    if c in (PPPOPolicy, MasterPrefPolicy):
-        kw.update(pref_d_lstm=m.get("pref_d_lstm", 64), pref_d_attn=m.get("pref_d_attn", 64))
-    p = c(m["obs_dim"], m["critic_obs_dim"], m["N"], **kw)
-    p.load_state_dict(torch.load(ck)); p.eval()
+    # Registri tunggal (marl_spklu/rl/registry.py) -- kelas dibaca dari meta; memuat dgn
+    # kelas keliru akan gagal pada bentuk bobot.
+    p = bangun_kebijakan(m, state_dict=torch.load(ck))
     return lambda sim, pp=p: InferenceAgent(pp, sim, VW(), k=2, epsilon=0.0, threshold=0.20)
 
 
@@ -307,7 +296,12 @@ def main():
             ("MASTER-eq(abs)", None, f"mastereq_{TAG}_abs"),
             ("MASTER-eq(sgn)", None, f"mastereq_{TAG}_sgn"),
             ("MASTER+P(abs)", None, f"masterp_{TAG}_abs"),
-            ("MASTER+P(sgn)", None, f"masterp_{TAG}_sgn")]
+            ("MASTER+P(sgn)", None, f"masterp_{TAG}_sgn"),
+            # T2 (2026-08-19): stasiun-sebagai-agen + bidding. Pasangan pembanding yang
+            # BENAR adalah lengan MASTER di atas (sama-sama tanpa riwayat) -- selisihnya
+            # murni peran agen + bentuk aksi.
+            ("MASTER-bid(abs)", None, f"masterbid_{TAG}_abs"),
+            ("MASTER-bid(sgn)", None, f"masterbid_{TAG}_sgn")]
 
     out = {"horizon": TAG, "seeds": SEEDS, "trust_beku": TRUST_BEKU,
            "per_seed": {}, "agregat": {}, "harian": {}, "stasiun": {}}

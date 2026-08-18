@@ -21,8 +21,7 @@ import numpy as np, torch, common
 import marl_spklu.env.user as U
 from marl_spklu.rl.forecaster import ForecasterBase
 from marl_spklu.agents.greedy_agent import GreedyAgent
-from marl_spklu.rl.policy import HPPOPolicy
-from marl_spklu.rl.p_ppo_policy import PPPOPolicy
+from marl_spklu.rl.registry import bangun_kebijakan
 from marl_spklu.rl.rollout import InferenceAgent
 from _uji_aturan_trust import mode_trust, DATASET, TAG_HORIZON, SEEDS, nama_lengan
 
@@ -43,13 +42,9 @@ def pol(stem, seed):
     if not (os.path.exists(ck) and os.path.exists(mp)):
         return None
     m = json.load(open(mp))
-    c = PPPOPolicy if m.get("policy_cls") == "PPPOPolicy" else HPPOPolicy
-    kw = dict(n_critics=m.get("n_critics", 1))
-    if c is PPPOPolicy:
-        kw.update(pref_d_lstm=m.get("pref_d_lstm", 64), pref_d_attn=m.get("pref_d_attn", 64))
-    p = c(m["obs_dim"], m["critic_obs_dim"], m["N"], **kw)
-    p.load_state_dict(torch.load(ck))
-    p.eval()
+    # Registri tunggal (marl_spklu/rl/registry.py) -- bentuk biner lama di sini memuat
+    # SELURUH lengan MASTER sbg HPPOPolicy dan gagal pada bentuk bobot.
+    p = bangun_kebijakan(m, state_dict=torch.load(ck))
     return lambda sim, pp=p: InferenceAgent(pp, sim, VW(), k=2, epsilon=0.0, threshold=0.20)
 
 
