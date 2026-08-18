@@ -57,6 +57,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from marl_spklu.rl.policy import HPPOPolicy
+from marl_spklu.rl.p_ppo_policy import PPPOPolicy
 from marl_spklu.rl.master_policy import MasterPolicy
 
 # Bid stasiun tak-feasible tak pernah boleh menang. Dipakai sbg pengganti +inf supaya
@@ -64,17 +66,30 @@ from marl_spklu.rl.master_policy import MasterPolicy
 BID_INF = 1e9
 
 
-class MasterBiddingPolicy(MasterPolicy):
-    """Stasiun-sebagai-agen; aksi = *bid* kontinu; k penawar terendah direkomendasikan.
 
-    Mewarisi `MasterPolicy` -> tanpa encoder riwayat per-pengguna, setia pada kondisi
-    informasi MASTER (aktor tidak mengondisikan pada riwayat individual).
+class _BiddingMixin:
+    """Bentuk aksi *bidding*: skor per stasiun ditafsirkan sebagai TAKSIRAN WAKTU TUNGGU,
+    k taksiran TERENDAH direkomendasikan.
 
-    `disc_head` DIPAKAI ULANG sebagai kepala rerata *bid* -- bentuknya sudah tepat
-    (Linear(station_hidden, 1), satu keluaran per stasiun) dan `forward()` induk karenanya
-    dapat dipakai apa adanya. Yang berubah hanya TAFSIR keluarannya: bukan lagi logit yang
-    akan di-softmax lintas stasiun, melainkan rerata Gaussian per stasiun yang berdiri
-    sendiri.
+    Dipisah sebagai mixin karena bentuk aksi ini ORTOGONAL terhadap peran agen. Yang
+    menentukan peran agen adalah kelas dasarnya:
+
+        MasterPolicy  -> tanpa riwayat pengguna  -> agen = STASIUN
+        HPPOPolicy    -> + `hist_lstm`           -> agen = PERMINTAAN
+        PPPOPolicy    -> + modul preferensi      -> agen = PERMINTAAN
+
+    ⚠️ CATATAN YANG WAJIB MASUK NASKAH. Dengan Gaussian INDEPENDEN per stasiun, "stasiun
+    sebagai agen" dan "permintaan sebagai agen yang mengeluarkan N taksiran" menghasilkan
+    fungsi yang IDENTIK -- logp, gradien, dan seleksi sama persis. Perbedaan peran agen
+    baru menjadi nyata secara komputasi ketika agen mengondisikan pada RIWAYAT pengguna
+    yang sedang meminta, karena hanya permintaan yang punya riwayat; stasiun tidak
+    "mengingat" pengguna tertentu. Karena itu `hist_lstm` adalah penanda operasional
+    peran agen di sini, bukan sekadar tambahan kapasitas.
+
+    `disc_head` DIPAKAI ULANG sebagai kepala rerata bid -- bentuknya sudah tepat
+    (Linear(station_hidden, 1)), sehingga `forward()` kelas dasar dipakai apa adanya.
+    Yang berubah hanya TAFSIR keluarannya: bukan logit yang akan di-softmax lintas
+    stasiun, melainkan rerata Gaussian per stasiun yang berdiri sendiri.
     """
 
     def __init__(self, *args, bid_log_std_init: float = 0.0, **kwargs):
@@ -89,13 +104,17 @@ class MasterBiddingPolicy(MasterPolicy):
         std = torch.exp(self.bid_log_std).expand_as(bid_mean)
         return torch.distributions.Normal(bid_mean, std)
 
+    def _fwd(self, obs, hist, critic_obs, pref_hist):
+        """Panggil forward kelas dasar; teruskan pref_hist HANYA bila kelasnya punya
+        modul preferensi (HPPOPolicy.forward tak menerima argumen itu)."""
+        if pref_hist is not None and hasattr(self, "pref_lstm"):
+            return self.forward(obs, hist, critic_obs, pref_hist=pref_hist)
+        return self.forward(obs, hist, critic_obs)
+
     @staticmethod
     def _pilih_terendah(bids_row, mask_row, k):
-        """k *bid* TERENDAH di antara stasiun feasible, terurut menaik.
-
-        Mengembalikan list indeks. Lantai 1 dipertahankan (sama spt aturan seleksi
-        P-PPO): selama ada stasiun feasible, selalu ada minimal satu rekomendasi.
-        """
+        """k bid TERENDAH di antara stasiun feasible, terurut menaik. Lantai 1
+        dipertahankan (sama spt aturan seleksi P-PPO)."""
         feasible_idx = np.nonzero(mask_row)[0]
         if feasible_idx.size == 0:
             return []
@@ -106,35 +125,33 @@ class MasterBiddingPolicy(MasterPolicy):
     # ------------------------------------------------------------------ rollout
     @torch.no_grad()
     def act(self, obs_np, feasible_mask_np, hist_np, k: int = 3, critic_obs_np=None,
-            epsilon: float = 0.0, threshold: float = 0.20, **_abaikan):
-        """`epsilon`/`threshold` DIABAIKAN -- lihat catatan EKSPLORASI di docstring modul.
+            epsilon: float = 0.0, threshold: float = 0.20, pref_hist_np=None, **_abaikan):
+        """`epsilon`/`threshold` DIABAIKAN -- eksplorasi berasal dari pencuplikan Gaussian
+        atas bid, bukan epsilon-greedy. Keduanya tetap diterima demi keseragaman
+        pemanggilan di rollout.py.
 
-        Return dict yg sama spt HPPOPolicy.act, DITAMBAH `bids` (N,) float32: aksi
-        sesungguhnya yang harus disimpan di transisi, karena rasio PPO dihitung atas
-        *bid*, bukan atas himpunan terpilih.
+        Return dict spt HPPOPolicy.act DITAMBAH `bids` (N,): aksi sesungguhnya yang harus
+        disimpan di transisi, karena rasio PPO dihitung atas bid.
         """
         obs = torch.as_tensor(obs_np, dtype=torch.float32).unsqueeze(0)
         hist = torch.as_tensor(hist_np, dtype=torch.float32).unsqueeze(0)
         critic_obs = (torch.as_tensor(critic_obs_np, dtype=torch.float32).unsqueeze(0)
                       if critic_obs_np is not None else None)
+        pref_hist = (torch.as_tensor(pref_hist_np, dtype=torch.float32).unsqueeze(0)
+                     if pref_hist_np is not None else None)
 
-        bid_mean, value = self.forward(obs, hist, critic_obs)
+        bid_mean, value = self._fwd(obs, hist, critic_obs, pref_hist)
         dist = self._bid_dist(bid_mean)
-        bids = dist.sample()                                   # (1, N)
+        bids = dist.sample()
 
         mask_np = np.asarray(feasible_mask_np, dtype=bool)
         mask_t = torch.as_tensor(mask_np, dtype=torch.bool).unsqueeze(0)
-
-        # log-prob HANYA atas stasiun feasible. Stasiun tak-feasible tak pernah bisa
-        # menang, jadi *bid*-nya tak mempengaruhi hasil -- memasukkannya ke rasio PPO
-        # akan menyuntikkan derau murni ke gradien.
-        logp_all = dist.log_prob(bids)                         # (1, N)
-        logp_total = float((logp_all * mask_t.float()).sum().item())
+        # log-prob HANYA atas stasiun feasible: bid stasiun tak-feasible tak mempengaruhi
+        # hasil, memasukkannya ke rasio PPO hanya menyuntikkan derau ke gradien.
+        logp_total = float((dist.log_prob(bids) * mask_t.float()).sum().item())
 
         bids_np = bids[0].cpu().numpy().astype("float32")
-        bids_pilih = np.where(mask_np, bids_np, BID_INF)
-        chosen_order = self._pilih_terendah(bids_pilih, mask_np, k)
-
+        chosen_order = self._pilih_terendah(np.where(mask_np, bids_np, BID_INF), mask_np, k)
         return {
             "chosen_indices": chosen_order,
             "n_rec": len(chosen_order),
@@ -145,21 +162,37 @@ class MasterBiddingPolicy(MasterPolicy):
 
     # ------------------------------------------------------------------ update PPO
     def evaluate(self, obs_b, mask_b, chosen_indices_b, n_rec_b, hist_b, critic_obs_b=None,
-                 bids_b=None, **_abaikan):
-        """`chosen_indices_b`/`n_rec_b` TIDAK dipakai -- dan itu memang benar.
-
-        Seluruh stokastisitas kebijakan ada pada *bid*; seleksi k-terendah bersifat
-        DETERMINISTIK begitu *bid* diketahui. Rasio PPO karenanya harus dihitung atas
-        *bid*, bukan atas himpunan terpilih. Menghitungnya atas himpunan terpilih akan
-        salah: himpunan yang sama dapat berasal dari *bid* yang sangat berbeda.
-        """
+                 bids_b=None, pref_hist_b=None, **_abaikan):
+        """`chosen_indices_b`/`n_rec_b` TIDAK dipakai -- dan itu memang benar. Seluruh
+        stokastisitas ada pada bid; seleksi k-terendah DETERMINISTIK begitu bid diketahui.
+        Rasio PPO karenanya dihitung atas bid: himpunan terpilih yang sama dapat berasal
+        dari bid yang sangat berbeda."""
         if bids_b is None:
             raise ValueError(
-                "MasterBiddingPolicy.evaluate butuh `bids_b` (aksi sesungguhnya). "
+                "kebijakan bidding butuh `bids_b` (aksi sesungguhnya). "
                 "Cek PPOTrainer.update -- jalur `use_bids` tidak aktif.")
-        bid_mean, value = self.forward(obs_b, hist_b, critic_obs_b)
+        bid_mean, value = self._fwd(obs_b, hist_b, critic_obs_b, pref_hist_b)
         dist = self._bid_dist(bid_mean)
         m = mask_b.float()
-        logp = (dist.log_prob(bids_b) * m).sum(dim=-1)
-        entropy = (dist.entropy() * m).sum(dim=-1)
-        return logp, entropy, value
+        return (dist.log_prob(bids_b) * m).sum(dim=-1), (dist.entropy() * m).sum(dim=-1), value
+
+
+class MasterBiddingPolicy(_BiddingMixin, MasterPolicy):
+    """Agen = STASIUN. Tanpa riwayat pengguna -- setia pada kondisi informasi MASTER.
+
+    Nama & parameter DIPERTAHANKAN persis (`bid_log_std`) supaya checkpoint yang sudah
+    dilatih (2026-08-19) tetap dapat dimuat.
+    """
+
+
+class BiddingHistPolicy(_BiddingMixin, HPPOPolicy):
+    """Agen = PERMINTAAN. Bentuk aksi bidding + `hist_lstm` (riwayat pengguna).
+
+    Pembanding yang benar adalah `MasterBiddingPolicy`: bentuk aksi, reward, kritik, dan
+    lingkungan identik -- yang berbeda HANYA apakah agen mengondisikan pada riwayat
+    pengguna yang sedang meminta, yaitu apakah agennya permintaan atau stasiun.
+    """
+
+
+class BiddingPrefPolicy(_BiddingMixin, PPPOPolicy):
+    """Agen = PERMINTAAN, + modul preferensi PDQN. Formula: MASTER-bid + preference."""

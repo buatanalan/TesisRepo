@@ -26,7 +26,9 @@ import marl_spklu.env.user as U
 from marl_spklu.rl.p_ppo_policy import PPPOPolicy
 from marl_spklu.rl.master_policy import (MasterPolicy, MasterPolicyEqCap,
                                          MasterPrefPolicy)
-from marl_spklu.rl.master_bidding_policy import MasterBiddingPolicy
+from marl_spklu.rl.master_bidding_policy import (MasterBiddingPolicy,
+                                                 BiddingHistPolicy,
+                                                 BiddingPrefPolicy)
 import _tahap2_jalankan as T2
 
 # Horizon yang tersedia. Kuncinya ikut jadi bagian nama berkas keluaran.
@@ -98,6 +100,11 @@ def main():
         # dgn satu faktor berubah thd lengan `master`: distribusi kebijakan Gaussian
         # independen per stasiun (bid) vs softmax gabungan lintas stasiun.
         jobs.append((nama_lengan("masterbid", mode), MasterBiddingPolicy, mode))
+        # Bentuk aksi bidding pada AGEN-PERMINTAAN: pembanding langsung thd
+        # `masterbid` -- bentuk aksi/kritik/reward/lingkungan identik, yang beda
+        # HANYA apakah agen mengondisikan riwayat pengguna (=> agen permintaan).
+        jobs.append((nama_lengan("bidhist", mode), BiddingHistPolicy, mode))
+        jobs.append((nama_lengan("bidpref", mode), BiddingPrefPolicy, mode))
 
     # argv[3] (opsional): saring lengan, dipisah koma -- mis. `masterbid` untuk menjalankan
     # HANYA lengan T2 tanpa melatih ulang lengan yang sudah selesai. Dicocokkan pada nama
@@ -105,7 +112,8 @@ def main():
     # aturan-trust sekaligus.
     if len(sys.argv) > 3:
         pilih = {s for s in sys.argv[3].replace(" ", "").split(",") if s}
-        tak_dikenal = pilih - {"hppo", "pppo", "master", "mastereq", "masterp", "masterbid"}
+        tak_dikenal = pilih - {"hppo", "pppo", "master", "mastereq", "masterp", "masterbid",
+                              "bidhist", "bidpref"}
         if tak_dikenal:
             raise SystemExit(f"lengan tak dikenal: {sorted(tak_dikenal)}")
         jobs = [j for j in jobs if j[0].split("_")[0] in pilih]

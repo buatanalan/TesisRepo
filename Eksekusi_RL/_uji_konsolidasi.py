@@ -301,7 +301,12 @@ def main():
             # BENAR adalah lengan MASTER di atas (sama-sama tanpa riwayat) -- selisihnya
             # murni peran agen + bentuk aksi.
             ("MASTER-bid(abs)", None, f"masterbid_{TAG}_abs"),
-            ("MASTER-bid(sgn)", None, f"masterbid_{TAG}_sgn")]
+            ("MASTER-bid(sgn)", None, f"masterbid_{TAG}_sgn"),
+            # Bidding pada AGEN-PERMINTAAN (2026-08-19)
+            ("bid+hist(abs)", None, f"bidhist_{TAG}_abs"),
+            ("bid+hist(sgn)", None, f"bidhist_{TAG}_sgn"),
+            ("bid+pref(abs)", None, f"bidpref_{TAG}_abs"),
+            ("bid+pref(sgn)", None, f"bidpref_{TAG}_sgn")]
 
     out = {"horizon": TAG, "seeds": SEEDS, "trust_beku": TRUST_BEKU,
            "per_seed": {}, "agregat": {}, "harian": {}, "stasiun": {}}
