@@ -24,6 +24,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import torch, common
 import marl_spklu.env.user as U
 from marl_spklu.rl.p_ppo_policy import PPPOPolicy
+from marl_spklu.rl.master_policy import (MasterPolicy, MasterPolicyEqCap,
+                                         MasterPrefPolicy)
 import _tahap2_jalankan as T2
 
 # Horizon yang tersedia. Kuncinya ikut jadi bagian nama berkas keluaran.
@@ -81,8 +83,15 @@ def main():
 
     jobs = []
     for mode in ("abs", "signed"):
+        # Lengan lama (tetap): H-PPO = MASTER + adaptasi riwayat; P-PPO = + modul preferensi
         jobs.append((nama_lengan("hppo", mode), None, mode))
         jobs.append((nama_lengan("pppo", mode), PPPOPolicy, mode))
+        # Lengan MASTER (2026-08-18): baseline tanpa encoder riwayat per-pengguna, yang
+        # selama ini TIDAK ADA -- tanpanya kontribusi adaptasi riwayat tak dapat
+        # diatribusikan, krn H-PPO pun sudah memuat encoder turunan PDQN.
+        jobs.append((nama_lengan("master", mode), MasterPolicy, mode))
+        jobs.append((nama_lengan("mastereq", mode), MasterPolicyEqCap, mode))
+        jobs.append((nama_lengan("masterp", mode), MasterPrefPolicy, mode))
 
     t_all = time.time()
     print(f"horizon={TAG_HORIZON} ({DATASET})", flush=True)
