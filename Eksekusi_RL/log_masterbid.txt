@@ -1,0 +1,1 @@
+python: can't open file '/home/iskandar/Alan/TesisRepo/Eksekusi_RL/Eksekusi_RL/_uji_aturan_trust.py': [Errno 2] No such file or directory

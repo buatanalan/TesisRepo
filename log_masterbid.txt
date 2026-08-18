@@ -1,0 +1,1247 @@
+horizon=30d (scenario_dataset_klaster12_4x.json)
+seed yang dijalankan: [0, 1, 2]
+lengan: ['masterbid_30d_abs', 'masterbid_30d_sgn']
+
+================================================================
+[masterbid_30d_abs] seed=0 aturan-trust=abs dataset=scenario_dataset_klaster12_4x.json
+================================================================
+20:46:50 [INFO] CONFIG {'dataset': '/home/iskandar/Alan/TesisRepo/scenario_dataset_klaster12_4x.json', 'N': 6, 'obs_dim': 42, 'willingness_ratio': None, 'k': 2, 't_max': 120.0, 'rollout_steps': 288, 'seed': 0, 'alpha_wait': 0.0046, 'beta_prox': 0.1, 'alpha_gini': 2.6019, 'alpha_flock': 0.0208, 'lr': 0.0003, 'gamma': 0.99, 'avg_reward': True, 'clip': 0.2, 'ent_coef': 0.01, 'epochs': 10, 'minibatch': 64}
+20:46:51 [INFO] [chunk   0] R=+0.0288 accept=0.66 flock=2.79 | KL=0.0152 EV=0.77 | gini=0.057 n=490 pend=20
+20:46:52 [INFO] [chunk   1] R=+0.0239 accept=0.64 flock=2.90 | KL=0.0260 EV=0.95 | gini=0.059 n=533 pend=26
+20:46:52 [INFO] [chunk   2] R=+0.0204 accept=0.67 flock=3.06 | KL=0.0134 EV=0.95 | gini=0.072 n=549 pend=20
+20:46:53 [INFO] [chunk   3] R=+0.0249 accept=0.65 flock=2.83 | KL=0.0122 EV=0.96 | gini=0.072 n=513 pend=34
+20:46:54 [INFO] [chunk   4] R=+0.0179 accept=0.65 flock=3.14 | KL=0.0257 EV=0.93 | gini=0.080 n=565 pend=21
+20:46:55 [INFO] [chunk   5] R=+0.0269 accept=0.61 flock=2.74 | KL=0.0118 EV=0.91 | gini=0.084 n=497 pend=28
+20:46:56 [INFO] [chunk   6] R=+0.0233 accept=0.60 flock=2.84 | KL=0.0141 EV=0.90 | gini=0.084 n=504 pend=29
+20:46:57 [INFO] [chunk   7] R=+0.0232 accept=0.58 flock=2.83 | KL=0.0063 EV=0.97 | gini=0.088 n=506 pend=38
+20:46:58 [INFO] [chunk   8] R=+0.0163 accept=0.59 flock=3.23 | KL=0.0052 EV=0.93 | gini=0.091 n=577 pend=34
+20:46:59 [INFO] [chunk   9] R=+0.0170 accept=0.54 flock=3.14 | KL=0.0082 EV=0.94 | gini=0.090 n=545 pend=33 |PASS-BARU
+20:47:00 [INFO] [chunk  10] R=+0.0305 accept=0.68 flock=2.76 | KL=0.0106 EV=0.96 | gini=0.078 n=486 pend=25
+20:47:01 [INFO] [chunk  11] R=+0.0221 accept=0.60 flock=2.95 | KL=0.0232 EV=0.97 | gini=0.076 n=538 pend=24
+20:47:02 [INFO] [chunk  12] R=+0.0223 accept=0.67 flock=3.00 | KL=0.0066 EV=0.95 | gini=0.072 n=539 pend=28
+20:47:03 [INFO] [chunk  13] R=+0.0224 accept=0.61 flock=2.91 | KL=0.0069 EV=0.95 | gini=0.072 n=525 pend=30
+20:47:04 [INFO] [chunk  14] R=+0.0192 accept=0.61 flock=3.08 | KL=0.0028 EV=0.93 | gini=0.081 n=541 pend=40
+20:47:05 [INFO] [chunk  15] R=+0.0247 accept=0.64 flock=2.84 | KL=0.0001 EV=0.91 | gini=0.074 n=510 pend=36
+20:47:05 [INFO] [chunk  16] R=+0.0213 accept=0.61 flock=2.90 | KL=0.0270 EV=0.91 | gini=0.070 n=508 pend=33
+20:47:06 [INFO] [chunk  17] R=+0.0225 accept=0.56 flock=2.88 | KL=0.0045 EV=0.97 | gini=0.063 n=523 pend=27
+20:47:07 [INFO] [chunk  18] R=+0.0165 accept=0.57 flock=3.17 | KL=0.0260 EV=0.95 | gini=0.065 n=560 pend=38
+20:47:08 [INFO] [chunk  19] R=+0.0186 accept=0.60 flock=3.12 | KL=0.0114 EV=0.98 | gini=0.061 n=554 pend=27 |PASS-BARU
+20:47:09 [INFO] [chunk  20] R=-0.0089 accept=0.68 flock=3.88 | KL=0.0146 EV=0.96 | gini=0.122 n=463 pend=47
+20:47:10 [INFO] [chunk  21] R=+0.0081 accept=0.66 flock=3.32 | KL=0.0053 EV=0.96 | gini=0.092 n=569 pend=17
+20:47:11 [INFO] [chunk  22] R=+0.0204 accept=0.65 flock=3.03 | KL=0.0044 EV=0.93 | gini=0.098 n=537 pend=22
+20:47:12 [INFO] [chunk  23] R=+0.0231 accept=0.62 flock=2.90 | KL=0.0066 EV=0.92 | gini=0.094 n=527 pend=23
+20:47:12 [INFO] [chunk  24] R=+0.0194 accept=0.61 flock=3.09 | KL=0.0007 EV=0.93 | gini=0.088 n=553 pend=22
+20:47:13 [INFO] [chunk  25] R=+0.0248 accept=0.57 flock=2.79 | KL=0.0089 EV=0.93 | gini=0.088 n=501 pend=24
+20:47:14 [INFO] [chunk  26] R=+0.0245 accept=0.61 flock=2.87 | KL=0.0087 EV=0.88 | gini=0.086 n=513 pend=17
+20:47:15 [INFO] [chunk  27] R=+0.0239 accept=0.57 flock=2.83 | KL=0.0159 EV=0.95 | gini=0.083 n=512 pend=21
+20:47:15 [INFO] [chunk  28] R=+0.0184 accept=0.59 flock=3.07 | KL=0.0035 EV=0.95 | gini=0.082 n=549 pend=44
+20:47:16 [INFO] [chunk  29] R=+0.0156 accept=0.59 flock=3.10 | KL=-0.0016 EV=0.97 | gini=0.077 n=561 pend=26 |PASS-BARU
+20:47:17 [INFO] [chunk  30] R=+0.0247 accept=0.68 flock=2.96 | KL=0.0090 EV=0.96 | gini=0.086 n=494 pend=16
+20:47:18 [INFO] [chunk  31] R=+0.0232 accept=0.64 flock=2.93 | KL=0.0227 EV=0.98 | gini=0.098 n=534 pend=22
+20:47:19 [INFO] [chunk  32] R=+0.0223 accept=0.65 flock=2.99 | KL=0.0069 EV=0.98 | gini=0.090 n=545 pend=18
+20:47:20 [INFO] [chunk  33] R=+0.0258 accept=0.65 flock=2.85 | KL=0.0058 EV=0.95 | gini=0.088 n=515 pend=31
+20:47:21 [INFO] [chunk  34] R=+0.0195 accept=0.62 flock=3.08 | KL=0.0054 EV=0.97 | gini=0.087 n=552 pend=30
+20:47:22 [INFO] [chunk  35] R=+0.0268 accept=0.60 flock=2.73 | KL=-0.0023 EV=0.94 | gini=0.084 n=494 pend=40
+20:47:23 [INFO] [chunk  36] R=+0.0241 accept=0.61 flock=2.83 | KL=0.0107 EV=0.94 | gini=0.080 n=512 pend=33
+20:47:24 [INFO] [chunk  37] R=+0.0250 accept=0.62 flock=2.82 | KL=0.0148 EV=0.98 | gini=0.080 n=520 pend=31
+20:47:25 [INFO] [chunk  38] R=+0.0177 accept=0.61 flock=3.14 | KL=0.0081 EV=0.97 | gini=0.081 n=574 pend=28
+20:47:26 [INFO] [chunk  39] R=+0.0195 accept=0.58 flock=3.04 | KL=0.0037 EV=0.97 | gini=0.079 n=549 pend=23 |PASS-BARU
+20:47:27 [INFO] [chunk  40] R=+0.0280 accept=0.65 flock=2.78 | KL=-0.0076 EV=0.98 | gini=0.092 n=487 pend=24
+20:47:28 [INFO] [chunk  41] R=+0.0217 accept=0.64 flock=2.98 | KL=0.0128 EV=0.96 | gini=0.083 n=549 pend=13
+20:47:28 [INFO] [chunk  42] R=+0.0222 accept=0.64 flock=2.97 | KL=0.0212 EV=0.95 | gini=0.093 n=537 pend=19
+20:47:29 [INFO] [chunk  43] R=+0.0268 accept=0.62 flock=2.77 | KL=0.0094 EV=0.92 | gini=0.092 n=505 pend=41
+20:47:30 [INFO] [chunk  44] R=+0.0166 accept=0.58 flock=3.18 | KL=0.0236 EV=0.92 | gini=0.093 n=567 pend=26
+20:47:31 [INFO] [chunk  45] R=+0.0270 accept=0.66 flock=2.75 | KL=0.0053 EV=0.91 | gini=0.093 n=505 pend=25
+20:47:32 [INFO] [chunk  46] R=+0.0256 accept=0.60 flock=2.81 | KL=0.0151 EV=0.88 | gini=0.096 n=504 pend=26
+20:47:33 [INFO] [chunk  47] R=+0.0257 accept=0.61 flock=2.81 | KL=-0.0002 EV=0.97 | gini=0.095 n=513 pend=29
+20:47:33 [INFO] [chunk  48] R=+0.0184 accept=0.56 flock=3.10 | KL=0.0087 EV=0.95 | gini=0.098 n=558 pend=43
+20:47:34 [INFO] [chunk  49] R=+0.0188 accept=0.61 flock=3.07 | KL=0.0088 EV=0.96 | gini=0.097 n=557 pend=28 |PASS-BARU
+20:47:35 [INFO] [chunk  50] R=+0.0178 accept=0.69 flock=3.02 | KL=0.0212 EV=0.95 | gini=0.069 n=481 pend=30
+20:47:36 [INFO] [chunk  51] R=+0.0212 accept=0.67 flock=3.03 | KL=0.0183 EV=0.98 | gini=0.050 n=548 pend=20
+20:47:37 [INFO] [chunk  52] R=+0.0241 accept=0.66 flock=2.96 | KL=0.0135 EV=0.97 | gini=0.056 n=530 pend=33
+20:47:37 [INFO] [chunk  53] R=+0.0246 accept=0.62 flock=2.88 | KL=0.0187 EV=0.96 | gini=0.063 n=528 pend=32
+20:47:38 [INFO] [chunk  54] R=+0.0188 accept=0.64 flock=3.16 | KL=0.0104 EV=0.97 | gini=0.063 n=559 pend=25
+20:47:39 [INFO] [chunk  55] R=+0.0265 accept=0.62 flock=2.72 | KL=-0.0022 EV=0.94 | gini=0.067 n=500 pend=29
+20:47:40 [INFO] [chunk  56] R=+0.0260 accept=0.60 flock=2.80 | KL=0.0138 EV=0.92 | gini=0.072 n=507 pend=27
+20:47:41 [INFO] [chunk  57] R=+0.0233 accept=0.61 flock=2.87 | KL=0.0093 EV=0.98 | gini=0.070 n=514 pend=29
+20:47:41 [INFO] [chunk  58] R=+0.0179 accept=0.62 flock=3.15 | KL=0.0074 EV=0.94 | gini=0.070 n=568 pend=33
+20:47:42 [INFO] [chunk  59] R=+0.0186 accept=0.58 flock=3.06 | KL=0.0167 EV=0.98 | gini=0.067 n=544 pend=32 |PASS-BARU
+20:47:43 [INFO] [chunk  60] R=+0.0281 accept=0.62 flock=2.75 | KL=0.0086 EV=0.98 | gini=0.107 n=492 pend=19
+20:47:44 [INFO] [chunk  61] R=+0.0225 accept=0.70 flock=2.96 | KL=0.0102 EV=0.98 | gini=0.104 n=533 pend=25
+20:47:45 [INFO] [chunk  62] R=+0.0219 accept=0.71 flock=3.02 | KL=0.0084 EV=0.95 | gini=0.105 n=547 pend=20
+20:47:45 [INFO] [chunk  63] R=+0.0250 accept=0.66 flock=2.86 | KL=0.0171 EV=0.95 | gini=0.099 n=521 pend=26
+20:47:46 [INFO] [chunk  64] R=+0.0194 accept=0.64 flock=3.12 | KL=0.0047 EV=0.95 | gini=0.096 n=566 pend=12
+20:47:47 [INFO] [chunk  65] R=+0.0261 accept=0.58 flock=2.71 | KL=0.0047 EV=0.93 | gini=0.095 n=490 pend=26
+20:47:48 [INFO] [chunk  66] R=+0.0262 accept=0.64 flock=2.83 | KL=0.0196 EV=0.90 | gini=0.092 n=512 pend=19
+20:47:49 [INFO] [chunk  67] R=+0.0254 accept=0.64 flock=2.82 | KL=0.0078 EV=0.98 | gini=0.092 n=513 pend=23
+20:47:49 [INFO] [chunk  68] R=+0.0200 accept=0.66 flock=3.08 | KL=0.0166 EV=0.96 | gini=0.096 n=554 pend=40
+20:47:50 [INFO] [chunk  69] R=+0.0190 accept=0.61 flock=3.11 | KL=0.0097 EV=0.99 | gini=0.095 n=563 pend=20 |PASS-BARU
+20:47:51 [INFO] [chunk  70] R=-0.0138 accept=0.72 flock=4.20 | KL=0.0163 EV=0.96 | gini=0.115 n=485 pend=26
+20:47:52 [INFO] [chunk  71] R=+0.0215 accept=0.71 flock=3.07 | KL=0.0184 EV=0.96 | gini=0.084 n=553 pend=12
+20:47:53 [INFO] [chunk  72] R=+0.0231 accept=0.68 flock=2.94 | KL=0.0455 EV=0.97 | gini=0.094 n=522 pend=32
+20:47:53 [INFO] [chunk  73] R=+0.0194 accept=0.63 flock=2.99 | KL=0.0343 EV=0.98 | gini=0.101 n=508 pend=48
+20:47:54 [INFO] [chunk  74] R=+0.0118 accept=0.65 flock=3.35 | KL=0.0107 EV=0.97 | gini=0.089 n=579 pend=23
+20:47:55 [INFO] [chunk  75] R=+0.0257 accept=0.66 flock=2.80 | KL=0.0074 EV=0.97 | gini=0.086 n=489 pend=39
+20:47:56 [INFO] [chunk  76] R=+0.0245 accept=0.64 flock=2.86 | KL=0.0094 EV=0.94 | gini=0.088 n=512 pend=31
+20:47:57 [INFO] [chunk  77] R=+0.0240 accept=0.67 flock=2.91 | KL=0.0182 EV=0.98 | gini=0.088 n=527 pend=22
+20:47:57 [INFO] [chunk  78] R=+0.0190 accept=0.60 flock=3.07 | KL=0.0074 EV=0.96 | gini=0.090 n=553 pend=39
+20:47:58 [INFO] [chunk  79] R=+0.0200 accept=0.65 flock=3.07 | KL=0.0146 EV=0.95 | gini=0.088 n=551 pend=33 |PASS-BARU
+20:47:59 [INFO] [chunk  80] R=+0.0297 accept=0.69 flock=2.67 | KL=0.0029 EV=0.98 | gini=0.112 n=479 pend=31
+20:48:00 [INFO] [chunk  81] R=+0.0235 accept=0.71 flock=3.00 | KL=0.0161 EV=0.98 | gini=0.085 n=550 pend=20
+20:48:01 [INFO] [chunk  82] R=+0.0227 accept=0.68 flock=2.97 | KL=0.0110 EV=0.98 | gini=0.080 n=538 pend=25
+20:48:01 [INFO] [chunk  83] R=+0.0253 accept=0.69 flock=2.84 | KL=0.0123 EV=0.97 | gini=0.085 n=521 pend=30
+20:48:02 [INFO] [chunk  84] R=+0.0201 accept=0.68 flock=3.17 | KL=0.0281 EV=0.97 | gini=0.084 n=573 pend=10
+20:48:03 [INFO] [chunk  85] R=+0.0291 accept=0.68 flock=2.65 | KL=-0.0074 EV=0.95 | gini=0.083 n=480 pend=34
+20:48:04 [INFO] [chunk  86] R=+0.0237 accept=0.66 flock=2.89 | KL=0.0096 EV=0.95 | gini=0.086 n=524 pend=14
+20:48:05 [INFO] [chunk  87] R=+0.0279 accept=0.67 flock=2.79 | KL=0.0286 EV=0.99 | gini=0.085 n=505 pend=25
+20:48:06 [INFO] [chunk  88] R=+0.0189 accept=0.65 flock=3.12 | KL=0.0188 EV=0.97 | gini=0.090 n=562 pend=35
+20:48:07 [INFO] [chunk  89] R=+0.0196 accept=0.64 flock=3.06 | KL=0.0105 EV=0.96 | gini=0.089 n=548 pend=31 |PASS-BARU
+20:48:07 [INFO] [chunk  90] R=+0.0294 accept=0.66 flock=2.72 | KL=0.0322 EV=0.98 | gini=0.094 n=497 pend=14
+20:48:08 [INFO] [chunk  91] R=+0.0236 accept=0.70 flock=2.95 | KL=0.0225 EV=0.98 | gini=0.101 n=534 pend=18
+20:48:09 [INFO] [chunk  92] R=+0.0240 accept=0.73 flock=2.99 | KL=0.0172 EV=0.99 | gini=0.108 n=537 pend=24
+20:48:10 [INFO] [chunk  93] R=+0.0280 accept=0.67 flock=2.75 | KL=0.0173 EV=0.96 | gini=0.093 n=495 pend=52
+20:48:11 [INFO] [chunk  94] R=+0.0175 accept=0.65 flock=3.19 | KL=0.0185 EV=0.97 | gini=0.093 n=589 pend=19
+20:48:12 [INFO] [chunk  95] R=+0.0288 accept=0.67 flock=2.74 | KL=-0.0020 EV=0.97 | gini=0.089 n=503 pend=20
+20:48:12 [INFO] [chunk  96] R=+0.0267 accept=0.67 flock=2.81 | KL=0.0194 EV=0.96 | gini=0.094 n=504 pend=21
+20:48:13 [INFO] [chunk  97] R=+0.0271 accept=0.65 flock=2.78 | KL=0.0164 EV=0.98 | gini=0.092 n=505 pend=32
+20:48:14 [INFO] [chunk  98] R=+0.0199 accept=0.63 flock=3.12 | KL=0.0113 EV=0.98 | gini=0.087 n=567 pend=37
+20:48:15 [INFO] [chunk  99] R=+0.0210 accept=0.64 flock=3.05 | KL=0.0060 EV=0.96 | gini=0.086 n=554 pend=26 |PASS-BARU
+20:48:16 [INFO] [chunk 100] R=+0.0283 accept=0.64 flock=2.77 | KL=0.0029 EV=0.98 | gini=0.123 n=497 pend=14
+20:48:16 [INFO] [chunk 101] R=+0.0250 accept=0.72 flock=2.93 | KL=0.0083 EV=0.98 | gini=0.109 n=538 pend=15
+20:48:17 [INFO] [chunk 102] R=+0.0246 accept=0.71 flock=2.94 | KL=0.0204 EV=0.97 | gini=0.089 n=527 pend=29
+20:48:18 [INFO] [chunk 103] R=+0.0264 accept=0.69 flock=2.85 | KL=0.0197 EV=0.98 | gini=0.094 n=525 pend=32
+20:48:19 [INFO] [chunk 104] R=+0.0211 accept=0.70 flock=3.11 | KL=0.0114 EV=0.97 | gini=0.092 n=562 pend=22
+20:48:20 [INFO] [chunk 105] R=+0.0275 accept=0.70 flock=2.75 | KL=0.0115 EV=0.97 | gini=0.092 n=497 pend=29
+20:48:20 [INFO] [chunk 106] R=+0.0263 accept=0.68 flock=2.84 | KL=0.0187 EV=0.95 | gini=0.086 n=521 pend=11
+20:48:21 [INFO] [chunk 107] R=+0.0282 accept=0.70 flock=2.80 | KL=0.0195 EV=0.98 | gini=0.089 n=509 pend=21
+20:48:22 [INFO] [chunk 108] R=+0.0215 accept=0.71 flock=3.08 | KL=0.0008 EV=0.97 | gini=0.089 n=558 pend=34
+20:48:23 [INFO] [chunk 109] R=+0.0216 accept=0.69 flock=3.05 | KL=0.0093 EV=0.98 | gini=0.088 n=558 pend=19 |PASS-BARU
+20:48:24 [INFO] [chunk 110] R=+0.0298 accept=0.69 flock=2.74 | KL=0.0176 EV=0.99 | gini=0.081 n=493 pend=18
+20:48:24 [INFO] [chunk 111] R=+0.0250 accept=0.69 flock=2.90 | KL=0.0096 EV=0.98 | gini=0.080 n=529 pend=27
+20:48:25 [INFO] [chunk 112] R=+0.0230 accept=0.72 flock=3.03 | KL=0.0148 EV=0.97 | gini=0.093 n=541 pend=28
+20:48:26 [INFO] [chunk 113] R=+0.0265 accept=0.72 flock=2.83 | KL=0.0380 EV=0.98 | gini=0.091 n=523 pend=32
+20:48:27 [INFO] [chunk 114] R=+0.0202 accept=0.69 flock=3.12 | KL=0.0165 EV=0.97 | gini=0.090 n=562 pend=23
+20:48:27 [INFO] [chunk 115] R=+0.0269 accept=0.70 flock=2.77 | KL=0.0034 EV=0.95 | gini=0.090 n=497 pend=29
+20:48:28 [INFO] [chunk 116] R=+0.0272 accept=0.72 flock=2.80 | KL=0.0210 EV=0.95 | gini=0.088 n=505 pend=30
+20:48:29 [INFO] [chunk 117] R=+0.0264 accept=0.67 flock=2.87 | KL=0.0191 EV=0.98 | gini=0.089 n=527 pend=18
+20:48:30 [INFO] [chunk 118] R=+0.0227 accept=0.70 flock=3.05 | KL=0.0182 EV=0.96 | gini=0.089 n=538 pend=52
+20:48:31 [INFO] [chunk 119] R=+0.0227 accept=0.70 flock=3.05 | KL=0.0120 EV=0.97 | gini=0.087 n=566 pend=31 |PASS-BARU
+20:48:31 [INFO] [chunk 120] R=+0.0302 accept=0.67 flock=2.75 | KL=0.0133 EV=0.98 | gini=0.084 n=493 pend=17
+20:48:32 [INFO] [chunk 121] R=+0.0236 accept=0.70 flock=2.95 | KL=0.0310 EV=0.98 | gini=0.093 n=541 pend=16
+20:48:33 [INFO] [chunk 122] R=+0.0240 accept=0.73 flock=3.00 | KL=0.0163 EV=0.97 | gini=0.099 n=547 pend=11
+20:48:34 [INFO] [chunk 123] R=+0.0267 accept=0.68 flock=2.84 | KL=0.0191 EV=0.94 | gini=0.096 n=517 pend=21
+20:48:34 [INFO] [chunk 124] R=+0.0226 accept=0.75 flock=3.09 | KL=0.0145 EV=0.95 | gini=0.094 n=559 pend=14
+20:48:35 [INFO] [chunk 125] R=+0.0290 accept=0.74 flock=2.75 | KL=0.0227 EV=0.95 | gini=0.095 n=495 pend=23
+20:48:36 [INFO] [chunk 126] R=+0.0278 accept=0.71 flock=2.78 | KL=0.0073 EV=0.93 | gini=0.095 n=504 pend=22
+20:48:37 [INFO] [chunk 127] R=+0.0275 accept=0.71 flock=2.84 | KL=0.0141 EV=0.98 | gini=0.096 n=522 pend=19
+20:48:38 [INFO] [chunk 128] R=+0.0223 accept=0.75 flock=3.11 | KL=0.0107 EV=0.98 | gini=0.096 n=563 pend=27
+20:48:38 [INFO] [chunk 129] R=+0.0249 accept=0.76 flock=3.03 | KL=0.0156 EV=0.98 | gini=0.094 n=548 pend=22 |PASS-BARU
+20:48:39 [INFO] [chunk 130] R=+0.0312 accept=0.70 flock=2.70 | KL=0.0042 EV=0.98 | gini=0.075 n=492 pend=19
+20:48:40 [INFO] [chunk 131] R=+0.0271 accept=0.77 flock=2.91 | KL=0.0247 EV=0.98 | gini=0.083 n=530 pend=26
+20:48:41 [INFO] [chunk 132] R=+0.0247 accept=0.79 flock=3.06 | KL=0.0419 EV=0.96 | gini=0.095 n=549 pend=21
+20:48:42 [INFO] [chunk 133] R=+0.0300 accept=0.76 flock=2.83 | KL=0.0145 EV=0.98 | gini=0.095 n=519 pend=29
+20:48:42 [INFO] [chunk 134] R=+0.0232 accept=0.76 flock=3.10 | KL=0.0172 EV=0.97 | gini=0.091 n=562 pend=19
+20:48:43 [INFO] [chunk 135] R=+0.0311 accept=0.81 flock=2.76 | KL=0.0126 EV=0.97 | gini=0.089 n=503 pend=19
+20:48:44 [INFO] [chunk 136] R=+0.0313 accept=0.81 flock=2.75 | KL=0.0445 EV=0.95 | gini=0.084 n=497 pend=27
+20:48:45 [INFO] [chunk 137] R=+0.0291 accept=0.80 flock=2.83 | KL=0.0095 EV=0.98 | gini=0.081 n=521 pend=23
+20:48:45 [INFO] [chunk 138] R=+0.0244 accept=0.78 flock=3.06 | KL=0.0096 EV=0.98 | gini=0.081 n=557 pend=37
+20:48:46 [INFO] [chunk 139] R=+0.0264 accept=0.81 flock=3.07 | KL=0.0101 EV=0.96 | gini=0.083 n=562 pend=20 |PASS-BARU
+20:48:47 [INFO] [chunk 140] R=+0.0310 accept=0.73 flock=2.66 | KL=0.0083 EV=0.98 | gini=0.064 n=482 pend=29
+20:48:48 [INFO] [chunk 141] R=+0.0256 accept=0.77 flock=3.00 | KL=0.0241 EV=0.99 | gini=0.077 n=549 pend=19
+20:48:49 [INFO] [chunk 142] R=+0.0259 accept=0.78 flock=3.02 | KL=0.0185 EV=0.98 | gini=0.083 n=545 pend=16
+20:48:49 [INFO] [chunk 143] R=+0.0315 accept=0.76 flock=2.73 | KL=0.0344 EV=0.97 | gini=0.092 n=500 pend=42
+20:48:50 [INFO] [chunk 144] R=+0.0227 accept=0.82 flock=3.17 | KL=0.0294 EV=0.98 | gini=0.098 n=575 pend=19
+20:48:51 [INFO] [chunk 145] R=+0.0320 accept=0.83 flock=2.74 | KL=0.0058 EV=0.97 | gini=0.096 n=503 pend=21
+20:48:52 [INFO] [chunk 146] R=+0.0310 accept=0.83 flock=2.80 | KL=0.0347 EV=0.94 | gini=0.095 n=510 pend=16
+20:48:53 [INFO] [chunk 147] R=+0.0335 accept=0.83 flock=2.71 | KL=0.0137 EV=0.98 | gini=0.090 n=494 pend=38
+20:48:53 [INFO] [chunk 148] R=+0.0250 accept=0.84 flock=3.14 | KL=0.0208 EV=0.96 | gini=0.092 n=576 pend=34
+20:48:54 [INFO] [chunk 149] R=+0.0260 accept=0.83 flock=3.03 | KL=0.0100 EV=0.97 | gini=0.091 n=549 pend=29 |PASS-BARU
+20:48:55 [INFO] [chunk 150] R=+0.0335 accept=0.72 flock=2.70 | KL=0.0136 EV=0.99 | gini=0.088 n=489 pend=22
+20:48:56 [INFO] [chunk 151] R=+0.0259 accept=0.75 flock=2.93 | KL=0.0287 EV=0.98 | gini=0.099 n=536 pend=24
+20:48:57 [INFO] [chunk 152] R=+0.0262 accept=0.81 flock=2.99 | KL=0.0136 EV=0.98 | gini=0.101 n=543 pend=24
+20:48:57 [INFO] [chunk 153] R=+0.0290 accept=0.79 flock=2.85 | KL=0.0201 EV=0.98 | gini=0.099 n=524 pend=27
+20:48:58 [INFO] [chunk 154] R=+0.0262 accept=0.84 flock=3.05 | KL=0.0269 EV=0.97 | gini=0.097 n=554 pend=25
+20:48:59 [INFO] [chunk 155] R=+0.0323 accept=0.80 flock=2.77 | KL=0.0126 EV=0.97 | gini=0.098 n=501 pend=27
+20:49:00 [INFO] [chunk 156] R=+0.0327 accept=0.88 flock=2.76 | KL=0.0077 EV=0.95 | gini=0.097 n=499 pend=34
+20:49:01 [INFO] [chunk 157] R=+0.0316 accept=0.88 flock=2.83 | KL=0.0165 EV=0.98 | gini=0.097 n=514 pend=35
+20:49:01 [INFO] [chunk 158] R=+0.0243 accept=0.84 flock=3.17 | KL=0.0129 EV=0.98 | gini=0.100 n=580 pend=28
+20:49:02 [INFO] [chunk 159] R=+0.0283 accept=0.87 flock=3.02 | KL=-0.0021 EV=0.96 | gini=0.099 n=545 pend=27 |PASS-BARU
+20:49:03 [INFO] [chunk 160] R=+0.0275 accept=0.71 flock=2.79 | KL=0.0220 EV=0.99 | gini=0.096 n=497 pend=14
+20:49:04 [INFO] [chunk 161] R=+0.0271 accept=0.79 flock=2.91 | KL=0.0317 EV=0.98 | gini=0.097 n=531 pend=20
+20:49:05 [INFO] [chunk 162] R=+0.0271 accept=0.82 flock=2.99 | KL=0.0376 EV=0.97 | gini=0.095 n=545 pend=19
+20:49:05 [INFO] [chunk 163] R=+0.0316 accept=0.86 flock=2.84 | KL=0.0150 EV=0.98 | gini=0.100 n=522 pend=24
+20:49:06 [INFO] [chunk 164] R=+0.0275 accept=0.85 flock=3.06 | KL=0.0295 EV=0.98 | gini=0.099 n=553 pend=23
+20:49:07 [INFO] [chunk 165] R=+0.0339 accept=0.86 flock=2.76 | KL=-0.0072 EV=0.96 | gini=0.097 n=506 pend=21
+20:49:08 [INFO] [chunk 166] R=+0.0335 accept=0.89 flock=2.77 | KL=0.0384 EV=0.97 | gini=0.093 n=505 pend=21
+20:49:09 [INFO] [chunk 167] R=+0.0339 accept=0.85 flock=2.78 | KL=0.0138 EV=0.99 | gini=0.090 n=510 pend=28
+20:49:09 [INFO] [chunk 168] R=+0.0285 accept=0.86 flock=3.08 | KL=0.0218 EV=0.97 | gini=0.090 n=556 pend=43
+20:49:10 [INFO] [chunk 169] R=+0.0268 accept=0.90 flock=3.12 | KL=0.0500 EV=0.94 | gini=0.090 n=572 pend=15 |PASS-BARU
+20:49:11 [INFO] [chunk 170] R=+0.0316 accept=0.71 flock=2.71 | KL=0.0205 EV=0.99 | gini=0.111 n=493 pend=18
+20:49:12 [INFO] [chunk 171] R=+0.0292 accept=0.79 flock=2.88 | KL=0.0164 EV=0.98 | gini=0.095 n=524 pend=32
+20:49:12 [INFO] [chunk 172] R=+0.0250 accept=0.81 flock=3.05 | KL=0.0012 EV=0.98 | gini=0.094 n=557 pend=18
+20:49:13 [INFO] [chunk 173] R=+0.0301 accept=0.84 flock=2.87 | KL=0.0147 EV=0.98 | gini=0.093 n=523 pend=20
+20:49:14 [INFO] [chunk 174] R=+0.0278 accept=0.86 flock=3.01 | KL=0.0125 EV=0.96 | gini=0.097 n=544 pend=30
+20:49:15 [INFO] [chunk 175] R=+0.0331 accept=0.86 flock=2.79 | KL=0.0070 EV=0.96 | gini=0.095 n=509 pend=24
+20:49:16 [INFO] [chunk 176] R=+0.0331 accept=0.88 flock=2.81 | KL=0.0066 EV=0.96 | gini=0.096 n=506 pend=24
+20:49:16 [INFO] [chunk 177] R=+0.0335 accept=0.88 flock=2.81 | KL=0.0208 EV=0.98 | gini=0.091 n=513 pend=28
+20:49:17 [INFO] [chunk 178] R=+0.0282 accept=0.91 flock=3.10 | KL=0.0171 EV=0.98 | gini=0.090 n=560 pend=39
+20:49:18 [INFO] [chunk 179] R=+0.0280 accept=0.88 flock=3.07 | KL=0.0080 EV=0.97 | gini=0.090 n=554 pend=28 |PASS-BARU
+20:49:19 [INFO] [chunk 180] R=+0.0278 accept=0.69 flock=2.74 | KL=0.0229 EV=0.98 | gini=0.091 n=493 pend=18
+20:49:20 [INFO] [chunk 181] R=+0.0288 accept=0.80 flock=2.92 | KL=0.0160 EV=0.98 | gini=0.084 n=539 pend=18
+20:49:20 [INFO] [chunk 182] R=+0.0286 accept=0.84 flock=2.96 | KL=0.0040 EV=0.98 | gini=0.086 n=535 pend=25
+20:49:21 [INFO] [chunk 183] R=+0.0316 accept=0.83 flock=2.84 | KL=0.0158 EV=0.98 | gini=0.083 n=519 pend=32
+20:49:22 [INFO] [chunk 184] R=+0.0252 accept=0.88 flock=3.17 | KL=0.0463 EV=0.98 | gini=0.080 n=578 pend=7
+20:49:23 [INFO] [chunk 185] R=+0.0375 accept=0.89 flock=2.62 | KL=0.0021 EV=0.96 | gini=0.077 n=471 pend=39
+20:49:23 [INFO] [chunk 186] R=+0.0322 accept=0.89 flock=2.86 | KL=0.0201 EV=0.97 | gini=0.080 n=517 pend=27
+20:49:24 [INFO] [chunk 187] R=+0.0339 accept=0.89 flock=2.86 | KL=0.0196 EV=0.99 | gini=0.081 n=529 pend=16
+20:49:25 [INFO] [chunk 188] R=+0.0290 accept=0.90 flock=3.06 | KL=0.0411 EV=0.99 | gini=0.086 n=549 pend=38
+20:49:26 [INFO] [chunk 189] R=+0.0294 accept=0.90 flock=3.05 | KL=0.0149 EV=0.97 | gini=0.085 n=548 pend=34 |PASS-BARU
+20:49:27 [INFO] [chunk 190] R=+0.0331 accept=0.76 flock=2.72 | KL=0.0119 EV=0.99 | gini=0.069 n=497 pend=13
+20:49:27 [INFO] [chunk 191] R=+0.0268 accept=0.82 flock=2.97 | KL=0.0286 EV=0.99 | gini=0.107 n=540 pend=13
+20:49:28 [INFO] [chunk 192] R=+0.0283 accept=0.83 flock=2.95 | KL=0.0152 EV=0.98 | gini=0.103 n=533 pend=21
+20:49:29 [INFO] [chunk 193] R=+0.0331 accept=0.86 flock=2.84 | KL=0.0173 EV=0.99 | gini=0.092 n=522 pend=26
+20:49:30 [INFO] [chunk 194] R=+0.0269 accept=0.89 flock=3.10 | KL=0.0184 EV=0.97 | gini=0.085 n=559 pend=20
+20:49:31 [INFO] [chunk 195] R=+0.0341 accept=0.86 flock=2.75 | KL=0.0046 EV=0.98 | gini=0.086 n=505 pend=18
+20:49:31 [INFO] [chunk 196] R=+0.0351 accept=0.91 flock=2.78 | KL=0.0079 EV=0.96 | gini=0.088 n=499 pend=25
+20:49:32 [INFO] [chunk 197] R=+0.0342 accept=0.90 flock=2.83 | KL=0.0178 EV=0.99 | gini=0.089 n=519 pend=23
+20:49:33 [INFO] [chunk 198] R=+0.0294 accept=0.90 flock=3.05 | KL=0.0285 EV=0.98 | gini=0.089 n=550 pend=44
+20:49:34 [INFO] [chunk 199] R=+0.0278 accept=0.90 flock=3.13 | KL=0.0162 EV=0.97 | gini=0.090 n=575 pend=13 |PASS-BARU
+[SELESAI] t2_masterbid_30d_abs_seed0 (164s)
+[masterbid_30d_abs] seed=0 selesai 2.7 mnt
+
+================================================================
+[masterbid_30d_sgn] seed=0 aturan-trust=signed dataset=scenario_dataset_klaster12_4x.json
+================================================================
+20:49:34 [INFO] CONFIG {'dataset': '/home/iskandar/Alan/TesisRepo/scenario_dataset_klaster12_4x.json', 'N': 6, 'obs_dim': 42, 'willingness_ratio': None, 'k': 2, 't_max': 120.0, 'rollout_steps': 288, 'seed': 0, 'alpha_wait': 0.0046, 'beta_prox': 0.1, 'alpha_gini': 2.6019, 'alpha_flock': 0.0208, 'lr': 0.0003, 'gamma': 0.99, 'avg_reward': True, 'clip': 0.2, 'ent_coef': 0.01, 'epochs': 10, 'minibatch': 64}
+20:49:35 [INFO] [chunk   0] R=+0.0294 accept=0.67 flock=2.78 | KL=0.0186 EV=0.76 | gini=0.058 n=488 pend=22
+20:49:36 [INFO] [chunk   1] R=+0.0244 accept=0.68 flock=2.92 | KL=0.0248 EV=0.95 | gini=0.075 n=536 pend=25
+20:49:37 [INFO] [chunk   2] R=+0.0189 accept=0.63 flock=3.09 | KL=0.0100 EV=0.94 | gini=0.095 n=553 pend=15
+20:49:38 [INFO] [chunk   3] R=+0.0253 accept=0.66 flock=2.82 | KL=-0.0032 EV=0.90 | gini=0.101 n=508 pend=33
+20:49:39 [INFO] [chunk   4] R=+0.0190 accept=0.66 flock=3.14 | KL=0.0151 EV=0.95 | gini=0.099 n=567 pend=18
+20:49:40 [INFO] [chunk   5] R=+0.0253 accept=0.65 flock=2.77 | KL=0.0050 EV=0.90 | gini=0.094 n=499 pend=24
+20:49:40 [INFO] [chunk   6] R=+0.0245 accept=0.65 flock=2.83 | KL=0.0103 EV=0.92 | gini=0.089 n=505 pend=23
+20:49:42 [INFO] [chunk   7] R=+0.0246 accept=0.59 flock=2.78 | KL=0.0074 EV=0.96 | gini=0.088 n=493 pend=46
+20:49:43 [INFO] [chunk   8] R=+0.0156 accept=0.64 flock=3.26 | KL=0.0024 EV=0.94 | gini=0.088 n=584 pend=34
+20:49:44 [INFO] [chunk   9] R=+0.0179 accept=0.62 flock=3.12 | KL=0.0045 EV=0.94 | gini=0.090 n=547 pend=30 |PASS-BARU
+20:49:45 [INFO] [chunk  10] R=+0.0280 accept=0.65 flock=2.73 | KL=0.0094 EV=0.96 | gini=0.072 n=483 pend=28
+20:49:46 [INFO] [chunk  11] R=+0.0225 accept=0.67 flock=2.96 | KL=0.0074 EV=0.98 | gini=0.066 n=545 pend=22
+20:49:47 [INFO] [chunk  12] R=+0.0203 accept=0.64 flock=3.00 | KL=0.0194 EV=0.97 | gini=0.082 n=534 pend=29
+20:49:47 [INFO] [chunk  13] R=+0.0247 accept=0.71 flock=2.87 | KL=0.0101 EV=0.95 | gini=0.072 n=523 pend=33
+20:49:48 [INFO] [chunk  14] R=+0.0202 accept=0.68 flock=3.13 | KL=0.0047 EV=0.94 | gini=0.080 n=560 pend=26
+20:49:49 [INFO] [chunk  15] R=+0.0274 accept=0.64 flock=2.73 | KL=0.0089 EV=0.92 | gini=0.080 n=496 pend=34
+20:49:50 [INFO] [chunk  16] R=+0.0246 accept=0.67 flock=2.87 | KL=0.0161 EV=0.92 | gini=0.074 n=512 pend=25
+20:49:50 [INFO] [chunk  17] R=+0.0244 accept=0.65 flock=2.83 | KL=0.0157 EV=0.96 | gini=0.076 n=516 pend=28
+20:49:51 [INFO] [chunk  18] R=+0.0166 accept=0.65 flock=3.18 | KL=0.0186 EV=0.93 | gini=0.077 n=573 pend=26
+20:49:52 [INFO] [chunk  19] R=+0.0211 accept=0.63 flock=3.08 | KL=0.0081 EV=0.95 | gini=0.076 n=550 pend=20 |PASS-BARU
+20:49:53 [INFO] [chunk  20] R=+0.0300 accept=0.69 flock=2.73 | KL=0.0135 EV=0.97 | gini=0.077 n=492 pend=19
+20:49:53 [INFO] [chunk  21] R=+0.0218 accept=0.64 flock=2.97 | KL=0.0210 EV=0.95 | gini=0.090 n=542 pend=16
+20:49:54 [INFO] [chunk  22] R=+0.0214 accept=0.65 flock=3.01 | KL=0.0198 EV=0.94 | gini=0.090 n=537 pend=21
+20:49:55 [INFO] [chunk  23] R=+0.0247 accept=0.66 flock=2.91 | KL=0.0018 EV=0.93 | gini=0.083 n=529 pend=19
+20:49:56 [INFO] [chunk  24] R=+0.0207 accept=0.70 flock=3.10 | KL=0.0047 EV=0.90 | gini=0.075 n=549 pend=22
+20:49:57 [INFO] [chunk  25] R=+0.0240 accept=0.62 flock=2.81 | KL=0.0058 EV=0.93 | gini=0.075 n=507 pend=19
+20:49:57 [INFO] [chunk  26] R=+0.0243 accept=0.67 flock=2.87 | KL=0.0121 EV=0.89 | gini=0.070 n=512 pend=12
+20:49:58 [INFO] [chunk  27] R=+0.0258 accept=0.69 flock=2.85 | KL=0.0024 EV=0.98 | gini=0.072 n=512 pend=17
+20:49:59 [INFO] [chunk  28] R=+0.0209 accept=0.67 flock=3.06 | KL=0.0176 EV=0.95 | gini=0.071 n=550 pend=38
+20:50:00 [INFO] [chunk  29] R=+0.0208 accept=0.67 flock=3.09 | KL=0.0009 EV=0.96 | gini=0.071 n=556 pend=25 |PASS-BARU
+20:50:00 [INFO] [chunk  30] R=+0.0259 accept=0.66 flock=2.80 | KL=0.0163 EV=0.97 | gini=0.128 n=491 pend=20
+20:50:01 [INFO] [chunk  31] R=+0.0235 accept=0.70 flock=2.94 | KL=0.0217 EV=0.98 | gini=0.101 n=534 pend=24
+20:50:02 [INFO] [chunk  32] R=+0.0228 accept=0.67 flock=3.03 | KL=0.0126 EV=0.98 | gini=0.094 n=552 pend=15
+20:50:03 [INFO] [chunk  33] R=+0.0254 accept=0.68 flock=2.84 | KL=0.0121 EV=0.94 | gini=0.094 n=513 pend=28
+20:50:04 [INFO] [chunk  34] R=+0.0209 accept=0.69 flock=3.07 | KL=0.0176 EV=0.94 | gini=0.091 n=550 pend=29
+20:50:04 [INFO] [chunk  35] R=+0.0269 accept=0.69 flock=2.80 | KL=-0.0016 EV=0.91 | gini=0.087 n=497 pend=37
+20:50:05 [INFO] [chunk  36] R=+0.0248 accept=0.66 flock=2.83 | KL=0.0068 EV=0.91 | gini=0.089 n=517 pend=25
+20:50:06 [INFO] [chunk  37] R=+0.0239 accept=0.67 flock=2.87 | KL=0.0116 EV=0.97 | gini=0.086 n=520 pend=23
+20:50:07 [INFO] [chunk  38] R=+0.0182 accept=0.67 flock=3.15 | KL=0.0072 EV=0.95 | gini=0.086 n=568 pend=26
+20:50:07 [INFO] [chunk  39] R=+0.0220 accept=0.66 flock=3.01 | KL=0.0006 EV=0.95 | gini=0.087 n=547 pend=22 |PASS-BARU
+20:50:08 [INFO] [chunk  40] R=+0.0262 accept=0.70 flock=2.82 | KL=0.0188 EV=0.98 | gini=0.056 n=490 pend=21
+20:50:09 [INFO] [chunk  41] R=+0.0233 accept=0.69 flock=2.97 | KL=0.0220 EV=0.98 | gini=0.089 n=543 pend=17
+20:50:10 [INFO] [chunk  42] R=+0.0217 accept=0.69 flock=3.00 | KL=0.0289 EV=0.98 | gini=0.106 n=540 pend=19
+20:50:11 [INFO] [chunk  43] R=+0.0265 accept=0.67 flock=2.80 | KL=0.0195 EV=0.96 | gini=0.109 n=509 pend=36
+20:50:11 [INFO] [chunk  44] R=+0.0187 accept=0.69 flock=3.18 | KL=0.0017 EV=0.92 | gini=0.106 n=570 pend=18
+20:50:12 [INFO] [chunk  45] R=+0.0266 accept=0.69 flock=2.76 | KL=0.0015 EV=0.92 | gini=0.102 n=496 pend=27
+20:50:13 [INFO] [chunk  46] R=+0.0259 accept=0.73 flock=2.84 | KL=0.0141 EV=0.92 | gini=0.102 n=511 pend=20
+20:50:14 [INFO] [chunk  47] R=+0.0270 accept=0.69 flock=2.78 | KL=0.0209 EV=0.98 | gini=0.102 n=508 pend=29
+20:50:14 [INFO] [chunk  48] R=+0.0206 accept=0.73 flock=3.12 | KL=0.0011 EV=0.94 | gini=0.101 n=564 pend=37
+20:50:15 [INFO] [chunk  49] R=+0.0209 accept=0.73 flock=3.04 | KL=0.0148 EV=0.97 | gini=0.098 n=546 pend=34 |PASS-BARU
+20:50:16 [INFO] [chunk  50] R=+0.0175 accept=0.67 flock=3.00 | KL=0.0260 EV=0.97 | gini=0.099 n=481 pend=30
+20:50:17 [INFO] [chunk  51] R=+0.0225 accept=0.68 flock=3.01 | KL=0.0156 EV=0.99 | gini=0.073 n=548 pend=21
+20:50:18 [INFO] [chunk  52] R=+0.0222 accept=0.70 flock=2.98 | KL=0.0247 EV=0.98 | gini=0.073 n=535 pend=28
+20:50:18 [INFO] [chunk  53] R=+0.0268 accept=0.70 flock=2.85 | KL=0.0239 EV=0.98 | gini=0.071 n=523 pend=31
+20:50:19 [INFO] [chunk  54] R=+0.0199 accept=0.68 flock=3.12 | KL=0.0161 EV=0.93 | gini=0.078 n=563 pend=21
+20:50:20 [INFO] [chunk  55] R=+0.0305 accept=0.73 flock=2.73 | KL=-0.0058 EV=0.93 | gini=0.079 n=500 pend=25
+20:50:21 [INFO] [chunk  56] R=+0.0266 accept=0.70 flock=2.83 | KL=0.0131 EV=0.92 | gini=0.079 n=508 pend=21
+20:50:22 [INFO] [chunk  57] R=+0.0263 accept=0.70 flock=2.84 | KL=0.0054 EV=0.97 | gini=0.075 n=509 pend=29
+20:50:22 [INFO] [chunk  58] R=+0.0206 accept=0.73 flock=3.12 | KL=0.0096 EV=0.95 | gini=0.076 n=564 pend=37
+20:50:23 [INFO] [chunk  59] R=+0.0220 accept=0.70 flock=3.06 | KL=0.0165 EV=0.97 | gini=0.076 n=550 pend=30 |PASS-BARU
+20:50:24 [INFO] [chunk  60] R=+0.0301 accept=0.69 flock=2.70 | KL=0.0337 EV=0.98 | gini=0.110 n=492 pend=18
+20:50:25 [INFO] [chunk  61] R=+0.0231 accept=0.67 flock=2.97 | KL=0.0122 EV=0.98 | gini=0.106 n=535 pend=23
+20:50:26 [INFO] [chunk  62] R=+0.0239 accept=0.69 flock=2.98 | KL=0.0268 EV=0.98 | gini=0.110 n=544 pend=20
+20:50:26 [INFO] [chunk  63] R=+0.0263 accept=0.70 flock=2.85 | KL=0.0154 EV=0.97 | gini=0.111 n=525 pend=22
+20:50:27 [INFO] [chunk  64] R=+0.0202 accept=0.67 flock=3.10 | KL=0.0276 EV=0.95 | gini=0.104 n=563 pend=12
+20:50:28 [INFO] [chunk  65] R=+0.0305 accept=0.71 flock=2.71 | KL=0.0041 EV=0.94 | gini=0.099 n=495 pend=21
+20:50:29 [INFO] [chunk  66] R=+0.0273 accept=0.71 flock=2.82 | KL=0.0138 EV=0.90 | gini=0.099 n=507 pend=19
+20:50:29 [INFO] [chunk  67] R=+0.0278 accept=0.72 flock=2.80 | KL=0.0064 EV=0.97 | gini=0.096 n=511 pend=25
+20:50:30 [INFO] [chunk  68] R=+0.0221 accept=0.73 flock=3.08 | KL=0.0142 EV=0.97 | gini=0.097 n=556 pend=40
+20:50:31 [INFO] [chunk  69] R=+0.0197 accept=0.70 flock=3.11 | KL=0.0085 EV=0.99 | gini=0.097 n=567 pend=16 |PASS-BARU
+20:50:32 [INFO] [chunk  70] R=+0.0300 accept=0.64 flock=2.79 | KL=0.0222 EV=0.98 | gini=0.118 n=495 pend=16
+20:50:33 [INFO] [chunk  71] R=+0.0239 accept=0.71 flock=2.96 | KL=0.0197 EV=0.99 | gini=0.083 n=540 pend=15
+20:50:34 [INFO] [chunk  72] R=+0.0242 accept=0.73 flock=3.00 | KL=0.0089 EV=0.98 | gini=0.086 n=541 pend=16
+20:50:34 [INFO] [chunk  73] R=+0.0288 accept=0.72 flock=2.77 | KL=0.0252 EV=0.96 | gini=0.092 n=507 pend=36
+20:50:35 [INFO] [chunk  74] R=+0.0211 accept=0.76 flock=3.13 | KL=0.0259 EV=0.97 | gini=0.093 n=573 pend=15
+20:50:36 [INFO] [chunk  75] R=+0.0305 accept=0.74 flock=2.70 | KL=0.0007 EV=0.95 | gini=0.088 n=484 pend=34
+20:50:37 [INFO] [chunk  76] R=+0.0278 accept=0.74 flock=2.82 | KL=0.0202 EV=0.93 | gini=0.093 n=513 pend=27
+20:50:37 [INFO] [chunk  77] R=+0.0272 accept=0.77 flock=2.85 | KL=0.0149 EV=0.98 | gini=0.089 n=525 pend=19
+20:50:38 [INFO] [chunk  78] R=+0.0235 accept=0.78 flock=3.03 | KL=0.0149 EV=0.96 | gini=0.090 n=550 pend=40
+20:50:39 [INFO] [chunk  79] R=+0.0249 accept=0.78 flock=3.03 | KL=0.0149 EV=0.95 | gini=0.093 n=551 pend=32 |PASS-BARU
+20:50:40 [INFO] [chunk  80] R=+0.0330 accept=0.73 flock=2.67 | KL=0.0189 EV=0.99 | gini=0.056 n=478 pend=33
+20:50:41 [INFO] [chunk  81] R=+0.0237 accept=0.73 flock=2.98 | KL=0.0111 EV=0.98 | gini=0.078 n=554 pend=18
+20:50:41 [INFO] [chunk  82] R=+0.0251 accept=0.73 flock=2.96 | KL=0.0136 EV=0.97 | gini=0.086 n=539 pend=20
+20:50:42 [INFO] [chunk  83] R=+0.0270 accept=0.75 flock=2.84 | KL=0.0201 EV=0.95 | gini=0.086 n=519 pend=29
+20:50:43 [INFO] [chunk  84] R=+0.0211 accept=0.70 flock=3.13 | KL=0.0284 EV=0.97 | gini=0.089 n=572 pend=9
+20:50:44 [INFO] [chunk  85] R=+0.0330 accept=0.80 flock=2.65 | KL=0.0255 EV=0.95 | gini=0.087 n=480 pend=32
+20:50:44 [INFO] [chunk  86] R=+0.0294 accept=0.77 flock=2.84 | KL=0.0092 EV=0.93 | gini=0.087 n=521 pend=17
+20:50:45 [INFO] [chunk  87] R=+0.0293 accept=0.77 flock=2.79 | KL=0.0073 EV=0.99 | gini=0.088 n=510 pend=23
+20:50:46 [INFO] [chunk  88] R=+0.0238 accept=0.76 flock=3.11 | KL=0.0076 EV=0.96 | gini=0.090 n=563 pend=32
+20:50:47 [INFO] [chunk  89] R=+0.0244 accept=0.78 flock=3.03 | KL=0.0088 EV=0.96 | gini=0.088 n=547 pend=28 |PASS-BARU
+20:50:48 [INFO] [chunk  90] R=+0.0296 accept=0.70 flock=2.71 | KL=0.0260 EV=0.98 | gini=0.107 n=497 pend=14
+20:50:48 [INFO] [chunk  91] R=+0.0256 accept=0.76 flock=2.94 | KL=0.0206 EV=0.99 | gini=0.099 n=533 pend=19
+20:50:49 [INFO] [chunk  92] R=+0.0262 accept=0.80 flock=2.96 | KL=0.0040 EV=0.98 | gini=0.091 n=535 pend=26
+20:50:50 [INFO] [chunk  93] R=+0.0304 accept=0.78 flock=2.78 | KL=0.0119 EV=0.96 | gini=0.089 n=505 pend=49
+20:50:51 [INFO] [chunk  94] R=+0.0213 accept=0.77 flock=3.19 | KL=0.0240 EV=0.98 | gini=0.090 n=591 pend=10
+20:50:52 [INFO] [chunk  95] R=+0.0326 accept=0.81 flock=2.71 | KL=0.0117 EV=0.98 | gini=0.096 n=496 pend=17
+20:50:52 [INFO] [chunk  96] R=+0.0322 accept=0.83 flock=2.74 | KL=0.0226 EV=0.96 | gini=0.094 n=498 pend=25
+20:50:53 [INFO] [chunk  97] R=+0.0312 accept=0.81 flock=2.79 | KL=0.0296 EV=0.98 | gini=0.091 n=510 pend=30
+20:50:54 [INFO] [chunk  98] R=+0.0257 accept=0.84 flock=3.12 | KL=0.0125 EV=0.96 | gini=0.093 n=568 pend=35
+20:50:55 [INFO] [chunk  99] R=+0.0260 accept=0.83 flock=3.06 | KL=0.0143 EV=0.97 | gini=0.093 n=551 pend=28 |PASS-BARU
+20:50:55 [INFO] [chunk 100] R=+0.0317 accept=0.70 flock=2.73 | KL=0.0078 EV=0.98 | gini=0.086 n=497 pend=14
+20:50:56 [INFO] [chunk 101] R=+0.0263 accept=0.77 flock=2.93 | KL=0.0248 EV=0.99 | gini=0.079 n=536 pend=17
+20:50:57 [INFO] [chunk 102] R=+0.0266 accept=0.80 flock=2.98 | KL=0.0342 EV=0.98 | gini=0.087 n=537 pend=21
+20:50:58 [INFO] [chunk 103] R=+0.0301 accept=0.83 flock=2.85 | KL=0.0135 EV=0.96 | gini=0.092 n=519 pend=29
+20:50:59 [INFO] [chunk 104] R=+0.0250 accept=0.82 flock=3.09 | KL=0.0226 EV=0.97 | gini=0.094 n=559 pend=23
+20:50:59 [INFO] [chunk 105] R=+0.0321 accept=0.83 flock=2.78 | KL=0.0077 EV=0.95 | gini=0.091 n=502 pend=24
+20:51:00 [INFO] [chunk 106] R=+0.0309 accept=0.84 flock=2.82 | KL=0.0291 EV=0.93 | gini=0.092 n=520 pend=10
+20:51:01 [INFO] [chunk 107] R=+0.0315 accept=0.88 flock=2.83 | KL=0.0149 EV=0.98 | gini=0.095 n=513 pend=14
+20:51:02 [INFO] [chunk 108] R=+0.0271 accept=0.88 flock=3.05 | KL=0.0215 EV=0.97 | gini=0.095 n=550 pend=35
+20:51:02 [INFO] [chunk 109] R=+0.0268 accept=0.86 flock=3.06 | KL=-0.0040 EV=0.99 | gini=0.093 n=557 pend=21 |PASS-BARU
+20:51:03 [INFO] [chunk 110] R=+0.0306 accept=0.70 flock=2.73 | KL=0.0094 EV=0.99 | gini=0.072 n=498 pend=13
+20:51:04 [INFO] [chunk 111] R=+0.0269 accept=0.76 flock=2.92 | KL=0.0156 EV=0.99 | gini=0.074 n=532 pend=20
+20:51:05 [INFO] [chunk 112] R=+0.0255 accept=0.78 flock=2.98 | KL=0.0146 EV=0.98 | gini=0.083 n=538 pend=24
+20:51:06 [INFO] [chunk 113] R=+0.0296 accept=0.82 flock=2.84 | KL=0.0203 EV=0.98 | gini=0.089 n=516 pend=35
+20:51:06 [INFO] [chunk 114] R=+0.0231 accept=0.84 flock=3.13 | KL=0.0228 EV=0.98 | gini=0.087 n=567 pend=20
+20:51:07 [INFO] [chunk 115] R=+0.0317 accept=0.84 flock=2.76 | KL=0.0182 EV=0.97 | gini=0.084 n=501 pend=23
+20:51:08 [INFO] [chunk 116] R=+0.0336 accept=0.90 flock=2.75 | KL=0.0270 EV=0.97 | gini=0.088 n=499 pend=29
+20:51:09 [INFO] [chunk 117] R=+0.0321 accept=0.89 flock=2.89 | KL=0.0101 EV=0.99 | gini=0.089 n=531 pend=15
+20:51:10 [INFO] [chunk 118] R=+0.0270 accept=0.85 flock=3.04 | KL=0.0244 EV=0.97 | gini=0.090 n=545 pend=41
+20:51:10 [INFO] [chunk 119] R=+0.0272 accept=0.86 flock=3.04 | KL=0.0016 EV=0.98 | gini=0.091 n=552 pend=32 |PASS-BARU
+20:51:11 [INFO] [chunk 120] R=+0.0298 accept=0.75 flock=2.73 | KL=0.0297 EV=0.99 | gini=0.093 n=493 pend=18
+20:51:12 [INFO] [chunk 121] R=+0.0267 accept=0.77 flock=2.93 | KL=0.0186 EV=0.98 | gini=0.090 n=536 pend=21
+20:51:13 [INFO] [chunk 122] R=+0.0263 accept=0.82 flock=3.02 | KL=0.0061 EV=0.98 | gini=0.092 n=549 pend=14
+20:51:13 [INFO] [chunk 123] R=+0.0304 accept=0.86 flock=2.82 | KL=0.0134 EV=0.96 | gini=0.092 n=517 pend=24
+20:51:14 [INFO] [chunk 124] R=+0.0252 accept=0.85 flock=3.10 | KL=0.0584 EV=0.97 | gini=0.093 n=564 pend=12
+20:51:15 [INFO] [chunk 125] R=+0.0333 accept=0.84 flock=2.71 | KL=0.0095 EV=0.96 | gini=0.090 n=493 pend=23
+20:51:16 [INFO] [chunk 126] R=+0.0307 accept=0.85 flock=2.83 | KL=0.0291 EV=0.95 | gini=0.097 n=509 pend=19
+20:51:16 [INFO] [chunk 127] R=+0.0325 accept=0.88 flock=2.82 | KL=0.0172 EV=0.98 | gini=0.094 n=519 pend=17
+20:51:17 [INFO] [chunk 128] R=+0.0256 accept=0.85 flock=3.09 | KL=0.0247 EV=0.98 | gini=0.091 n=558 pend=30
+20:51:18 [INFO] [chunk 129] R=+0.0273 accept=0.91 flock=3.06 | KL=0.0115 EV=0.97 | gini=0.094 n=554 pend=19 |PASS-BARU
+20:51:19 [INFO] [chunk 130] R=+0.0296 accept=0.73 flock=2.76 | KL=0.0201 EV=0.98 | gini=0.106 n=493 pend=18
+20:51:20 [INFO] [chunk 131] R=+0.0275 accept=0.79 flock=2.90 | KL=0.0273 EV=0.99 | gini=0.090 n=524 pend=33
+20:51:20 [INFO] [chunk 132] R=+0.0273 accept=0.77 flock=3.00 | KL=0.0170 EV=0.98 | gini=0.100 n=551 pend=24
+20:51:21 [INFO] [chunk 133] R=+0.0312 accept=0.84 flock=2.84 | KL=0.0224 EV=0.99 | gini=0.096 n=521 pend=30
+20:51:22 [INFO] [chunk 134] R=+0.0256 accept=0.83 flock=3.10 | KL=0.0514 EV=0.96 | gini=0.102 n=562 pend=20
+20:51:23 [INFO] [chunk 135] R=+0.0347 accept=0.89 flock=2.74 | KL=-0.0030 EV=0.96 | gini=0.096 n=498 pend=25
+20:51:23 [INFO] [chunk 136] R=+0.0320 accept=0.87 flock=2.81 | KL=0.0175 EV=0.95 | gini=0.092 n=508 pend=22
+20:51:24 [INFO] [chunk 137] R=+0.0328 accept=0.87 flock=2.82 | KL=0.0064 EV=0.98 | gini=0.090 n=515 pend=24
+20:51:25 [INFO] [chunk 138] R=+0.0270 accept=0.90 flock=3.11 | KL=0.0107 EV=0.97 | gini=0.089 n=559 pend=37
+20:51:26 [INFO] [chunk 139] R=+0.0267 accept=0.89 flock=3.09 | KL=-0.0023 EV=0.98 | gini=0.089 n=567 pend=14 |PASS-BARU
+20:51:26 [INFO] [chunk 140] R=+0.0304 accept=0.75 flock=2.73 | KL=0.0183 EV=0.98 | gini=0.110 n=480 pend=31
+20:51:27 [INFO] [chunk 141] R=+0.0264 accept=0.78 flock=2.96 | KL=0.0238 EV=0.99 | gini=0.099 n=547 pend=22
+20:51:28 [INFO] [chunk 142] R=+0.0267 accept=0.85 flock=3.03 | KL=0.0208 EV=0.97 | gini=0.095 n=549 pend=16
+20:51:29 [INFO] [chunk 143] R=+0.0317 accept=0.83 flock=2.74 | KL=0.0334 EV=0.96 | gini=0.092 n=500 pend=42
+20:51:30 [INFO] [chunk 144] R=+0.0254 accept=0.86 flock=3.15 | KL=0.0302 EV=0.98 | gini=0.094 n=579 pend=16
+20:51:30 [INFO] [chunk 145] R=+0.0340 accept=0.90 flock=2.75 | KL=0.0124 EV=0.94 | gini=0.098 n=498 pend=22
+20:51:31 [INFO] [chunk 146] R=+0.0333 accept=0.92 flock=2.84 | KL=0.0177 EV=0.93 | gini=0.100 n=514 pend=13
+20:51:32 [INFO] [chunk 147] R=+0.0349 accept=0.88 flock=2.71 | KL=0.0051 EV=0.99 | gini=0.098 n=494 pend=35
+20:51:33 [INFO] [chunk 148] R=+0.0275 accept=0.89 flock=3.11 | KL=0.0094 EV=0.97 | gini=0.099 n=569 pend=38
+20:51:34 [INFO] [chunk 149] R=+0.0288 accept=0.91 flock=3.07 | KL=0.0115 EV=0.97 | gini=0.095 n=559 pend=22 |PASS-BARU
+20:51:34 [INFO] [chunk 150] R=+0.0284 accept=0.75 flock=2.82 | KL=0.0056 EV=0.98 | gini=0.082 n=493 pend=18
+20:51:35 [INFO] [chunk 151] R=+0.0276 accept=0.78 flock=2.91 | KL=0.0142 EV=0.98 | gini=0.075 n=538 pend=19
+20:51:36 [INFO] [chunk 152] R=+0.0273 accept=0.81 flock=2.97 | KL=0.0184 EV=0.99 | gini=0.077 n=535 pend=26
+20:51:37 [INFO] [chunk 153] R=+0.0316 accept=0.87 flock=2.82 | KL=0.0304 EV=0.98 | gini=0.079 n=523 pend=29
+20:51:37 [INFO] [chunk 154] R=+0.0271 accept=0.87 flock=3.07 | KL=0.0226 EV=0.97 | gini=0.078 n=554 pend=27
+20:51:38 [INFO] [chunk 155] R=+0.0334 accept=0.88 flock=2.79 | KL=0.0046 EV=0.97 | gini=0.077 n=511 pend=21
+20:51:39 [INFO] [chunk 156] R=+0.0352 accept=0.90 flock=2.74 | KL=0.0100 EV=0.94 | gini=0.077 n=494 pend=31
+20:51:40 [INFO] [chunk 157] R=+0.0349 accept=0.92 flock=2.77 | KL=0.0166 EV=0.98 | gini=0.075 n=514 pend=34
+20:51:41 [INFO] [chunk 158] R=+0.0249 accept=0.90 flock=3.20 | KL=0.0252 EV=0.98 | gini=0.077 n=583 pend=23
+20:51:41 [INFO] [chunk 159] R=+0.0302 accept=0.91 flock=2.98 | KL=0.0081 EV=0.98 | gini=0.078 n=538 pend=28 |PASS-BARU
+20:51:42 [INFO] [chunk 160] R=+0.0292 accept=0.75 flock=2.75 | KL=0.0148 EV=0.99 | gini=0.111 n=492 pend=18
+20:51:43 [INFO] [chunk 161] R=+0.0273 accept=0.78 flock=2.96 | KL=0.0542 EV=0.97 | gini=0.089 n=542 pend=16
+20:51:44 [INFO] [chunk 162] R=+0.0276 accept=0.82 flock=2.96 | KL=0.0273 EV=0.96 | gini=0.091 n=536 pend=22
+20:51:44 [INFO] [chunk 163] R=+0.0319 accept=0.87 flock=2.87 | KL=0.0146 EV=0.98 | gini=0.090 n=526 pend=23
+20:51:45 [INFO] [chunk 164] R=+0.0270 accept=0.91 flock=3.10 | KL=0.0240 EV=0.96 | gini=0.088 n=559 pend=16
+20:51:46 [INFO] [chunk 165] R=+0.0352 accept=0.90 flock=2.75 | KL=0.0107 EV=0.96 | gini=0.087 n=499 pend=21
+20:51:47 [INFO] [chunk 166] R=+0.0342 accept=0.93 flock=2.81 | KL=0.0124 EV=0.96 | gini=0.089 n=511 pend=14
+20:51:47 [INFO] [chunk 167] R=+0.0334 accept=0.94 flock=2.83 | KL=0.0103 EV=0.98 | gini=0.088 n=510 pend=22
+20:51:48 [INFO] [chunk 168] R=+0.0280 accept=0.91 flock=3.10 | KL=0.0259 EV=0.98 | gini=0.090 n=551 pend=41
+20:51:49 [INFO] [chunk 169] R=+0.0287 accept=0.92 flock=3.10 | KL=0.0128 EV=0.97 | gini=0.091 n=565 pend=21 |PASS-BARU
+20:51:50 [INFO] [chunk 170] R=+0.0319 accept=0.72 flock=2.72 | KL=0.0159 EV=0.99 | gini=0.091 n=491 pend=20
+20:51:51 [INFO] [chunk 171] R=+0.0286 accept=0.81 flock=2.88 | KL=0.0213 EV=0.98 | gini=0.105 n=521 pend=36
+20:51:51 [INFO] [chunk 172] R=+0.0254 accept=0.85 flock=3.07 | KL=0.0217 EV=0.97 | gini=0.099 n=555 pend=24
+20:51:52 [INFO] [chunk 173] R=+0.0301 accept=0.84 flock=2.92 | KL=0.0158 EV=0.99 | gini=0.093 n=532 pend=20
+20:51:53 [INFO] [chunk 174] R=+0.0287 accept=0.89 flock=3.04 | KL=0.0239 EV=0.98 | gini=0.091 n=549 pend=23
+20:51:54 [INFO] [chunk 175] R=+0.0364 accept=0.91 flock=2.71 | KL=0.0210 EV=0.97 | gini=0.087 n=497 pend=30
+20:51:54 [INFO] [chunk 176] R=+0.0322 accept=0.91 flock=2.86 | KL=0.0172 EV=0.95 | gini=0.085 n=515 pend=19
+20:51:55 [INFO] [chunk 177] R=+0.0343 accept=0.92 flock=2.81 | KL=0.0167 EV=0.97 | gini=0.083 n=515 pend=22
+20:51:56 [INFO] [chunk 178] R=+0.0275 accept=0.92 flock=3.09 | KL=0.0016 EV=0.99 | gini=0.087 n=555 pend=38
+20:51:57 [INFO] [chunk 179] R=+0.0300 accept=0.94 flock=3.05 | KL=0.0059 EV=0.97 | gini=0.088 n=557 pend=24 |PASS-BARU
+20:51:57 [INFO] [chunk 180] R=+0.0305 accept=0.73 flock=2.75 | KL=0.0089 EV=0.99 | gini=0.062 n=497 pend=14
+20:51:58 [INFO] [chunk 181] R=+0.0292 accept=0.81 flock=2.91 | KL=0.0075 EV=0.98 | gini=0.056 n=533 pend=20
+20:51:59 [INFO] [chunk 182] R=+0.0282 accept=0.85 flock=2.99 | KL=0.0168 EV=0.97 | gini=0.067 n=535 pend=26
+20:52:00 [INFO] [chunk 183] R=+0.0309 accept=0.87 flock=2.86 | KL=0.0058 EV=0.99 | gini=0.071 n=525 pend=29
+20:52:01 [INFO] [chunk 184] R=+0.0263 accept=0.89 flock=3.13 | KL=0.0358 EV=0.97 | gini=0.079 n=573 pend=8
+20:52:02 [INFO] [chunk 185] R=+0.0367 accept=0.88 flock=2.62 | KL=0.0349 EV=0.98 | gini=0.085 n=468 pend=44
+20:52:02 [INFO] [chunk 186] R=+0.0328 accept=0.91 flock=2.90 | KL=0.0183 EV=0.97 | gini=0.086 n=526 pend=23
+20:52:03 [INFO] [chunk 187] R=+0.0346 accept=0.91 flock=2.85 | KL=0.0089 EV=0.99 | gini=0.089 n=522 pend=18
+20:52:04 [INFO] [chunk 188] R=+0.0289 accept=0.90 flock=3.10 | KL=0.0500 EV=0.96 | gini=0.088 n=557 pend=32
+20:52:05 [INFO] [chunk 189] R=+0.0298 accept=0.93 flock=3.04 | KL=0.0471 EV=0.96 | gini=0.087 n=541 pend=33 |PASS-BARU
+20:52:05 [INFO] [chunk 190] R=+0.0285 accept=0.69 flock=2.77 | KL=0.0099 EV=0.99 | gini=0.054 n=501 pend=9
+20:52:06 [INFO] [chunk 191] R=+0.0287 accept=0.81 flock=2.91 | KL=0.0160 EV=0.98 | gini=0.076 n=530 pend=19
+20:52:07 [INFO] [chunk 192] R=+0.0275 accept=0.83 flock=2.98 | KL=0.0237 EV=0.99 | gini=0.084 n=537 pend=24
+20:52:08 [INFO] [chunk 193] R=+0.0333 accept=0.87 flock=2.83 | KL=0.0329 EV=0.97 | gini=0.077 n=523 pend=28
+20:52:09 [INFO] [chunk 194] R=+0.0281 accept=0.90 flock=3.09 | KL=0.0148 EV=0.98 | gini=0.075 n=560 pend=20
+20:52:09 [INFO] [chunk 195] R=+0.0355 accept=0.91 flock=2.74 | KL=0.0162 EV=0.98 | gini=0.076 n=504 pend=19
+20:52:10 [INFO] [chunk 196] R=+0.0353 accept=0.93 flock=2.77 | KL=0.0070 EV=0.96 | gini=0.076 n=506 pend=18
+20:52:11 [INFO] [chunk 197] R=+0.0353 accept=0.92 flock=2.79 | KL=0.0132 EV=0.99 | gini=0.078 n=503 pend=32
+20:52:12 [INFO] [chunk 198] R=+0.0287 accept=0.91 flock=3.10 | KL=0.0191 EV=0.96 | gini=0.082 n=558 pend=46
+20:52:12 [INFO] [chunk 199] R=+0.0287 accept=0.93 flock=3.13 | KL=0.0251 EV=0.98 | gini=0.085 n=569 pend=20 |PASS-BARU
+[SELESAI] t2_masterbid_30d_sgn_seed0 (159s)
+[masterbid_30d_sgn] seed=0 selesai 2.6 mnt
+
+================================================================
+[masterbid_30d_abs] seed=1 aturan-trust=abs dataset=scenario_dataset_klaster12_4x.json
+================================================================
+20:52:12 [INFO] CONFIG {'dataset': '/home/iskandar/Alan/TesisRepo/scenario_dataset_klaster12_4x.json', 'N': 6, 'obs_dim': 42, 'willingness_ratio': None, 'k': 2, 't_max': 120.0, 'rollout_steps': 288, 'seed': 1, 'alpha_wait': 0.0046, 'beta_prox': 0.1, 'alpha_gini': 2.6019, 'alpha_flock': 0.0208, 'lr': 0.0003, 'gamma': 0.99, 'avg_reward': True, 'clip': 0.2, 'ent_coef': 0.01, 'epochs': 10, 'minibatch': 64}
+20:52:13 [INFO] [chunk   0] R=+0.0289 accept=0.67 flock=2.74 | KL=0.0090 EV=0.83 | gini=0.109 n=488 pend=22
+20:52:14 [INFO] [chunk   1] R=+0.0231 accept=0.66 flock=2.97 | KL=0.0128 EV=0.95 | gini=0.093 n=537 pend=24
+20:52:15 [INFO] [chunk   2] R=+0.0226 accept=0.64 flock=3.02 | KL=0.0173 EV=0.95 | gini=0.092 n=543 pend=23
+20:52:16 [INFO] [chunk   3] R=+0.0262 accept=0.63 flock=2.86 | KL=0.0387 EV=0.96 | gini=0.097 n=520 pend=30
+20:52:17 [INFO] [chunk   4] R=+0.0180 accept=0.61 flock=3.14 | KL=0.0086 EV=0.91 | gini=0.103 n=566 pend=17
+20:52:18 [INFO] [chunk   5] R=+0.0265 accept=0.62 flock=2.75 | KL=0.0029 EV=0.90 | gini=0.103 n=496 pend=24
+20:52:19 [INFO] [chunk   6] R=+0.0257 accept=0.62 flock=2.83 | KL=0.0220 EV=0.91 | gini=0.102 n=503 pend=26
+20:52:20 [INFO] [chunk   7] R=+0.0243 accept=0.61 flock=2.87 | KL=0.0180 EV=0.97 | gini=0.102 n=518 pend=24
+20:52:21 [INFO] [chunk   8] R=+0.0181 accept=0.61 flock=3.21 | KL=0.0153 EV=0.93 | gini=0.101 n=564 pend=33
+20:52:22 [INFO] [chunk   9] R=+0.0194 accept=0.60 flock=3.09 | KL=0.0114 EV=0.92 | gini=0.100 n=545 pend=31 |PASS-BARU
+20:52:23 [INFO] [chunk  10] R=+0.0310 accept=0.66 flock=2.72 | KL=0.0044 EV=0.96 | gini=0.116 n=490 pend=21
+20:52:23 [INFO] [chunk  11] R=+0.0229 accept=0.64 flock=2.92 | KL=0.0253 EV=0.96 | gini=0.104 n=521 pend=37
+20:52:24 [INFO] [chunk  12] R=+0.0198 accept=0.65 flock=3.13 | KL=0.0220 EV=0.94 | gini=0.080 n=562 pend=19
+20:52:25 [INFO] [chunk  13] R=+0.0280 accept=0.61 flock=2.70 | KL=0.0236 EV=0.94 | gini=0.080 n=493 pend=53
+20:52:26 [INFO] [chunk  14] R=+0.0159 accept=0.58 flock=3.20 | KL=0.0083 EV=0.95 | gini=0.094 n=586 pend=19
+20:52:26 [INFO] [chunk  15] R=+0.0262 accept=0.61 flock=2.76 | KL=0.0186 EV=0.92 | gini=0.092 n=502 pend=21
+20:52:27 [INFO] [chunk  16] R=+0.0268 accept=0.64 flock=2.75 | KL=0.0057 EV=0.92 | gini=0.096 n=498 pend=27
+20:52:28 [INFO] [chunk  17] R=+0.0253 accept=0.61 flock=2.85 | KL=0.0153 EV=0.97 | gini=0.095 n=522 pend=22
+20:52:29 [INFO] [chunk  18] R=+0.0191 accept=0.63 flock=3.09 | KL=0.0231 EV=0.94 | gini=0.098 n=556 pend=38
+20:52:29 [INFO] [chunk  19] R=+0.0215 accept=0.62 flock=2.98 | KL=0.0122 EV=0.94 | gini=0.098 n=539 pend=42 |PASS-BARU
+20:52:30 [INFO] [chunk  20] R=+0.0283 accept=0.64 flock=2.70 | KL=0.0110 EV=0.97 | gini=0.086 n=480 pend=29
+20:52:31 [INFO] [chunk  21] R=+0.0229 accept=0.68 flock=2.95 | KL=0.0164 EV=0.98 | gini=0.084 n=545 pend=25
+20:52:32 [INFO] [chunk  22] R=+0.0202 accept=0.61 flock=2.99 | KL=0.0186 EV=0.97 | gini=0.086 n=541 pend=26
+20:52:33 [INFO] [chunk  23] R=+0.0245 accept=0.62 flock=2.82 | KL=0.0093 EV=0.94 | gini=0.088 n=514 pend=37
+20:52:33 [INFO] [chunk  24] R=+0.0176 accept=0.59 flock=3.17 | KL=0.0045 EV=0.96 | gini=0.090 n=565 pend=26
+20:52:34 [INFO] [chunk  25] R=+0.0258 accept=0.61 flock=2.78 | KL=0.0178 EV=0.95 | gini=0.085 n=503 pend=27
+20:52:35 [INFO] [chunk  26] R=+0.0242 accept=0.61 flock=2.85 | KL=0.0285 EV=0.90 | gini=0.086 n=509 pend=22
+20:52:36 [INFO] [chunk  27] R=+0.0243 accept=0.60 flock=2.80 | KL=0.0201 EV=0.97 | gini=0.086 n=508 pend=32
+20:52:37 [INFO] [chunk  28] R=+0.0188 accept=0.57 flock=3.10 | KL=0.0117 EV=0.95 | gini=0.082 n=560 pend=42
+20:52:37 [INFO] [chunk  29] R=+0.0186 accept=0.60 flock=3.08 | KL=0.0013 EV=0.96 | gini=0.085 n=560 pend=26 |PASS-BARU
+20:52:38 [INFO] [chunk  30] R=+0.0289 accept=0.63 flock=2.75 | KL=0.0163 EV=0.97 | gini=0.108 n=484 pend=27
+20:52:39 [INFO] [chunk  31] R=+0.0216 accept=0.68 flock=3.00 | KL=0.0171 EV=0.98 | gini=0.114 n=550 pend=15
+20:52:40 [INFO] [chunk  32] R=+0.0246 accept=0.67 flock=2.95 | KL=0.0115 EV=0.95 | gini=0.116 n=525 pend=33
+20:52:41 [INFO] [chunk  33] R=+0.0227 accept=0.65 flock=2.98 | KL=0.0253 EV=0.97 | gini=0.117 n=540 pend=19
+20:52:42 [INFO] [chunk  34] R=+0.0210 accept=0.65 flock=3.07 | KL=0.0166 EV=0.92 | gini=0.111 n=555 pend=17
+20:52:43 [INFO] [chunk  35] R=+0.0260 accept=0.62 flock=2.79 | KL=0.0042 EV=0.91 | gini=0.109 n=504 pend=16
+20:52:44 [INFO] [chunk  36] R=+0.0282 accept=0.67 flock=2.75 | KL=0.0151 EV=0.89 | gini=0.108 n=490 pend=31
+20:52:44 [INFO] [chunk  37] R=+0.0248 accept=0.64 flock=2.91 | KL=0.0114 EV=0.96 | gini=0.102 n=533 pend=16
+20:52:46 [INFO] [chunk  38] R=+0.0213 accept=0.68 flock=3.07 | KL=0.0226 EV=0.94 | gini=0.103 n=550 pend=37
+20:52:47 [INFO] [chunk  39] R=+0.0199 accept=0.64 flock=3.09 | KL=0.0114 EV=0.96 | gini=0.104 n=557 pend=23 |PASS-BARU
+20:52:48 [INFO] [chunk  40] R=+0.0294 accept=0.65 flock=2.83 | KL=0.0188 EV=0.98 | gini=0.123 n=485 pend=25
+20:52:49 [INFO] [chunk  41] R=+0.0212 accept=0.65 flock=2.99 | KL=0.0118 EV=0.99 | gini=0.118 n=545 pend=20
+20:52:50 [INFO] [chunk  42] R=+0.0235 accept=0.66 flock=3.00 | KL=0.0091 EV=0.97 | gini=0.104 n=541 pend=21
+20:52:50 [INFO] [chunk  43] R=+0.0285 accept=0.69 flock=2.80 | KL=0.0163 EV=0.96 | gini=0.103 n=506 pend=40
+20:52:51 [INFO] [chunk  44] R=+0.0201 accept=0.68 flock=3.15 | KL=0.0085 EV=0.97 | gini=0.102 n=572 pend=22
+20:52:52 [INFO] [chunk  45] R=+0.0273 accept=0.63 flock=2.76 | KL=0.0082 EV=0.95 | gini=0.098 n=496 pend=30
+20:52:53 [INFO] [chunk  46] R=+0.0254 accept=0.64 flock=2.84 | KL=0.0106 EV=0.91 | gini=0.099 n=511 pend=24
+20:52:54 [INFO] [chunk  47] R=+0.0263 accept=0.64 flock=2.82 | KL=0.0065 EV=0.98 | gini=0.099 n=516 pend=25
+20:52:55 [INFO] [chunk  48] R=+0.0197 accept=0.64 flock=3.14 | KL=0.0098 EV=0.95 | gini=0.098 n=561 pend=34
+20:52:56 [INFO] [chunk  49] R=+0.0204 accept=0.65 flock=3.12 | KL=-0.0026 EV=0.94 | gini=0.096 n=557 pend=21 |PASS-BARU
+20:52:57 [INFO] [chunk  50] R=+0.0287 accept=0.66 flock=2.90 | KL=0.0126 EV=0.98 | gini=0.090 n=502 pend=9
+20:52:58 [INFO] [chunk  51] R=+0.0243 accept=0.68 flock=2.95 | KL=0.0227 EV=0.98 | gini=0.099 n=535 pend=13
+20:52:58 [INFO] [chunk  52] R=+0.0237 accept=0.67 flock=2.98 | KL=0.0131 EV=0.98 | gini=0.091 n=537 pend=18
+20:52:59 [INFO] [chunk  53] R=+0.0259 accept=0.68 flock=2.89 | KL=0.0105 EV=0.94 | gini=0.091 n=517 pend=28
+20:53:00 [INFO] [chunk  54] R=+0.0195 accept=0.68 flock=3.20 | KL=0.0266 EV=0.94 | gini=0.092 n=557 pend=23
+20:53:01 [INFO] [chunk  55] R=+0.0253 accept=0.68 flock=2.88 | KL=0.0125 EV=0.91 | gini=0.095 n=514 pend=13
+20:53:02 [INFO] [chunk  56] R=+0.0276 accept=0.66 flock=2.85 | KL=0.0124 EV=0.89 | gini=0.099 n=500 pend=16
+20:53:03 [INFO] [chunk  57] R=+0.0242 accept=0.68 flock=2.93 | KL=0.0011 EV=0.97 | gini=0.101 n=508 pend=27
+20:53:03 [INFO] [chunk  58] R=+0.0168 accept=0.66 flock=3.29 | KL=0.0278 EV=0.96 | gini=0.100 n=571 pend=27
+20:53:04 [INFO] [chunk  59] R=+0.0216 accept=0.65 flock=3.08 | KL=0.0215 EV=0.96 | gini=0.101 n=544 pend=25 |PASS-BARU
+20:53:05 [INFO] [chunk  60] R=+0.0290 accept=0.63 flock=2.88 | KL=0.0095 EV=0.98 | gini=0.088 n=494 pend=16
+20:53:06 [INFO] [chunk  61] R=+0.0233 accept=0.65 flock=2.97 | KL=0.0173 EV=0.98 | gini=0.087 n=537 pend=19
+20:53:07 [INFO] [chunk  62] R=+0.0221 accept=0.67 flock=3.02 | KL=-0.0030 EV=0.97 | gini=0.090 n=537 pend=23
+20:53:07 [INFO] [chunk  63] R=+0.0256 accept=0.67 flock=2.82 | KL=0.0030 EV=0.95 | gini=0.087 n=509 pend=41
+20:53:08 [INFO] [chunk  64] R=+0.0191 accept=0.64 flock=3.17 | KL=0.0111 EV=0.97 | gini=0.090 n=581 pend=13
+20:53:09 [INFO] [chunk  65] R=+0.0262 accept=0.67 flock=2.88 | KL=0.0099 EV=0.96 | gini=0.092 n=501 pend=15
+20:53:10 [INFO] [chunk  66] R=+0.0261 accept=0.64 flock=2.78 | KL=0.0268 EV=0.94 | gini=0.096 n=506 pend=15
+20:53:11 [INFO] [chunk  67] R=+0.0285 accept=0.66 flock=2.74 | KL=0.0120 EV=0.99 | gini=0.098 n=489 pend=43
+20:53:11 [INFO] [chunk  68] R=+0.0205 accept=0.64 flock=3.16 | KL=0.0087 EV=0.98 | gini=0.100 n=579 pend=35
+20:53:12 [INFO] [chunk  69] R=+0.0196 accept=0.62 flock=3.08 | KL=0.0203 EV=0.97 | gini=0.100 n=549 pend=29 |PASS-BARU
+20:53:13 [INFO] [chunk  70] R=+0.0299 accept=0.66 flock=2.81 | KL=0.0119 EV=0.99 | gini=0.096 n=493 pend=18
+20:53:14 [INFO] [chunk  71] R=+0.0252 accept=0.68 flock=2.93 | KL=0.0224 EV=0.98 | gini=0.113 n=536 pend=21
+20:53:15 [INFO] [chunk  72] R=+0.0228 accept=0.69 flock=3.02 | KL=0.0148 EV=0.98 | gini=0.113 n=548 pend=15
+20:53:15 [INFO] [chunk  73] R=+0.0263 accept=0.68 flock=2.88 | KL=0.0242 EV=0.95 | gini=0.115 n=516 pend=26
+20:53:16 [INFO] [chunk  74] R=+0.0201 accept=0.67 flock=3.14 | KL=0.0178 EV=0.94 | gini=0.116 n=551 pend=27
+20:53:17 [INFO] [chunk  75] R=+0.0267 accept=0.67 flock=2.84 | KL=0.0083 EV=0.96 | gini=0.120 n=516 pend=15
+20:53:18 [INFO] [chunk  76] R=+0.0271 accept=0.67 flock=2.82 | KL=0.0103 EV=0.90 | gini=0.120 n=500 pend=20
+20:53:18 [INFO] [chunk  77] R=+0.0267 accept=0.66 flock=2.84 | KL=0.0142 EV=0.97 | gini=0.119 n=513 pend=24
+20:53:19 [INFO] [chunk  78] R=+0.0208 accept=0.68 flock=3.17 | KL=0.0095 EV=0.96 | gini=0.116 n=559 pend=35
+20:53:20 [INFO] [chunk  79] R=+0.0222 accept=0.69 flock=3.09 | KL=0.0110 EV=0.96 | gini=0.116 n=553 pend=26 |PASS-BARU
+20:53:21 [INFO] [chunk  80] R=+0.0315 accept=0.66 flock=2.79 | KL=0.0013 EV=0.98 | gini=0.073 n=482 pend=29
+20:53:21 [INFO] [chunk  81] R=+0.0244 accept=0.71 flock=3.02 | KL=0.0121 EV=0.99 | gini=0.076 n=553 pend=15
+20:53:22 [INFO] [chunk  82] R=+0.0238 accept=0.68 flock=2.97 | KL=0.0061 EV=0.98 | gini=0.079 n=522 pend=33
+20:53:23 [INFO] [chunk  83] R=+0.0261 accept=0.69 flock=2.90 | KL=0.0182 EV=0.98 | gini=0.086 n=530 pend=31
+20:53:24 [INFO] [chunk  84] R=+0.0221 accept=0.74 flock=3.16 | KL=0.0129 EV=0.97 | gini=0.085 n=572 pend=12
+20:53:25 [INFO] [chunk  85] R=+0.0301 accept=0.73 flock=2.74 | KL=0.0059 EV=0.97 | gini=0.088 n=491 pend=25
+20:53:25 [INFO] [chunk  86] R=+0.0295 accept=0.77 flock=2.80 | KL=0.0108 EV=0.94 | gini=0.090 n=495 pend=35
+20:53:26 [INFO] [chunk  87] R=+0.0264 accept=0.74 flock=2.92 | KL=0.0213 EV=0.98 | gini=0.090 n=537 pend=15
+20:53:27 [INFO] [chunk  88] R=+0.0245 accept=0.77 flock=3.07 | KL=0.0128 EV=0.97 | gini=0.093 n=549 pend=37
+20:53:28 [INFO] [chunk  89] R=+0.0232 accept=0.74 flock=3.11 | KL=0.0139 EV=0.97 | gini=0.096 n=560 pend=20 |PASS-BARU
+20:53:28 [INFO] [chunk  90] R=+0.0282 accept=0.68 flock=3.03 | KL=0.0027 EV=0.98 | gini=0.105 n=495 pend=16
+20:53:29 [INFO] [chunk  91] R=+0.0245 accept=0.71 flock=2.97 | KL=0.0284 EV=0.96 | gini=0.112 n=535 pend=20
+20:53:30 [INFO] [chunk  92] R=+0.0239 accept=0.72 flock=3.02 | KL=-0.0096 EV=0.97 | gini=0.100 n=540 pend=22
+20:53:31 [INFO] [chunk  93] R=+0.0279 accept=0.71 flock=2.82 | KL=0.0292 EV=0.94 | gini=0.102 n=506 pend=41
+20:53:32 [INFO] [chunk  94] R=+0.0220 accept=0.74 flock=3.15 | KL=0.0096 EV=0.98 | gini=0.098 n=576 pend=19
+20:53:32 [INFO] [chunk  95] R=+0.0302 accept=0.77 flock=2.75 | KL=0.0077 EV=0.95 | gini=0.098 n=492 pend=31
+20:53:33 [INFO] [chunk  96] R=+0.0284 accept=0.77 flock=2.87 | KL=0.0036 EV=0.94 | gini=0.099 n=517 pend=18
+20:53:34 [INFO] [chunk  97] R=+0.0313 accept=0.81 flock=2.82 | KL=0.0221 EV=0.98 | gini=0.096 n=511 pend=25
+20:53:35 [INFO] [chunk  98] R=+0.0223 accept=0.80 flock=3.17 | KL=0.0083 EV=0.97 | gini=0.094 n=566 pend=29
+20:53:35 [INFO] [chunk  99] R=+0.0271 accept=0.77 flock=3.02 | KL=0.0010 EV=0.96 | gini=0.093 n=534 pend=39 |PASS-BARU
+20:53:36 [INFO] [chunk 100] R=+0.0312 accept=0.70 flock=2.84 | KL=0.0164 EV=0.98 | gini=0.092 n=499 pend=12
+20:53:37 [INFO] [chunk 101] R=+0.0260 accept=0.75 flock=3.00 | KL=0.0152 EV=0.98 | gini=0.112 n=537 pend=14
+20:53:38 [INFO] [chunk 102] R=+0.0264 accept=0.78 flock=2.97 | KL=0.0087 EV=0.98 | gini=0.103 n=531 pend=25
+20:53:38 [INFO] [chunk 103] R=+0.0275 accept=0.78 flock=2.91 | KL=0.0297 EV=0.96 | gini=0.100 n=519 pend=33
+20:53:39 [INFO] [chunk 104] R=+0.0229 accept=0.76 flock=3.11 | KL=0.0202 EV=0.97 | gini=0.093 n=556 pend=29
+20:53:40 [INFO] [chunk 105] R=+0.0294 accept=0.80 flock=2.84 | KL=0.0058 EV=0.95 | gini=0.092 n=520 pend=12
+20:53:41 [INFO] [chunk 106] R=+0.0292 accept=0.76 flock=2.81 | KL=0.0143 EV=0.92 | gini=0.090 n=500 pend=17
+20:53:42 [INFO] [chunk 107] R=+0.0314 accept=0.81 flock=2.80 | KL=0.0097 EV=0.99 | gini=0.095 n=504 pend=30
+20:53:42 [INFO] [chunk 108] R=+0.0236 accept=0.77 flock=3.12 | KL=0.0174 EV=0.97 | gini=0.093 n=559 pend=43
+20:53:43 [INFO] [chunk 109] R=+0.0225 accept=0.78 flock=3.17 | KL=0.0142 EV=0.97 | gini=0.095 n=565 pend=21 |PASS-BARU
+20:53:44 [INFO] [chunk 110] R=+0.0302 accept=0.66 flock=2.80 | KL=0.0004 EV=0.97 | gini=0.129 n=492 pend=19
+20:53:45 [INFO] [chunk 111] R=+0.0250 accept=0.73 flock=2.98 | KL=0.0305 EV=0.98 | gini=0.112 n=541 pend=17
+20:53:46 [INFO] [chunk 112] R=+0.0254 accept=0.73 flock=2.97 | KL=0.0129 EV=0.98 | gini=0.105 n=538 pend=21
+20:53:46 [INFO] [chunk 113] R=+0.0283 accept=0.77 flock=2.88 | KL=0.0172 EV=0.97 | gini=0.114 n=520 pend=27
+20:53:47 [INFO] [chunk 114] R=+0.0230 accept=0.75 flock=3.11 | KL=0.0173 EV=0.96 | gini=0.119 n=557 pend=22
+20:53:48 [INFO] [chunk 115] R=+0.0312 accept=0.79 flock=2.72 | KL=0.0034 EV=0.97 | gini=0.114 n=495 pend=32
+20:53:49 [INFO] [chunk 116] R=+0.0289 accept=0.77 flock=2.83 | KL=0.0155 EV=0.93 | gini=0.112 n=505 pend=31
+20:53:49 [INFO] [chunk 117] R=+0.0296 accept=0.77 flock=2.83 | KL=0.0046 EV=0.98 | gini=0.111 n=514 pend=34
+20:53:50 [INFO] [chunk 118] R=+0.0218 accept=0.75 flock=3.17 | KL=0.0132 EV=0.97 | gini=0.114 n=565 pend=41
+20:53:51 [INFO] [chunk 119] R=+0.0248 accept=0.76 flock=3.08 | KL=0.0137 EV=0.97 | gini=0.112 n=560 pend=25 |PASS-BARU
+20:53:52 [INFO] [chunk 120] R=+0.0301 accept=0.69 flock=2.77 | KL=0.0153 EV=0.98 | gini=0.113 n=491 pend=20
+20:53:53 [INFO] [chunk 121] R=+0.0249 accept=0.73 flock=2.95 | KL=0.0266 EV=0.96 | gini=0.091 n=547 pend=12
+20:53:53 [INFO] [chunk 122] R=+0.0258 accept=0.73 flock=2.95 | KL=0.0093 EV=0.98 | gini=0.090 n=534 pend=20
+20:53:54 [INFO] [chunk 123] R=+0.0298 accept=0.76 flock=2.84 | KL=0.0144 EV=0.95 | gini=0.097 n=524 pend=23
+20:53:55 [INFO] [chunk 124] R=+0.0243 accept=0.76 flock=3.05 | KL=0.0385 EV=0.95 | gini=0.092 n=552 pend=23
+20:53:56 [INFO] [chunk 125] R=+0.0327 accept=0.78 flock=2.72 | KL=0.0060 EV=0.96 | gini=0.091 n=487 pend=39
+20:53:57 [INFO] [chunk 126] R=+0.0297 accept=0.76 flock=2.85 | KL=0.0030 EV=0.95 | gini=0.086 n=517 pend=28
+20:53:57 [INFO] [chunk 127] R=+0.0286 accept=0.77 flock=2.85 | KL=0.0085 EV=0.98 | gini=0.086 n=519 pend=26
+20:53:58 [INFO] [chunk 128] R=+0.0233 accept=0.75 flock=3.07 | KL=0.0086 EV=0.97 | gini=0.091 n=557 pend=40
+20:53:59 [INFO] [chunk 129] R=+0.0257 accept=0.77 flock=3.06 | KL=0.0125 EV=0.97 | gini=0.090 n=553 pend=30 |PASS-BARU
+20:54:00 [INFO] [chunk 130] R=+0.0319 accept=0.68 flock=2.71 | KL=0.0130 EV=0.99 | gini=0.109 n=489 pend=22
+20:54:00 [INFO] [chunk 131] R=+0.0269 accept=0.78 flock=2.96 | KL=0.0474 EV=0.98 | gini=0.113 n=544 pend=17
+20:54:01 [INFO] [chunk 132] R=+0.0252 accept=0.72 flock=2.95 | KL=0.0174 EV=0.98 | gini=0.112 n=537 pend=22
+20:54:02 [INFO] [chunk 133] R=+0.0293 accept=0.77 flock=2.83 | KL=0.0324 EV=0.99 | gini=0.108 n=513 pend=34
+20:54:03 [INFO] [chunk 134] R=+0.0237 accept=0.80 flock=3.13 | KL=0.0296 EV=0.98 | gini=0.108 n=568 pend=20
+20:54:04 [INFO] [chunk 135] R=+0.0318 accept=0.75 flock=2.70 | KL=0.0037 EV=0.97 | gini=0.106 n=484 pend=39
+20:54:04 [INFO] [chunk 136] R=+0.0261 accept=0.77 flock=2.96 | KL=0.0194 EV=0.97 | gini=0.107 n=533 pend=12
+20:54:05 [INFO] [chunk 137] R=+0.0296 accept=0.77 flock=2.84 | KL=0.0116 EV=0.98 | gini=0.104 n=518 pend=11
+20:54:06 [INFO] [chunk 138] R=+0.0252 accept=0.78 flock=3.07 | KL=0.0125 EV=0.98 | gini=0.105 n=553 pend=28
+20:54:07 [INFO] [chunk 139] R=+0.0269 accept=0.83 flock=3.01 | KL=0.0106 EV=0.97 | gini=0.104 n=544 pend=28 |PASS-BARU
+20:54:07 [INFO] [chunk 140] R=+0.0308 accept=0.68 flock=2.86 | KL=0.0136 EV=0.98 | gini=0.113 n=481 pend=29
+20:54:08 [INFO] [chunk 141] R=+0.0243 accept=0.75 flock=3.00 | KL=0.0176 EV=0.97 | gini=0.116 n=554 pend=15
+20:54:09 [INFO] [chunk 142] R=+0.0259 accept=0.78 flock=2.98 | KL=0.0050 EV=0.97 | gini=0.110 n=537 pend=20
+20:54:10 [INFO] [chunk 143] R=+0.0301 accept=0.77 flock=2.79 | KL=0.0142 EV=0.96 | gini=0.109 n=500 pend=46
+20:54:11 [INFO] [chunk 144] R=+0.0236 accept=0.80 flock=3.11 | KL=0.0155 EV=0.96 | gini=0.105 n=558 pend=40
+20:54:12 [INFO] [chunk 145] R=+0.0311 accept=0.81 flock=2.78 | KL=0.0006 EV=0.97 | gini=0.101 n=510 pend=34
+20:54:12 [INFO] [chunk 146] R=+0.0295 accept=0.79 flock=2.88 | KL=0.0077 EV=0.96 | gini=0.098 n=518 pend=22
+20:54:13 [INFO] [chunk 147] R=+0.0310 accept=0.81 flock=2.79 | KL=0.0110 EV=0.98 | gini=0.094 n=508 pend=31
+20:54:14 [INFO] [chunk 148] R=+0.0243 accept=0.82 flock=3.13 | KL=0.0185 EV=0.98 | gini=0.091 n=565 pend=36
+20:54:15 [INFO] [chunk 149] R=+0.0269 accept=0.83 flock=3.05 | KL=0.0079 EV=0.96 | gini=0.092 n=555 pend=25 |PASS-BARU
+20:54:16 [INFO] [chunk 150] R=+0.0301 accept=0.70 flock=2.78 | KL=0.0106 EV=0.99 | gini=0.100 n=493 pend=18
+20:54:16 [INFO] [chunk 151] R=+0.0245 accept=0.74 flock=2.96 | KL=0.0219 EV=0.99 | gini=0.079 n=540 pend=17
+20:54:17 [INFO] [chunk 152] R=+0.0265 accept=0.81 flock=3.01 | KL=0.0483 EV=0.97 | gini=0.085 n=543 pend=16
+20:54:18 [INFO] [chunk 153] R=+0.0316 accept=0.79 flock=2.72 | KL=0.0148 EV=0.97 | gini=0.085 n=494 pend=48
+20:54:19 [INFO] [chunk 154] R=+0.0227 accept=0.82 flock=3.17 | KL=0.0129 EV=0.97 | gini=0.085 n=588 pend=13
+20:54:19 [INFO] [chunk 155] R=+0.0345 accept=0.81 flock=2.63 | KL=-0.0067 EV=0.97 | gini=0.084 n=476 pend=40
+20:54:20 [INFO] [chunk 156] R=+0.0293 accept=0.83 flock=2.83 | KL=0.0087 EV=0.97 | gini=0.086 n=514 pend=32
+20:54:21 [INFO] [chunk 157] R=+0.0307 accept=0.81 flock=2.85 | KL=0.0081 EV=0.98 | gini=0.087 n=522 pend=25
+20:54:22 [INFO] [chunk 158] R=+0.0257 accept=0.84 flock=3.11 | KL=0.0127 EV=0.96 | gini=0.085 n=562 pend=36
+20:54:22 [INFO] [chunk 159] R=+0.0261 accept=0.82 flock=3.05 | KL=0.0038 EV=0.97 | gini=0.088 n=538 pend=41 |PASS-BARU
+20:54:23 [INFO] [chunk 160] R=+0.0338 accept=0.74 flock=2.75 | KL=0.0509 EV=0.96 | gini=0.081 n=494 pend=16
+20:54:24 [INFO] [chunk 161] R=+0.0275 accept=0.76 flock=2.90 | KL=0.0169 EV=0.98 | gini=0.084 n=531 pend=24
+20:54:25 [INFO] [chunk 162] R=+0.0272 accept=0.81 flock=2.98 | KL=0.0158 EV=0.97 | gini=0.078 n=542 pend=24
+20:54:25 [INFO] [chunk 163] R=+0.0286 accept=0.83 flock=2.91 | KL=0.0139 EV=0.98 | gini=0.064 n=534 pend=18
+20:54:26 [INFO] [chunk 164] R=+0.0269 accept=0.82 flock=3.06 | KL=0.0274 EV=0.98 | gini=0.067 n=550 pend=20
+20:54:27 [INFO] [chunk 165] R=+0.0337 accept=0.82 flock=2.71 | KL=0.0069 EV=0.97 | gini=0.070 n=487 pend=37
+20:54:28 [INFO] [chunk 166] R=+0.0309 accept=0.86 flock=2.85 | KL=0.0229 EV=0.95 | gini=0.070 n=519 pend=22
+20:54:28 [INFO] [chunk 167] R=+0.0343 accept=0.87 flock=2.75 | KL=0.0149 EV=0.98 | gini=0.070 n=501 pend=38
+20:54:29 [INFO] [chunk 168] R=+0.0243 accept=0.85 flock=3.16 | KL=0.0027 EV=0.99 | gini=0.073 n=569 pend=41
+20:54:30 [INFO] [chunk 169] R=+0.0286 accept=0.85 flock=3.04 | KL=0.0241 EV=0.98 | gini=0.074 n=550 pend=33 |PASS-BARU
+20:54:31 [INFO] [chunk 170] R=+0.0321 accept=0.70 flock=2.75 | KL=0.0334 EV=0.97 | gini=0.087 n=497 pend=14
+20:54:32 [INFO] [chunk 171] R=+0.0267 accept=0.76 flock=2.94 | KL=0.0127 EV=0.98 | gini=0.090 n=539 pend=14
+20:54:32 [INFO] [chunk 172] R=+0.0271 accept=0.81 flock=2.99 | KL=0.0137 EV=0.98 | gini=0.096 n=533 pend=22
+20:54:33 [INFO] [chunk 173] R=+0.0300 accept=0.83 flock=2.87 | KL=0.0202 EV=0.98 | gini=0.087 n=522 pend=27
+20:54:34 [INFO] [chunk 174] R=+0.0261 accept=0.83 flock=3.10 | KL=0.0229 EV=0.98 | gini=0.088 n=555 pend=25
+20:54:35 [INFO] [chunk 175] R=+0.0333 accept=0.82 flock=2.80 | KL=0.0034 EV=0.97 | gini=0.088 n=508 pend=21
+20:54:35 [INFO] [chunk 176] R=+0.0341 accept=0.85 flock=2.76 | KL=0.0199 EV=0.96 | gini=0.088 n=492 pend=34
+20:54:36 [INFO] [chunk 177] R=+0.0326 accept=0.85 flock=2.82 | KL=0.0086 EV=0.98 | gini=0.092 n=516 pend=33
+20:54:37 [INFO] [chunk 178] R=+0.0265 accept=0.90 flock=3.15 | KL=0.0022 EV=0.97 | gini=0.093 n=570 pend=35
+20:54:38 [INFO] [chunk 179] R=+0.0288 accept=0.89 flock=3.05 | KL=0.0060 EV=0.97 | gini=0.092 n=559 pend=20 |PASS-BARU
+20:54:38 [INFO] [chunk 180] R=+0.0313 accept=0.71 flock=2.71 | KL=0.0217 EV=0.99 | gini=0.063 n=487 pend=24
+20:54:39 [INFO] [chunk 181] R=+0.0271 accept=0.81 flock=2.97 | KL=0.0147 EV=0.98 | gini=0.062 n=549 pend=14
+20:54:40 [INFO] [chunk 182] R=+0.0286 accept=0.79 flock=2.93 | KL=0.0026 EV=0.99 | gini=0.072 n=526 pend=30
+20:54:41 [INFO] [chunk 183] R=+0.0312 accept=0.86 flock=2.89 | KL=0.0165 EV=0.99 | gini=0.075 n=528 pend=29
+20:54:42 [INFO] [chunk 184] R=+0.0277 accept=0.86 flock=3.10 | KL=0.0048 EV=0.96 | gini=0.077 n=560 pend=21
+20:54:42 [INFO] [chunk 185] R=+0.0359 accept=0.88 flock=2.71 | KL=-0.0072 EV=0.98 | gini=0.075 n=491 pend=33
+20:54:43 [INFO] [chunk 186] R=+0.0330 accept=0.88 flock=2.85 | KL=0.0211 EV=0.97 | gini=0.072 n=521 pend=18
+20:54:44 [INFO] [chunk 187] R=+0.0335 accept=0.90 flock=2.81 | KL=0.0102 EV=0.99 | gini=0.073 n=519 pend=16
+20:54:45 [INFO] [chunk 188] R=+0.0281 accept=0.89 flock=3.07 | KL=0.0179 EV=0.98 | gini=0.077 n=551 pend=36
+20:54:45 [INFO] [chunk 189] R=+0.0298 accept=0.89 flock=3.03 | KL=0.0153 EV=0.98 | gini=0.079 n=535 pend=43 |PASS-BARU
+20:54:46 [INFO] [chunk 190] R=+0.0330 accept=0.72 flock=2.76 | KL=0.0203 EV=0.99 | gini=0.115 n=493 pend=18
+20:54:47 [INFO] [chunk 191] R=+0.0288 accept=0.80 flock=2.95 | KL=0.0083 EV=0.98 | gini=0.101 n=538 pend=19
+20:54:48 [INFO] [chunk 192] R=+0.0271 accept=0.81 flock=2.97 | KL=0.0157 EV=0.98 | gini=0.099 n=535 pend=25
+20:54:49 [INFO] [chunk 193] R=+0.0305 accept=0.86 flock=2.90 | KL=0.0318 EV=0.98 | gini=0.097 n=531 pend=22
+20:54:49 [INFO] [chunk 194] R=+0.0274 accept=0.88 flock=3.07 | KL=0.0055 EV=0.97 | gini=0.094 n=555 pend=19
+20:54:50 [INFO] [chunk 195] R=+0.0343 accept=0.89 flock=2.78 | KL=0.0146 EV=0.96 | gini=0.094 n=502 pend=21
+20:54:51 [INFO] [chunk 196] R=+0.0340 accept=0.88 flock=2.79 | KL=0.0109 EV=0.96 | gini=0.096 n=500 pend=26
+20:54:52 [INFO] [chunk 197] R=+0.0352 accept=0.90 flock=2.80 | KL=0.0169 EV=0.98 | gini=0.094 n=506 pend=37
+20:54:52 [INFO] [chunk 198] R=+0.0275 accept=0.91 flock=3.14 | KL=0.0146 EV=0.97 | gini=0.096 n=572 pend=36
+20:54:53 [INFO] [chunk 199] R=+0.0306 accept=0.92 flock=3.03 | KL=0.0181 EV=0.96 | gini=0.096 n=547 pend=32 |PASS-BARU
+[SELESAI] t2_masterbid_30d_abs_seed1 (161s)
+[masterbid_30d_abs] seed=1 selesai 2.7 mnt
+
+================================================================
+[masterbid_30d_sgn] seed=1 aturan-trust=signed dataset=scenario_dataset_klaster12_4x.json
+================================================================
+20:54:53 [INFO] CONFIG {'dataset': '/home/iskandar/Alan/TesisRepo/scenario_dataset_klaster12_4x.json', 'N': 6, 'obs_dim': 42, 'willingness_ratio': None, 'k': 2, 't_max': 120.0, 'rollout_steps': 288, 'seed': 1, 'alpha_wait': 0.0046, 'beta_prox': 0.1, 'alpha_gini': 2.6019, 'alpha_flock': 0.0208, 'lr': 0.0003, 'gamma': 0.99, 'avg_reward': True, 'clip': 0.2, 'ent_coef': 0.01, 'epochs': 10, 'minibatch': 64}
+20:54:54 [INFO] [chunk   0] R=+0.0286 accept=0.63 flock=2.78 | KL=0.0128 EV=0.83 | gini=0.099 n=501 pend=10
+20:54:55 [INFO] [chunk   1] R=+0.0240 accept=0.67 flock=2.93 | KL=0.0109 EV=0.96 | gini=0.080 n=528 pend=20
+20:54:56 [INFO] [chunk   2] R=+0.0226 accept=0.66 flock=3.02 | KL=0.0062 EV=0.96 | gini=0.079 n=548 pend=15
+20:54:57 [INFO] [chunk   3] R=+0.0256 accept=0.67 flock=2.85 | KL=0.0182 EV=0.96 | gini=0.088 n=516 pend=25
+20:54:58 [INFO] [chunk   4] R=+0.0196 accept=0.69 flock=3.14 | KL=0.0256 EV=0.93 | gini=0.091 n=568 pend=10
+20:54:59 [INFO] [chunk   5] R=+0.0282 accept=0.63 flock=2.73 | KL=0.0002 EV=0.90 | gini=0.091 n=494 pend=20
+20:55:00 [INFO] [chunk   6] R=+0.0266 accept=0.69 flock=2.80 | KL=0.0127 EV=0.90 | gini=0.093 n=499 pend=25
+20:55:01 [INFO] [chunk   7] R=+0.0239 accept=0.61 flock=2.87 | KL=0.0114 EV=0.96 | gini=0.092 n=522 pend=20
+20:55:02 [INFO] [chunk   8] R=+0.0190 accept=0.66 flock=3.16 | KL=0.0108 EV=0.93 | gini=0.089 n=555 pend=37
+20:55:02 [INFO] [chunk   9] R=+0.0189 accept=0.66 flock=3.13 | KL=0.0116 EV=0.96 | gini=0.088 n=554 pend=25 |PASS-BARU
+20:55:03 [INFO] [chunk  10] R=+0.0310 accept=0.67 flock=2.74 | KL=0.0203 EV=0.96 | gini=0.119 n=492 pend=19
+20:55:04 [INFO] [chunk  11] R=+0.0231 accept=0.65 flock=2.97 | KL=0.0170 EV=0.97 | gini=0.093 n=533 pend=25
+20:55:05 [INFO] [chunk  12] R=+0.0214 accept=0.66 flock=3.05 | KL=0.0101 EV=0.96 | gini=0.093 n=551 pend=16
+20:55:06 [INFO] [chunk  13] R=+0.0282 accept=0.69 flock=2.73 | KL=0.0169 EV=0.91 | gini=0.090 n=500 pend=41
+20:55:06 [INFO] [chunk  14] R=+0.0190 accept=0.66 flock=3.18 | KL=0.0011 EV=0.93 | gini=0.089 n=581 pend=14
+20:55:07 [INFO] [chunk  15] R=+0.0272 accept=0.64 flock=2.75 | KL=-0.0028 EV=0.94 | gini=0.086 n=496 pend=21
+20:55:08 [INFO] [chunk  16] R=+0.0272 accept=0.67 flock=2.78 | KL=0.0118 EV=0.92 | gini=0.082 n=503 pend=24
+20:55:09 [INFO] [chunk  17] R=+0.0256 accept=0.66 flock=2.84 | KL=0.0119 EV=0.96 | gini=0.086 n=517 pend=24
+20:55:09 [INFO] [chunk  18] R=+0.0212 accept=0.66 flock=3.07 | KL=0.0065 EV=0.93 | gini=0.084 n=554 pend=41
+20:55:10 [INFO] [chunk  19] R=+0.0226 accept=0.70 flock=3.01 | KL=0.0066 EV=0.94 | gini=0.088 n=539 pend=44 |PASS-BARU
+20:55:11 [INFO] [chunk  20] R=+0.0314 accept=0.66 flock=2.71 | KL=0.0004 EV=0.97 | gini=0.078 n=487 pend=24
+20:55:12 [INFO] [chunk  21] R=+0.0233 accept=0.67 flock=2.97 | KL=0.0174 EV=0.98 | gini=0.078 n=541 pend=22
+20:55:13 [INFO] [chunk  22] R=+0.0214 accept=0.65 flock=2.97 | KL=0.0040 EV=0.96 | gini=0.081 n=539 pend=24
+20:55:14 [INFO] [chunk  23] R=+0.0259 accept=0.66 flock=2.80 | KL=0.0083 EV=0.96 | gini=0.090 n=512 pend=39
+20:55:15 [INFO] [chunk  24] R=+0.0193 accept=0.66 flock=3.15 | KL=0.0199 EV=0.94 | gini=0.088 n=564 pend=28
+20:55:16 [INFO] [chunk  25] R=+0.0262 accept=0.66 flock=2.81 | KL=0.0056 EV=0.93 | gini=0.090 n=502 pend=30
+20:55:17 [INFO] [chunk  26] R=+0.0261 accept=0.68 flock=2.85 | KL=0.0156 EV=0.89 | gini=0.093 n=516 pend=19
+20:55:18 [INFO] [chunk  27] R=+0.0257 accept=0.66 flock=2.77 | KL=0.0111 EV=0.97 | gini=0.088 n=499 pend=36
+20:55:18 [INFO] [chunk  28] R=+0.0162 accept=0.65 flock=3.21 | KL=-0.0005 EV=0.93 | gini=0.086 n=573 pend=35
+20:55:19 [INFO] [chunk  29] R=+0.0187 accept=0.65 flock=3.11 | KL=-0.0011 EV=0.98 | gini=0.083 n=556 pend=22 |PASS-BARU
+20:55:20 [INFO] [chunk  30] R=-0.0507 accept=0.69 flock=5.51 | KL=-0.0006 EV=0.95 | gini=0.055 n=469 pend=41
+20:55:21 [INFO] [chunk  31] R=+0.0113 accept=0.71 flock=3.41 | KL=0.0018 EV=0.96 | gini=0.049 n=563 pend=18
+20:55:22 [INFO] [chunk  32] R=+0.0240 accept=0.63 flock=2.95 | KL=0.0247 EV=0.92 | gini=0.052 n=527 pend=33
+20:55:23 [INFO] [chunk  33] R=+0.0222 accept=0.66 flock=2.93 | KL=0.0098 EV=0.94 | gini=0.058 n=532 pend=27
+20:55:24 [INFO] [chunk  34] R=+0.0183 accept=0.67 flock=3.15 | KL=0.0116 EV=0.95 | gini=0.066 n=566 pend=14
+20:55:25 [INFO] [chunk  35] R=+0.0285 accept=0.67 flock=2.70 | KL=0.0023 EV=0.92 | gini=0.076 n=491 pend=27
+20:55:26 [INFO] [chunk  36] R=+0.0237 accept=0.67 flock=2.85 | KL=0.0061 EV=0.89 | gini=0.090 n=501 pend=30
+20:55:27 [INFO] [chunk  37] R=+0.0245 accept=0.66 flock=2.92 | KL=0.0118 EV=0.97 | gini=0.087 n=536 pend=12
+20:55:28 [INFO] [chunk  38] R=+0.0201 accept=0.66 flock=3.04 | KL=0.0089 EV=0.95 | gini=0.086 n=544 pend=39
+20:55:29 [INFO] [chunk  39] R=+0.0204 accept=0.64 flock=3.07 | KL=0.0175 EV=0.96 | gini=0.088 n=558 pend=24 |PASS-BARU
+20:55:30 [INFO] [chunk  40] R=+0.0135 accept=0.66 flock=3.19 | KL=0.0266 EV=0.98 | gini=0.107 n=476 pend=34
+20:55:31 [INFO] [chunk  41] R=+0.0217 accept=0.73 flock=3.03 | KL=0.0218 EV=0.92 | gini=0.085 n=553 pend=20
+20:55:32 [INFO] [chunk  42] R=+0.0207 accept=0.72 flock=3.08 | KL=0.0266 EV=0.97 | gini=0.097 n=549 pend=14
+20:55:33 [INFO] [chunk  43] R=+0.0281 accept=0.71 flock=2.75 | KL=0.0093 EV=0.95 | gini=0.098 n=502 pend=38
+20:55:34 [INFO] [chunk  44] R=+0.0199 accept=0.66 flock=3.13 | KL=0.0164 EV=0.97 | gini=0.105 n=571 pend=20
+20:55:35 [INFO] [chunk  45] R=+0.0264 accept=0.67 flock=2.79 | KL=-0.0033 EV=0.94 | gini=0.102 n=494 pend=30
+20:55:36 [INFO] [chunk  46] R=+0.0247 accept=0.69 flock=2.85 | KL=0.0203 EV=0.90 | gini=0.100 n=509 pend=25
+20:55:36 [INFO] [chunk  47] R=+0.0260 accept=0.66 flock=2.82 | KL=0.0139 EV=0.98 | gini=0.094 n=509 pend=33
+20:55:38 [INFO] [chunk  48] R=+0.0191 accept=0.69 flock=3.16 | KL=0.0158 EV=0.96 | gini=0.098 n=569 pend=36
+20:55:39 [INFO] [chunk  49] R=+0.0192 accept=0.68 flock=3.16 | KL=0.0059 EV=0.98 | gini=0.098 n=561 pend=19 |PASS-BARU
+20:55:40 [INFO] [chunk  50] R=+0.0185 accept=0.68 flock=2.99 | KL=0.0068 EV=0.97 | gini=0.139 n=500 pend=11
+20:55:41 [INFO] [chunk  51] R=+0.0227 accept=0.69 flock=2.95 | KL=0.0213 EV=0.98 | gini=0.114 n=530 pend=20
+20:55:42 [INFO] [chunk  52] R=+0.0232 accept=0.71 flock=3.01 | KL=0.0083 EV=0.98 | gini=0.098 n=546 pend=15
+20:55:43 [INFO] [chunk  53] R=+0.0268 accept=0.71 flock=2.83 | KL=0.0165 EV=0.96 | gini=0.096 n=512 pend=31
+20:55:44 [INFO] [chunk  54] R=+0.0198 accept=0.73 flock=3.13 | KL=0.0148 EV=0.93 | gini=0.095 n=555 pend=27
+20:55:44 [INFO] [chunk  55] R=+0.0254 accept=0.71 flock=2.85 | KL=0.0077 EV=0.93 | gini=0.095 n=514 pend=18
+20:55:45 [INFO] [chunk  56] R=+0.0272 accept=0.76 flock=2.81 | KL=0.0262 EV=0.90 | gini=0.093 n=505 pend=18
+20:55:46 [INFO] [chunk  57] R=+0.0242 accept=0.72 flock=2.95 | KL=0.0133 EV=0.97 | gini=0.090 n=503 pend=32
+20:55:47 [INFO] [chunk  58] R=+0.0195 accept=0.72 flock=3.19 | KL=0.0081 EV=0.95 | gini=0.092 n=572 pend=31
+20:55:48 [INFO] [chunk  59] R=+0.0210 accept=0.75 flock=3.08 | KL=0.0053 EV=0.95 | gini=0.094 n=546 pend=28 |PASS-BARU
+20:55:49 [INFO] [chunk  60] R=+0.0276 accept=0.70 flock=2.79 | KL=0.0144 EV=0.98 | gini=0.127 n=491 pend=20
+20:55:50 [INFO] [chunk  61] R=+0.0240 accept=0.70 flock=2.95 | KL=0.0000 EV=0.99 | gini=0.106 n=540 pend=19
+20:55:51 [INFO] [chunk  62] R=+0.0218 accept=0.71 flock=3.04 | KL=0.0053 EV=0.98 | gini=0.101 n=540 pend=20
+20:55:52 [INFO] [chunk  63] R=+0.0250 accept=0.71 flock=2.84 | KL=0.0114 EV=0.97 | gini=0.105 n=505 pend=41
+20:55:53 [INFO] [chunk  64] R=+0.0195 accept=0.72 flock=3.15 | KL=0.0143 EV=0.96 | gini=0.107 n=572 pend=22
+20:55:53 [INFO] [chunk  65] R=+0.0283 accept=0.73 flock=2.79 | KL=0.0092 EV=0.95 | gini=0.104 n=510 pend=17
+20:55:54 [INFO] [chunk  66] R=+0.0286 accept=0.73 flock=2.76 | KL=0.0123 EV=0.92 | gini=0.106 n=499 pend=22
+20:55:55 [INFO] [chunk  67] R=+0.0276 accept=0.75 flock=2.81 | KL=0.0067 EV=0.96 | gini=0.101 n=505 pend=33
+20:55:56 [INFO] [chunk  68] R=+0.0201 accept=0.73 flock=3.16 | KL=0.0105 EV=0.95 | gini=0.101 n=568 pend=38
+20:55:56 [INFO] [chunk  69] R=+0.0223 accept=0.72 flock=3.07 | KL=0.0131 EV=0.98 | gini=0.099 n=550 pend=31 |PASS-BARU
+20:55:57 [INFO] [chunk  70] R=+0.0279 accept=0.69 flock=2.78 | KL=0.0152 EV=0.99 | gini=0.104 n=499 pend=12
+20:55:58 [INFO] [chunk  71] R=+0.0253 accept=0.71 flock=2.92 | KL=0.0114 EV=0.98 | gini=0.113 n=529 pend=22
+20:55:59 [INFO] [chunk  72] R=+0.0214 accept=0.73 flock=3.06 | KL=0.0215 EV=0.99 | gini=0.111 n=547 pend=17
+20:56:00 [INFO] [chunk  73] R=+0.0279 accept=0.73 flock=2.80 | KL=0.0174 EV=0.96 | gini=0.106 n=508 pend=35
+20:56:00 [INFO] [chunk  74] R=+0.0204 accept=0.71 flock=3.10 | KL=0.0147 EV=0.98 | gini=0.105 n=559 pend=28
+20:56:01 [INFO] [chunk  75] R=+0.0275 accept=0.73 flock=2.79 | KL=0.0150 EV=0.95 | gini=0.101 n=509 pend=24
+20:56:02 [INFO] [chunk  76] R=+0.0274 accept=0.76 flock=2.83 | KL=0.0066 EV=0.90 | gini=0.103 n=512 pend=17
+20:56:03 [INFO] [chunk  77] R=+0.0287 accept=0.75 flock=2.77 | KL=0.0093 EV=0.99 | gini=0.100 n=502 pend=30
+20:56:04 [INFO] [chunk  78] R=+0.0199 accept=0.75 flock=3.18 | KL=0.0117 EV=0.97 | gini=0.098 n=566 pend=37
+20:56:04 [INFO] [chunk  79] R=+0.0225 accept=0.74 flock=3.03 | KL=-0.0038 EV=0.96 | gini=0.094 n=551 pend=29 |PASS-BARU
+20:56:05 [INFO] [chunk  80] R=+0.0278 accept=0.67 flock=2.71 | KL=0.0089 EV=0.98 | gini=0.100 n=480 pend=30
+20:56:06 [INFO] [chunk  81] R=+0.0222 accept=0.72 flock=3.03 | KL=0.0089 EV=0.99 | gini=0.092 n=558 pend=12
+20:56:07 [INFO] [chunk  82] R=+0.0231 accept=0.71 flock=2.93 | KL=0.0144 EV=0.98 | gini=0.084 n=515 pend=38
+20:56:08 [INFO] [chunk  83] R=+0.0257 accept=0.74 flock=2.91 | KL=0.0112 EV=0.98 | gini=0.077 n=535 pend=30
+20:56:08 [INFO] [chunk  84] R=+0.0219 accept=0.75 flock=3.09 | KL=0.0017 EV=0.96 | gini=0.083 n=567 pend=16
+20:56:09 [INFO] [chunk  85] R=+0.0298 accept=0.75 flock=2.74 | KL=0.0009 EV=0.95 | gini=0.083 n=496 pend=23
+20:56:10 [INFO] [chunk  86] R=+0.0294 accept=0.75 flock=2.74 | KL=0.0106 EV=0.95 | gini=0.089 n=488 pend=41
+20:56:11 [INFO] [chunk  87] R=+0.0244 accept=0.76 flock=2.94 | KL=0.0124 EV=0.96 | gini=0.087 n=542 pend=16
+20:56:12 [INFO] [chunk  88] R=+0.0235 accept=0.77 flock=3.06 | KL=0.0068 EV=0.96 | gini=0.089 n=547 pend=40
+20:56:13 [INFO] [chunk  89] R=+0.0240 accept=0.77 flock=3.07 | KL=0.0126 EV=0.97 | gini=0.090 n=563 pend=21 |PASS-BARU
+20:56:14 [INFO] [chunk  90] R=+0.0254 accept=0.71 flock=2.86 | KL=0.0098 EV=0.98 | gini=0.081 n=496 pend=15
+20:56:15 [INFO] [chunk  91] R=+0.0246 accept=0.72 flock=2.93 | KL=0.0282 EV=0.96 | gini=0.082 n=534 pend=20
+20:56:16 [INFO] [chunk  92] R=+0.0235 accept=0.76 flock=2.97 | KL=0.0086 EV=0.98 | gini=0.093 n=536 pend=25
+20:56:16 [INFO] [chunk  93] R=+0.0275 accept=0.76 flock=2.79 | KL=0.0104 EV=0.95 | gini=0.086 n=513 pend=39
+20:56:17 [INFO] [chunk  94] R=+0.0215 accept=0.76 flock=3.15 | KL=0.0092 EV=0.96 | gini=0.095 n=574 pend=18
+20:56:18 [INFO] [chunk  95] R=+0.0314 accept=0.78 flock=2.73 | KL=-0.0005 EV=0.94 | gini=0.093 n=491 pend=31
+20:56:19 [INFO] [chunk  96] R=+0.0276 accept=0.81 flock=2.87 | KL=0.0217 EV=0.86 | gini=0.090 n=510 pend=26
+20:56:20 [INFO] [chunk  97] R=+0.0285 accept=0.79 flock=2.86 | KL=0.0127 EV=0.96 | gini=0.091 n=524 pend=19
+20:56:20 [INFO] [chunk  98] R=+0.0219 accept=0.76 flock=3.11 | KL=0.0202 EV=0.97 | gini=0.091 n=561 pend=28
+20:56:21 [INFO] [chunk  99] R=+0.0260 accept=0.77 flock=2.98 | KL=-0.0085 EV=0.97 | gini=0.089 n=534 pend=38 |PASS-BARU
+20:56:22 [INFO] [chunk 100] R=+0.0308 accept=0.67 flock=2.87 | KL=0.0142 EV=0.98 | gini=0.067 n=499 pend=12
+20:56:23 [INFO] [chunk 101] R=+0.0253 accept=0.73 flock=2.97 | KL=0.0109 EV=0.98 | gini=0.076 n=539 pend=12
+20:56:24 [INFO] [chunk 102] R=+0.0247 accept=0.78 flock=2.97 | KL=0.0163 EV=0.98 | gini=0.064 n=530 pend=24
+20:56:24 [INFO] [chunk 103] R=+0.0274 accept=0.77 flock=2.83 | KL=0.0168 EV=0.97 | gini=0.081 n=518 pend=32
+20:56:25 [INFO] [chunk 104] R=+0.0238 accept=0.78 flock=3.04 | KL=0.0129 EV=0.96 | gini=0.084 n=549 pend=36
+20:56:26 [INFO] [chunk 105] R=+0.0279 accept=0.81 flock=2.86 | KL=0.0000 EV=0.96 | gini=0.087 n=522 pend=18
+20:56:27 [INFO] [chunk 106] R=+0.0282 accept=0.77 flock=2.85 | KL=0.0145 EV=0.94 | gini=0.084 n=504 pend=19
+20:56:28 [INFO] [chunk 107] R=+0.0306 accept=0.77 flock=2.75 | KL=0.0107 EV=0.97 | gini=0.084 n=505 pend=31
+20:56:28 [INFO] [chunk 108] R=+0.0238 accept=0.83 flock=3.12 | KL=0.0217 EV=0.96 | gini=0.084 n=558 pend=43
+20:56:29 [INFO] [chunk 109] R=+0.0249 accept=0.81 flock=3.12 | KL=0.0183 EV=0.96 | gini=0.085 n=562 pend=25 |PASS-BARU
+20:56:30 [INFO] [chunk 110] R=+0.0308 accept=0.73 flock=2.80 | KL=0.0082 EV=0.98 | gini=0.097 n=494 pend=17
+20:56:31 [INFO] [chunk 111] R=+0.0259 accept=0.74 flock=2.93 | KL=0.0292 EV=0.98 | gini=0.089 n=537 pend=19
+20:56:32 [INFO] [chunk 112] R=+0.0264 accept=0.77 flock=2.97 | KL=0.0110 EV=0.98 | gini=0.077 n=540 pend=21
+20:56:32 [INFO] [chunk 113] R=+0.0299 accept=0.78 flock=2.83 | KL=0.0104 EV=0.97 | gini=0.080 n=514 pend=34
+20:56:33 [INFO] [chunk 114] R=+0.0230 accept=0.84 flock=3.16 | KL=0.0150 EV=0.97 | gini=0.085 n=569 pend=17
+20:56:34 [INFO] [chunk 115] R=+0.0326 accept=0.82 flock=2.69 | KL=0.0006 EV=0.95 | gini=0.083 n=487 pend=33
+20:56:35 [INFO] [chunk 116] R=+0.0315 accept=0.82 flock=2.81 | KL=0.0229 EV=0.93 | gini=0.088 n=509 pend=30
+20:56:36 [INFO] [chunk 117] R=+0.0316 accept=0.84 flock=2.78 | KL=0.0167 EV=0.98 | gini=0.086 n=499 pend=46
+20:56:36 [INFO] [chunk 118] R=+0.0230 accept=0.81 flock=3.18 | KL=0.0268 EV=0.97 | gini=0.085 n=582 pend=37
+20:56:37 [INFO] [chunk 119] R=+0.0251 accept=0.80 flock=3.06 | KL=0.0088 EV=0.94 | gini=0.085 n=554 pend=26 |PASS-BARU
+20:56:38 [INFO] [chunk 120] R=+0.0271 accept=0.64 flock=3.16 | KL=0.0308 EV=0.97 | gini=0.042 n=488 pend=21
+20:56:39 [INFO] [chunk 121] R=+0.0241 accept=0.74 flock=3.00 | KL=0.0143 EV=0.98 | gini=0.076 n=545 pend=17
+20:56:40 [INFO] [chunk 122] R=+0.0251 accept=0.78 flock=2.97 | KL=0.0025 EV=0.99 | gini=0.089 n=530 pend=28
+20:56:40 [INFO] [chunk 123] R=+0.0285 accept=0.79 flock=2.88 | KL=0.0042 EV=0.97 | gini=0.097 n=531 pend=24
+20:56:41 [INFO] [chunk 124] R=+0.0243 accept=0.83 flock=3.08 | KL=0.0118 EV=0.97 | gini=0.102 n=558 pend=19
+20:56:42 [INFO] [chunk 125] R=+0.0321 accept=0.83 flock=2.71 | KL=0.0232 EV=0.97 | gini=0.103 n=484 pend=39
+20:56:43 [INFO] [chunk 126] R=+0.0299 accept=0.82 flock=2.87 | KL=0.0229 EV=0.91 | gini=0.095 n=512 pend=31
+20:56:44 [INFO] [chunk 127] R=+0.0290 accept=0.84 flock=2.86 | KL=0.0078 EV=0.98 | gini=0.093 n=521 pend=28
+20:56:45 [INFO] [chunk 128] R=+0.0248 accept=0.83 flock=3.11 | KL=0.0226 EV=0.97 | gini=0.093 n=562 pend=37
+20:56:46 [INFO] [chunk 129] R=+0.0256 accept=0.83 flock=3.07 | KL=0.0066 EV=0.97 | gini=0.090 n=551 pend=29 |PASS-BARU
+20:56:46 [INFO] [chunk 130] R=+0.0310 accept=0.66 flock=2.94 | KL=0.0135 EV=0.98 | gini=0.082 n=489 pend=21
+20:56:47 [INFO] [chunk 131] R=+0.0259 accept=0.78 flock=2.97 | KL=0.0477 EV=0.97 | gini=0.092 n=546 pend=15
+20:56:48 [INFO] [chunk 132] R=+0.0268 accept=0.80 flock=2.96 | KL=0.0260 EV=0.98 | gini=0.095 n=533 pend=23
+20:56:49 [INFO] [chunk 133] R=+0.0314 accept=0.79 flock=2.79 | KL=0.0165 EV=0.98 | gini=0.092 n=511 pend=39
+20:56:49 [INFO] [chunk 134] R=+0.0245 accept=0.83 flock=3.12 | KL=0.0214 EV=0.98 | gini=0.095 n=565 pend=27
+20:56:50 [INFO] [chunk 135] R=+0.0326 accept=0.82 flock=2.74 | KL=0.0045 EV=0.95 | gini=0.096 n=496 pend=35
+20:56:51 [INFO] [chunk 136] R=+0.0307 accept=0.84 flock=2.88 | KL=0.0164 EV=0.95 | gini=0.095 n=529 pend=11
+20:56:51 [INFO] [chunk 137] R=+0.0311 accept=0.86 flock=2.84 | KL=0.0084 EV=0.98 | gini=0.096 n=515 pend=13
+20:56:52 [INFO] [chunk 138] R=+0.0261 accept=0.84 flock=3.06 | KL=0.0098 EV=0.98 | gini=0.098 n=549 pend=35
+20:56:53 [INFO] [chunk 139] R=+0.0273 accept=0.87 flock=3.05 | KL=0.0085 EV=0.97 | gini=0.096 n=551 pend=27 |PASS-BARU
+20:56:54 [INFO] [chunk 140] R=+0.0308 accept=0.71 flock=2.73 | KL=0.0300 EV=0.99 | gini=0.098 n=488 pend=22
+20:56:55 [INFO] [chunk 141] R=+0.0274 accept=0.79 flock=2.95 | KL=0.0171 EV=0.98 | gini=0.119 n=544 pend=18
+20:56:55 [INFO] [chunk 142] R=+0.0264 accept=0.81 flock=2.97 | KL=0.0056 EV=0.97 | gini=0.112 n=543 pend=17
+20:56:56 [INFO] [chunk 143] R=+0.0316 accept=0.85 flock=2.77 | KL=0.0205 EV=0.96 | gini=0.110 n=503 pend=40
+20:56:57 [INFO] [chunk 144] R=+0.0261 accept=0.86 flock=3.10 | KL=0.0220 EV=0.97 | gini=0.104 n=553 pend=40
+20:56:58 [INFO] [chunk 145] R=+0.0335 accept=0.87 flock=2.79 | KL=0.0136 EV=0.97 | gini=0.100 n=514 pend=30
+20:56:58 [INFO] [chunk 146] R=+0.0317 accept=0.88 flock=2.82 | KL=0.0464 EV=0.94 | gini=0.099 n=506 pend=28
+20:56:59 [INFO] [chunk 147] R=+0.0323 accept=0.90 flock=2.87 | KL=0.0028 EV=0.98 | gini=0.100 n=520 pend=25
+20:57:00 [INFO] [chunk 148] R=+0.0265 accept=0.89 flock=3.12 | KL=0.0125 EV=0.97 | gini=0.098 n=557 pend=39
+20:57:01 [INFO] [chunk 149] R=+0.0278 accept=0.91 flock=3.06 | KL=0.0198 EV=0.95 | gini=0.098 n=557 pend=27 |PASS-BARU
+20:57:02 [INFO] [chunk 150] R=+0.0309 accept=0.74 flock=2.77 | KL=0.0067 EV=0.99 | gini=0.106 n=497 pend=14
+20:57:02 [INFO] [chunk 151] R=+0.0265 accept=0.78 flock=2.96 | KL=0.0096 EV=0.98 | gini=0.117 n=536 pend=16
+20:57:03 [INFO] [chunk 152] R=+0.0283 accept=0.82 flock=3.00 | KL=0.0160 EV=0.98 | gini=0.115 n=547 pend=12
+20:57:04 [INFO] [chunk 153] R=+0.0324 accept=0.88 flock=2.73 | KL=0.0061 EV=0.97 | gini=0.113 n=495 pend=44
+20:57:05 [INFO] [chunk 154] R=+0.0236 accept=0.86 flock=3.21 | KL=0.0173 EV=0.98 | gini=0.112 n=584 pend=12
+20:57:05 [INFO] [chunk 155] R=+0.0353 accept=0.87 flock=2.67 | KL=0.0019 EV=0.96 | gini=0.114 n=477 pend=39
+20:57:06 [INFO] [chunk 156] R=+0.0318 accept=0.87 flock=2.82 | KL=-0.0035 EV=0.95 | gini=0.108 n=513 pend=31
+20:57:07 [INFO] [chunk 157] R=+0.0322 accept=0.90 flock=2.85 | KL=0.0194 EV=0.98 | gini=0.108 n=523 pend=25
+20:57:08 [INFO] [chunk 158] R=+0.0270 accept=0.88 flock=3.11 | KL=0.0233 EV=0.97 | gini=0.107 n=562 pend=34
+20:57:08 [INFO] [chunk 159] R=+0.0294 accept=0.91 flock=3.04 | KL=0.0054 EV=0.97 | gini=0.105 n=540 pend=38 |PASS-BARU
+20:57:09 [INFO] [chunk 160] R=+0.0320 accept=0.70 flock=2.78 | KL=0.0226 EV=0.99 | gini=0.117 n=494 pend=16
+20:57:10 [INFO] [chunk 161] R=+0.0277 accept=0.80 flock=2.90 | KL=0.0470 EV=0.98 | gini=0.110 n=532 pend=22
+20:57:11 [INFO] [chunk 162] R=+0.0274 accept=0.85 flock=2.99 | KL=0.0217 EV=0.97 | gini=0.097 n=538 pend=27
+20:57:11 [INFO] [chunk 163] R=+0.0300 accept=0.85 flock=2.89 | KL=0.0063 EV=0.98 | gini=0.096 n=536 pend=19
+20:57:12 [INFO] [chunk 164] R=+0.0276 accept=0.89 flock=3.06 | KL=0.0324 EV=0.98 | gini=0.096 n=556 pend=15
+20:57:13 [INFO] [chunk 165] R=+0.0346 accept=0.85 flock=2.68 | KL=0.0159 EV=0.96 | gini=0.098 n=480 pend=38
+20:57:14 [INFO] [chunk 166] R=+0.0308 accept=0.89 flock=2.87 | KL=0.0144 EV=0.96 | gini=0.098 n=520 pend=24
+20:57:15 [INFO] [chunk 167] R=+0.0332 accept=0.88 flock=2.78 | KL=0.0261 EV=0.97 | gini=0.099 n=506 pend=35
+20:57:15 [INFO] [chunk 168] R=+0.0250 accept=0.86 flock=3.15 | KL=0.0114 EV=0.98 | gini=0.101 n=566 pend=39
+20:57:16 [INFO] [chunk 169] R=+0.0273 accept=0.89 flock=3.09 | KL=0.0170 EV=0.98 | gini=0.099 n=556 pend=27 |PASS-BARU
+20:57:17 [INFO] [chunk 170] R=+0.0301 accept=0.72 flock=2.74 | KL=0.0200 EV=0.99 | gini=0.075 n=497 pend=14
+20:57:18 [INFO] [chunk 171] R=+0.0267 accept=0.80 flock=2.93 | KL=0.0272 EV=0.98 | gini=0.083 n=539 pend=14
+20:57:18 [INFO] [chunk 172] R=+0.0268 accept=0.80 flock=2.99 | KL=0.0104 EV=0.98 | gini=0.085 n=537 pend=19
+20:57:19 [INFO] [chunk 173] R=+0.0311 accept=0.87 flock=2.85 | KL=0.0257 EV=0.98 | gini=0.094 n=522 pend=24
+20:57:20 [INFO] [chunk 174] R=+0.0272 accept=0.88 flock=3.08 | KL=0.0299 EV=0.97 | gini=0.098 n=553 pend=23
+20:57:21 [INFO] [chunk 175] R=+0.0320 accept=0.86 flock=2.78 | KL=0.0074 EV=0.96 | gini=0.097 n=500 pend=27
+20:57:21 [INFO] [chunk 176] R=+0.0333 accept=0.89 flock=2.80 | KL=0.0183 EV=0.96 | gini=0.097 n=494 pend=37
+20:57:22 [INFO] [chunk 177] R=+0.0320 accept=0.88 flock=2.85 | KL=0.0098 EV=0.98 | gini=0.097 n=523 pend=32
+20:57:23 [INFO] [chunk 178] R=+0.0267 accept=0.88 flock=3.14 | KL=0.0210 EV=0.98 | gini=0.095 n=570 pend=33
+20:57:24 [INFO] [chunk 179] R=+0.0283 accept=0.92 flock=3.08 | KL=0.0136 EV=0.98 | gini=0.096 n=555 pend=22 |PASS-BARU
+20:57:25 [INFO] [chunk 180] R=+0.0279 accept=0.68 flock=2.96 | KL=0.0287 EV=0.98 | gini=0.087 n=477 pend=33
+20:57:25 [INFO] [chunk 181] R=+0.0265 accept=0.79 flock=2.99 | KL=0.0301 EV=0.98 | gini=0.097 n=561 pend=12
+20:57:26 [INFO] [chunk 182] R=+0.0309 accept=0.85 flock=2.88 | KL=0.0272 EV=0.99 | gini=0.104 n=521 pend=33
+20:57:27 [INFO] [chunk 183] R=+0.0302 accept=0.87 flock=2.89 | KL=0.0070 EV=0.98 | gini=0.103 n=526 pend=34
+20:57:28 [INFO] [chunk 184] R=+0.0250 accept=0.86 flock=3.14 | KL=0.0216 EV=0.97 | gini=0.103 n=568 pend=18
+20:57:29 [INFO] [chunk 185] R=+0.0346 accept=0.89 flock=2.73 | KL=-0.0003 EV=0.97 | gini=0.100 n=492 pend=30
+20:57:29 [INFO] [chunk 186] R=+0.0322 accept=0.91 flock=2.82 | KL=0.0247 EV=0.95 | gini=0.098 n=514 pend=20
+20:57:30 [INFO] [chunk 187] R=+0.0323 accept=0.90 flock=2.87 | KL=0.0062 EV=0.99 | gini=0.097 n=522 pend=15
+20:57:31 [INFO] [chunk 188] R=+0.0288 accept=0.91 flock=3.06 | KL=0.0185 EV=0.98 | gini=0.098 n=549 pend=38
+20:57:32 [INFO] [chunk 189] R=+0.0296 accept=0.90 flock=3.02 | KL=0.0212 EV=0.97 | gini=0.094 n=537 pend=44 |PASS-BARU
+20:57:32 [INFO] [chunk 190] R=+0.0334 accept=0.73 flock=2.83 | KL=0.0229 EV=0.99 | gini=0.084 n=498 pend=13
+20:57:33 [INFO] [chunk 191] R=+0.0275 accept=0.81 flock=2.92 | KL=0.0107 EV=0.98 | gini=0.108 n=530 pend=22
+20:57:34 [INFO] [chunk 192] R=+0.0282 accept=0.82 flock=2.98 | KL=0.0219 EV=0.96 | gini=0.109 n=537 pend=26
+20:57:35 [INFO] [chunk 193] R=+0.0301 accept=0.83 flock=2.86 | KL=0.0197 EV=0.98 | gini=0.098 n=527 pend=27
+20:57:36 [INFO] [chunk 194] R=+0.0269 accept=0.87 flock=3.08 | KL=0.0080 EV=0.98 | gini=0.099 n=558 pend=21
+20:57:36 [INFO] [chunk 195] R=+0.0331 accept=0.89 flock=2.80 | KL=0.0145 EV=0.98 | gini=0.094 n=502 pend=23
+20:57:37 [INFO] [chunk 196] R=+0.0341 accept=0.91 flock=2.77 | KL=0.0159 EV=0.95 | gini=0.090 n=499 pend=28
+20:57:38 [INFO] [chunk 197] R=+0.0333 accept=0.91 flock=2.81 | KL=0.0256 EV=0.99 | gini=0.087 n=509 pend=37
+20:57:39 [INFO] [chunk 198] R=+0.0274 accept=0.90 flock=3.13 | KL=0.0186 EV=0.97 | gini=0.091 n=571 pend=37
+20:57:39 [INFO] [chunk 199] R=+0.0280 accept=0.90 flock=3.04 | KL=0.0020 EV=0.96 | gini=0.094 n=547 pend=33 |PASS-BARU
+[SELESAI] t2_masterbid_30d_sgn_seed1 (166s)
+[masterbid_30d_sgn] seed=1 selesai 2.8 mnt
+
+================================================================
+[masterbid_30d_abs] seed=2 aturan-trust=abs dataset=scenario_dataset_klaster12_4x.json
+================================================================
+20:57:39 [INFO] CONFIG {'dataset': '/home/iskandar/Alan/TesisRepo/scenario_dataset_klaster12_4x.json', 'N': 6, 'obs_dim': 42, 'willingness_ratio': None, 'k': 2, 't_max': 120.0, 'rollout_steps': 288, 'seed': 2, 'alpha_wait': 0.0046, 'beta_prox': 0.1, 'alpha_gini': 2.6019, 'alpha_flock': 0.0208, 'lr': 0.0003, 'gamma': 0.99, 'avg_reward': True, 'clip': 0.2, 'ent_coef': 0.01, 'epochs': 10, 'minibatch': 64}
+20:57:40 [INFO] [chunk   0] R=+0.0273 accept=0.66 flock=2.76 | KL=0.0125 EV=0.85 | gini=0.081 n=488 pend=23
+20:57:41 [INFO] [chunk   1] R=+0.0213 accept=0.64 flock=2.99 | KL=0.0046 EV=0.96 | gini=0.091 n=540 pend=21
+20:57:42 [INFO] [chunk   2] R=+0.0208 accept=0.61 flock=3.02 | KL=0.0045 EV=0.96 | gini=0.096 n=544 pend=20
+20:57:43 [INFO] [chunk   3] R=+0.0258 accept=0.62 flock=2.84 | KL=0.0070 EV=0.92 | gini=0.091 n=517 pend=30
+20:57:44 [INFO] [chunk   4] R=+0.0187 accept=0.62 flock=3.09 | KL=0.0144 EV=0.93 | gini=0.092 n=559 pend=23
+20:57:45 [INFO] [chunk   5] R=+0.0266 accept=0.61 flock=2.74 | KL=-0.0083 EV=0.89 | gini=0.100 n=494 pend=32
+20:57:46 [INFO] [chunk   6] R=+0.0255 accept=0.60 flock=2.84 | KL=0.0080 EV=0.89 | gini=0.103 n=512 pend=26
+20:57:47 [INFO] [chunk   7] R=+0.0247 accept=0.60 flock=2.80 | KL=-0.0032 EV=0.96 | gini=0.105 n=502 pend=40
+20:57:48 [INFO] [chunk   8] R=+0.0180 accept=0.62 flock=3.17 | KL=0.0070 EV=0.93 | gini=0.106 n=563 pend=48
+20:57:49 [INFO] [chunk   9] R=+0.0180 accept=0.60 flock=3.12 | KL=0.0144 EV=0.92 | gini=0.111 n=568 pend=24 |PASS-BARU
+20:57:49 [INFO] [chunk  10] R=+0.0297 accept=0.69 flock=2.74 | KL=0.0197 EV=0.96 | gini=0.100 n=495 pend=16
+20:57:50 [INFO] [chunk  11] R=+0.0234 accept=0.66 flock=2.92 | KL=0.0212 EV=0.97 | gini=0.105 n=531 pend=23
+20:57:51 [INFO] [chunk  12] R=+0.0208 accept=0.69 flock=3.04 | KL=0.0173 EV=0.97 | gini=0.103 n=548 pend=18
+20:57:52 [INFO] [chunk  13] R=+0.0263 accept=0.67 flock=2.84 | KL=0.0266 EV=0.91 | gini=0.110 n=519 pend=26
+20:57:52 [INFO] [chunk  14] R=+0.0186 accept=0.66 flock=3.15 | KL=0.0107 EV=0.94 | gini=0.109 n=565 pend=13
+20:57:53 [INFO] [chunk  15] R=+0.0280 accept=0.66 flock=2.73 | KL=-0.0024 EV=0.91 | gini=0.111 n=495 pend=22
+20:57:54 [INFO] [chunk  16] R=+0.0264 accept=0.66 flock=2.83 | KL=0.0203 EV=0.87 | gini=0.107 n=507 pend=20
+20:57:55 [INFO] [chunk  17] R=+0.0241 accept=0.63 flock=2.85 | KL=0.0101 EV=0.96 | gini=0.106 n=515 pend=21
+20:57:55 [INFO] [chunk  18] R=+0.0208 accept=0.65 flock=3.10 | KL=0.0027 EV=0.94 | gini=0.108 n=556 pend=37
+20:57:56 [INFO] [chunk  19] R=+0.0200 accept=0.60 flock=3.02 | KL=0.0142 EV=0.98 | gini=0.109 n=544 pend=35 |PASS-BARU
+20:57:57 [INFO] [chunk  20] R=+0.0295 accept=0.67 flock=2.71 | KL=0.0074 EV=0.97 | gini=0.100 n=482 pend=29
+20:57:58 [INFO] [chunk  21] R=+0.0229 accept=0.67 flock=2.99 | KL=0.0085 EV=0.97 | gini=0.105 n=542 pend=25
+20:57:59 [INFO] [chunk  22] R=+0.0217 accept=0.65 flock=3.03 | KL=0.0160 EV=0.97 | gini=0.112 n=544 pend=23
+20:57:59 [INFO] [chunk  23] R=+0.0254 accept=0.66 flock=2.86 | KL=0.0204 EV=0.97 | gini=0.119 n=522 pend=29
+20:58:00 [INFO] [chunk  24] R=+0.0198 accept=0.65 flock=3.11 | KL=0.0224 EV=0.94 | gini=0.106 n=566 pend=15
+20:58:01 [INFO] [chunk  25] R=+0.0298 accept=0.69 flock=2.71 | KL=-0.0004 EV=0.92 | gini=0.102 n=489 pend=29
+20:58:02 [INFO] [chunk  26] R=+0.0261 accept=0.66 flock=2.85 | KL=0.0257 EV=0.88 | gini=0.103 n=514 pend=21
+20:58:02 [INFO] [chunk  27] R=+0.0252 accept=0.68 flock=2.82 | KL=0.0330 EV=0.97 | gini=0.101 n=510 pend=27
+20:58:03 [INFO] [chunk  28] R=+0.0187 accept=0.66 flock=3.15 | KL=0.0082 EV=0.95 | gini=0.096 n=569 pend=30
+20:58:04 [INFO] [chunk  29] R=+0.0200 accept=0.66 flock=3.04 | KL=0.0166 EV=0.95 | gini=0.096 n=538 pend=35 |PASS-BARU
+20:58:05 [INFO] [chunk  30] R=+0.0311 accept=0.65 flock=2.75 | KL=0.0097 EV=0.98 | gini=0.084 n=497 pend=14
+20:58:06 [INFO] [chunk  31] R=+0.0247 accept=0.66 flock=2.87 | KL=0.0180 EV=0.98 | gini=0.096 n=526 pend=26
+20:58:06 [INFO] [chunk  32] R=+0.0206 accept=0.65 flock=3.04 | KL=0.0090 EV=0.98 | gini=0.089 n=543 pend=25
+20:58:07 [INFO] [chunk  33] R=+0.0247 accept=0.65 flock=2.93 | KL=0.0297 EV=0.95 | gini=0.089 n=532 pend=21
+20:58:08 [INFO] [chunk  34] R=+0.0214 accept=0.71 flock=3.06 | KL=0.0060 EV=0.93 | gini=0.091 n=551 pend=22
+20:58:09 [INFO] [chunk  35] R=+0.0273 accept=0.73 flock=2.83 | KL=0.0036 EV=0.93 | gini=0.090 n=511 pend=15
+20:58:09 [INFO] [chunk  36] R=+0.0290 accept=0.70 flock=2.74 | KL=0.0307 EV=0.90 | gini=0.093 n=487 pend=33
+20:58:10 [INFO] [chunk  37] R=+0.0269 accept=0.71 flock=2.85 | KL=0.0055 EV=0.96 | gini=0.094 n=524 pend=26
+20:58:11 [INFO] [chunk  38] R=+0.0208 accept=0.70 flock=3.15 | KL=0.0193 EV=0.95 | gini=0.097 n=573 pend=24
+20:58:12 [INFO] [chunk  39] R=+0.0230 accept=0.72 flock=3.02 | KL=0.0094 EV=0.95 | gini=0.095 n=539 pend=29 |PASS-BARU
+20:58:12 [INFO] [chunk  40] R=+0.0287 accept=0.70 flock=2.74 | KL=0.0293 EV=0.98 | gini=0.084 n=497 pend=14
+20:58:13 [INFO] [chunk  41] R=+0.0241 accept=0.69 flock=2.96 | KL=0.0108 EV=0.96 | gini=0.097 n=534 pend=19
+20:58:14 [INFO] [chunk  42] R=+0.0246 accept=0.72 flock=3.00 | KL=0.0107 EV=0.98 | gini=0.103 n=538 pend=23
+20:58:15 [INFO] [chunk  43] R=+0.0253 accept=0.73 flock=2.89 | KL=0.0078 EV=0.94 | gini=0.107 n=522 pend=28
+20:58:16 [INFO] [chunk  44] R=+0.0226 accept=0.71 flock=3.09 | KL=0.0247 EV=0.93 | gini=0.104 n=562 pend=18
+20:58:16 [INFO] [chunk  45] R=+0.0288 accept=0.70 flock=2.77 | KL=0.0244 EV=0.93 | gini=0.103 n=492 pend=30
+20:58:17 [INFO] [chunk  46] R=+0.0258 accept=0.73 flock=2.88 | KL=0.0170 EV=0.91 | gini=0.103 n=513 pend=20
+20:58:18 [INFO] [chunk  47] R=+0.0272 accept=0.73 flock=2.88 | KL=0.0208 EV=0.98 | gini=0.101 n=516 pend=23
+20:58:19 [INFO] [chunk  48] R=+0.0210 accept=0.72 flock=3.15 | KL=0.0262 EV=0.96 | gini=0.101 n=564 pend=30
+20:58:20 [INFO] [chunk  49] R=+0.0220 accept=0.70 flock=3.05 | KL=0.0085 EV=0.95 | gini=0.101 n=538 pend=35 |PASS-BARU
+20:58:20 [INFO] [chunk  50] R=+0.0309 accept=0.69 flock=2.69 | KL=0.0058 EV=0.97 | gini=0.088 n=487 pend=24
+20:58:21 [INFO] [chunk  51] R=+0.0250 accept=0.70 flock=2.91 | KL=0.0262 EV=0.98 | gini=0.091 n=535 pend=26
+20:58:22 [INFO] [chunk  52] R=+0.0232 accept=0.71 flock=3.05 | KL=0.0097 EV=0.97 | gini=0.090 n=546 pend=24
+20:58:23 [INFO] [chunk  53] R=+0.0261 accept=0.67 flock=2.83 | KL=0.0245 EV=0.97 | gini=0.098 n=516 pend=34
+20:58:24 [INFO] [chunk  54] R=+0.0197 accept=0.68 flock=3.15 | KL=0.0182 EV=0.93 | gini=0.097 n=564 pend=22
+20:58:24 [INFO] [chunk  55] R=+0.0305 accept=0.71 flock=2.69 | KL=0.0074 EV=0.92 | gini=0.093 n=487 pend=39
+20:58:25 [INFO] [chunk  56] R=+0.0274 accept=0.69 flock=2.83 | KL=0.0313 EV=0.92 | gini=0.092 n=512 pend=32
+20:58:26 [INFO] [chunk  57] R=+0.0284 accept=0.76 flock=2.90 | KL=0.0080 EV=0.97 | gini=0.095 n=528 pend=22
+20:58:27 [INFO] [chunk  58] R=+0.0224 accept=0.73 flock=3.10 | KL=0.0142 EV=0.95 | gini=0.096 n=547 pend=46
+20:58:28 [INFO] [chunk  59] R=+0.0228 accept=0.75 flock=3.11 | KL=0.0061 EV=0.98 | gini=0.097 n=569 pend=20 |PASS-BARU
+20:58:29 [INFO] [chunk  60] R=+0.0294 accept=0.69 flock=2.76 | KL=0.0133 EV=0.99 | gini=0.104 n=497 pend=14
+20:58:30 [INFO] [chunk  61] R=+0.0247 accept=0.73 flock=2.97 | KL=0.0161 EV=0.99 | gini=0.095 n=539 pend=14
+20:58:31 [INFO] [chunk  62] R=+0.0221 accept=0.70 flock=3.01 | KL=0.0006 EV=0.99 | gini=0.093 n=538 pend=18
+20:58:32 [INFO] [chunk  63] R=+0.0286 accept=0.77 flock=2.85 | KL=0.0296 EV=0.94 | gini=0.098 n=515 pend=30
+20:58:33 [INFO] [chunk  64] R=+0.0218 accept=0.73 flock=3.14 | KL=0.0098 EV=0.97 | gini=0.100 n=562 pend=20
+20:58:34 [INFO] [chunk  65] R=+0.0318 accept=0.75 flock=2.71 | KL=0.0250 EV=0.95 | gini=0.097 n=481 pend=42
+20:58:35 [INFO] [chunk  66] R=+0.0273 accept=0.74 flock=2.87 | KL=0.0265 EV=0.94 | gini=0.097 n=522 pend=24
+20:58:36 [INFO] [chunk  67] R=+0.0262 accept=0.71 flock=2.90 | KL=0.0051 EV=0.97 | gini=0.099 n=525 pend=18
+20:58:37 [INFO] [chunk  68] R=+0.0238 accept=0.78 flock=3.12 | KL=0.0054 EV=0.96 | gini=0.099 n=561 pend=28
+20:58:37 [INFO] [chunk  69] R=+0.0241 accept=0.72 flock=3.02 | KL=0.0071 EV=0.97 | gini=0.100 n=539 pend=32 |PASS-BARU
+20:58:38 [INFO] [chunk  70] R=+0.0300 accept=0.70 flock=2.72 | KL=0.0029 EV=0.98 | gini=0.126 n=488 pend=23
+20:58:39 [INFO] [chunk  71] R=+0.0244 accept=0.71 flock=2.96 | KL=0.0257 EV=0.96 | gini=0.109 n=539 pend=23
+20:58:40 [INFO] [chunk  72] R=+0.0231 accept=0.69 flock=3.01 | KL=0.0032 EV=0.97 | gini=0.105 n=540 pend=25
+20:58:41 [INFO] [chunk  73] R=+0.0251 accept=0.72 flock=2.90 | KL=0.0201 EV=0.98 | gini=0.106 n=521 pend=30
+20:58:41 [INFO] [chunk  74] R=+0.0217 accept=0.73 flock=3.12 | KL=0.0038 EV=0.96 | gini=0.099 n=560 pend=23
+20:58:42 [INFO] [chunk  75] R=+0.0300 accept=0.76 flock=2.77 | KL=0.0067 EV=0.96 | gini=0.100 n=504 pend=22
+20:58:43 [INFO] [chunk  76] R=+0.0286 accept=0.77 flock=2.82 | KL=0.0094 EV=0.91 | gini=0.098 n=504 pend=24
+20:58:44 [INFO] [chunk  77] R=+0.0270 accept=0.74 flock=2.89 | KL=0.0093 EV=0.98 | gini=0.099 n=511 pend=29
+20:58:44 [INFO] [chunk  78] R=+0.0224 accept=0.74 flock=3.11 | KL=0.0130 EV=0.97 | gini=0.099 n=557 pend=43
+20:58:45 [INFO] [chunk  79] R=+0.0223 accept=0.78 flock=3.19 | KL=-0.0002 EV=0.96 | gini=0.098 n=574 pend=13 |PASS-BARU
+20:58:46 [INFO] [chunk  80] R=+0.0304 accept=0.69 flock=2.77 | KL=0.0159 EV=0.98 | gini=0.089 n=495 pend=15
+20:58:47 [INFO] [chunk  81] R=+0.0257 accept=0.75 flock=2.96 | KL=0.0148 EV=0.98 | gini=0.074 n=538 pend=16
+20:58:48 [INFO] [chunk  82] R=+0.0265 accept=0.76 flock=2.98 | KL=0.0130 EV=0.96 | gini=0.090 n=532 pend=27
+20:58:49 [INFO] [chunk  83] R=+0.0278 accept=0.73 flock=2.85 | KL=0.0183 EV=0.96 | gini=0.093 n=517 pend=37
+20:58:50 [INFO] [chunk  84] R=+0.0214 accept=0.76 flock=3.17 | KL=0.0147 EV=0.96 | gini=0.093 n=567 pend=22
+20:58:50 [INFO] [chunk  85] R=+0.0299 accept=0.77 flock=2.74 | KL=0.0114 EV=0.97 | gini=0.091 n=500 pend=26
+20:58:51 [INFO] [chunk  86] R=+0.0307 accept=0.76 flock=2.79 | KL=0.0243 EV=0.95 | gini=0.090 n=494 pend=35
+20:58:52 [INFO] [chunk  87] R=+0.0280 accept=0.80 flock=2.95 | KL=0.0012 EV=0.97 | gini=0.086 n=536 pend=18
+20:58:53 [INFO] [chunk  88] R=+0.0250 accept=0.81 flock=3.09 | KL=0.0108 EV=0.96 | gini=0.089 n=557 pend=32
+20:58:53 [INFO] [chunk  89] R=+0.0249 accept=0.82 flock=3.06 | KL=0.0090 EV=0.97 | gini=0.092 n=552 pend=23 |PASS-BARU
+20:58:54 [INFO] [chunk  90] R=+0.0270 accept=0.71 flock=2.76 | KL=0.0076 EV=0.99 | gini=0.087 n=495 pend=16
+20:58:55 [INFO] [chunk  91] R=+0.0256 accept=0.76 flock=2.95 | KL=0.0177 EV=0.99 | gini=0.089 n=540 pend=15
+20:58:56 [INFO] [chunk  92] R=+0.0251 accept=0.79 flock=2.99 | KL=0.0123 EV=0.98 | gini=0.098 n=541 pend=16
+20:58:57 [INFO] [chunk  93] R=+0.0286 accept=0.83 flock=2.89 | KL=0.0162 EV=0.97 | gini=0.103 n=524 pend=19
+20:58:57 [INFO] [chunk  94] R=+0.0246 accept=0.81 flock=3.07 | KL=0.0270 EV=0.97 | gini=0.106 n=551 pend=20
+20:58:58 [INFO] [chunk  95] R=+0.0319 accept=0.83 flock=2.75 | KL=0.0105 EV=0.94 | gini=0.103 n=499 pend=24
+20:58:59 [INFO] [chunk  96] R=+0.0328 accept=0.87 flock=2.83 | KL=0.0179 EV=0.91 | gini=0.104 n=512 pend=18
+20:59:00 [INFO] [chunk  97] R=+0.0318 accept=0.86 flock=2.83 | KL=0.0180 EV=0.97 | gini=0.106 n=514 pend=21
+20:59:00 [INFO] [chunk  98] R=+0.0257 accept=0.86 flock=3.14 | KL=0.0251 EV=0.97 | gini=0.108 n=560 pend=31
+20:59:01 [INFO] [chunk  99] R=+0.0254 accept=0.88 flock=3.13 | KL=0.0232 EV=0.97 | gini=0.106 n=559 pend=17 |PASS-BARU
+20:59:02 [INFO] [chunk 100] R=+0.0299 accept=0.74 flock=2.76 | KL=0.0212 EV=0.98 | gini=0.109 n=488 pend=23
+20:59:03 [INFO] [chunk 101] R=+0.0251 accept=0.78 flock=3.03 | KL=0.0234 EV=0.98 | gini=0.080 n=551 pend=11
+20:59:04 [INFO] [chunk 102] R=+0.0260 accept=0.80 flock=2.99 | KL=-0.0004 EV=0.98 | gini=0.083 n=540 pend=12
+20:59:04 [INFO] [chunk 103] R=+0.0306 accept=0.80 flock=2.78 | KL=0.0087 EV=0.99 | gini=0.084 n=501 pend=38
+20:59:05 [INFO] [chunk 104] R=+0.0239 accept=0.83 flock=3.20 | KL=0.0069 EV=0.97 | gini=0.085 n=576 pend=15
+20:59:06 [INFO] [chunk 105] R=+0.0347 accept=0.84 flock=2.69 | KL=0.0150 EV=0.95 | gini=0.085 n=485 pend=33
+20:59:07 [INFO] [chunk 106] R=+0.0308 accept=0.86 flock=2.88 | KL=0.0091 EV=0.96 | gini=0.087 n=524 pend=15
+20:59:08 [INFO] [chunk 107] R=+0.0330 accept=0.84 flock=2.78 | KL=0.0188 EV=0.98 | gini=0.087 n=496 pend=34
+20:59:09 [INFO] [chunk 108] R=+0.0221 accept=0.84 flock=3.23 | KL=0.0131 EV=0.97 | gini=0.092 n=574 pend=32
+20:59:10 [INFO] [chunk 109] R=+0.0276 accept=0.84 flock=3.02 | KL=0.0106 EV=0.97 | gini=0.094 n=544 pend=32 |PASS-BARU
+20:59:11 [INFO] [chunk 110] R=+0.0044 accept=0.73 flock=3.38 | KL=0.0073 EV=0.96 | gini=0.097 n=467 pend=44
+20:59:12 [INFO] [chunk 111] R=+0.0198 accept=0.74 flock=3.05 | KL=0.0090 EV=0.97 | gini=0.086 n=560 pend=22
+20:59:13 [INFO] [chunk 112] R=+0.0272 accept=0.79 flock=2.98 | KL=0.0135 EV=0.99 | gini=0.089 n=541 pend=23
+20:59:13 [INFO] [chunk 113] R=+0.0303 accept=0.82 flock=2.84 | KL=0.0312 EV=0.96 | gini=0.087 n=512 pend=39
+20:59:14 [INFO] [chunk 114] R=+0.0253 accept=0.83 flock=3.10 | KL=0.0273 EV=0.96 | gini=0.090 n=553 pend=36
+20:59:15 [INFO] [chunk 115] R=+0.0303 accept=0.80 flock=2.85 | KL=0.0073 EV=0.97 | gini=0.095 n=509 pend=33
+20:59:16 [INFO] [chunk 116] R=+0.0312 accept=0.82 flock=2.81 | KL=0.0325 EV=0.95 | gini=0.092 n=510 pend=27
+20:59:16 [INFO] [chunk 117] R=+0.0316 accept=0.85 flock=2.81 | KL=0.0128 EV=0.99 | gini=0.090 n=514 pend=30
+20:59:17 [INFO] [chunk 118] R=+0.0272 accept=0.86 flock=3.09 | KL=0.0108 EV=0.97 | gini=0.087 n=552 pend=50
+20:59:18 [INFO] [chunk 119] R=+0.0281 accept=0.86 flock=3.07 | KL=0.0318 EV=0.96 | gini=0.083 n=553 pend=40 |PASS-BARU
+20:59:19 [INFO] [chunk 120] R=+0.0315 accept=0.75 flock=2.72 | KL=0.0108 EV=0.99 | gini=0.122 n=488 pend=23
+20:59:20 [INFO] [chunk 121] R=+0.0267 accept=0.79 flock=2.97 | KL=0.0414 EV=0.98 | gini=0.136 n=545 pend=17
+20:59:21 [INFO] [chunk 122] R=+0.0266 accept=0.81 flock=3.00 | KL=0.0377 EV=0.98 | gini=0.129 n=542 pend=16
+20:59:21 [INFO] [chunk 123] R=+0.0299 accept=0.86 flock=2.90 | KL=0.0067 EV=0.97 | gini=0.121 n=519 pend=24
+20:59:22 [INFO] [chunk 124] R=+0.0268 accept=0.85 flock=3.06 | KL=0.0261 EV=0.97 | gini=0.115 n=556 pend=21
+20:59:23 [INFO] [chunk 125] R=+0.0346 accept=0.87 flock=2.74 | KL=0.0140 EV=0.96 | gini=0.108 n=497 pend=28
+20:59:24 [INFO] [chunk 126] R=+0.0331 accept=0.91 flock=2.84 | KL=0.0224 EV=0.93 | gini=0.105 n=504 pend=28
+20:59:25 [INFO] [chunk 127] R=+0.0334 accept=0.88 flock=2.88 | KL=0.0152 EV=0.99 | gini=0.100 n=529 pend=16
+20:59:25 [INFO] [chunk 128] R=+0.0282 accept=0.91 flock=3.10 | KL=0.0045 EV=0.97 | gini=0.098 n=551 pend=37
+20:59:26 [INFO] [chunk 129] R=+0.0291 accept=0.91 flock=3.03 | KL=0.0162 EV=0.98 | gini=0.097 n=539 pend=41 |PASS-BARU
+20:59:27 [INFO] [chunk 130] R=+0.0317 accept=0.74 flock=2.74 | KL=0.0185 EV=0.99 | gini=0.079 n=495 pend=16
+20:59:28 [INFO] [chunk 131] R=+0.0269 accept=0.79 flock=2.99 | KL=0.0138 EV=0.97 | gini=0.093 n=532 pend=23
+20:59:29 [INFO] [chunk 132] R=+0.0255 accept=0.82 flock=3.10 | KL=0.0126 EV=0.98 | gini=0.096 n=548 pend=17
+20:59:29 [INFO] [chunk 133] R=+0.0305 accept=0.86 flock=2.85 | KL=0.0201 EV=0.95 | gini=0.088 n=517 pend=27
+20:59:30 [INFO] [chunk 134] R=+0.0242 accept=0.84 flock=3.15 | KL=0.0058 EV=0.97 | gini=0.085 n=567 pend=12
+20:59:31 [INFO] [chunk 135] R=+0.0335 accept=0.87 flock=2.76 | KL=-0.0011 EV=0.97 | gini=0.086 n=496 pend=20
+20:59:32 [INFO] [chunk 136] R=+0.0347 accept=0.90 flock=2.74 | KL=0.0382 EV=0.96 | gini=0.083 n=494 pend=29
+20:59:32 [INFO] [chunk 137] R=+0.0328 accept=0.89 flock=2.82 | KL=0.0200 EV=0.99 | gini=0.083 n=521 pend=26
+20:59:33 [INFO] [chunk 138] R=+0.0262 accept=0.88 flock=3.12 | KL=0.0196 EV=0.98 | gini=0.085 n=561 pend=37
+20:59:34 [INFO] [chunk 139] R=+0.0283 accept=0.90 flock=3.08 | KL=0.0104 EV=0.96 | gini=0.084 n=554 pend=26 |PASS-BARU
+20:59:35 [INFO] [chunk 140] R=+0.0306 accept=0.75 flock=2.75 | KL=0.0208 EV=0.99 | gini=0.078 n=494 pend=17
+20:59:36 [INFO] [chunk 141] R=+0.0271 accept=0.80 flock=2.98 | KL=0.0198 EV=0.98 | gini=0.085 n=546 pend=10
+20:59:36 [INFO] [chunk 142] R=+0.0280 accept=0.81 flock=2.94 | KL=0.0135 EV=0.99 | gini=0.094 n=519 pend=33
+20:59:37 [INFO] [chunk 143] R=+0.0296 accept=0.82 flock=2.88 | KL=0.0115 EV=0.99 | gini=0.086 n=529 pend=31
+20:59:38 [INFO] [chunk 144] R=+0.0277 accept=0.87 flock=3.09 | KL=0.0165 EV=0.98 | gini=0.091 n=564 pend=19
+20:59:39 [INFO] [chunk 145] R=+0.0337 accept=0.86 flock=2.79 | KL=0.0136 EV=0.97 | gini=0.092 n=500 pend=23
+20:59:39 [INFO] [chunk 146] R=+0.0342 accept=0.91 flock=2.78 | KL=0.0160 EV=0.96 | gini=0.094 n=496 pend=31
+20:59:40 [INFO] [chunk 147] R=+0.0323 accept=0.90 flock=2.86 | KL=0.0148 EV=0.98 | gini=0.096 n=518 pend=31
+20:59:41 [INFO] [chunk 148] R=+0.0263 accept=0.88 flock=3.17 | KL=0.0121 EV=0.98 | gini=0.101 n=573 pend=28
+20:59:42 [INFO] [chunk 149] R=+0.0287 accept=0.89 flock=3.02 | KL=0.0077 EV=0.97 | gini=0.103 n=543 pend=29 |PASS-BARU
+20:59:43 [INFO] [chunk 150] R=+0.0082 accept=0.75 flock=3.39 | KL=0.0286 EV=0.96 | gini=0.097 n=490 pend=21
+20:59:43 [INFO] [chunk 151] R=+0.0266 accept=0.78 flock=2.99 | KL=0.0257 EV=0.98 | gini=0.072 n=545 pend=15
+20:59:44 [INFO] [chunk 152] R=+0.0278 accept=0.81 flock=2.98 | KL=0.0116 EV=0.98 | gini=0.071 n=528 pend=28
+20:59:45 [INFO] [chunk 153] R=+0.0322 accept=0.88 flock=2.87 | KL=0.0219 EV=0.99 | gini=0.059 n=525 pend=31
+20:59:46 [INFO] [chunk 154] R=+0.0254 accept=0.85 flock=3.13 | KL=0.0102 EV=0.99 | gini=0.067 n=568 pend=15
+20:59:46 [INFO] [chunk 155] R=+0.0346 accept=0.89 flock=2.75 | KL=0.0107 EV=0.97 | gini=0.065 n=488 pend=31
+20:59:47 [INFO] [chunk 156] R=+0.0326 accept=0.91 flock=2.86 | KL=0.0180 EV=0.97 | gini=0.068 n=511 pend=25
+20:59:48 [INFO] [chunk 157] R=+0.0326 accept=0.90 flock=2.85 | KL=0.0086 EV=0.99 | gini=0.069 n=518 pend=23
+20:59:49 [INFO] [chunk 158] R=+0.0287 accept=0.90 flock=3.09 | KL=0.0111 EV=0.98 | gini=0.070 n=559 pend=36
+20:59:50 [INFO] [chunk 159] R=+0.0293 accept=0.88 flock=3.06 | KL=0.0184 EV=0.98 | gini=0.073 n=556 pend=24 |PASS-BARU
+20:59:50 [INFO] [chunk 160] R=+0.0298 accept=0.73 flock=2.76 | KL=0.0119 EV=0.99 | gini=0.061 n=490 pend=21
+20:59:51 [INFO] [chunk 161] R=+0.0289 accept=0.82 flock=2.93 | KL=0.0139 EV=0.98 | gini=0.066 n=533 pend=27
+20:59:52 [INFO] [chunk 162] R=+0.0266 accept=0.82 flock=3.03 | KL=0.0062 EV=0.96 | gini=0.065 n=543 pend=26
+20:59:53 [INFO] [chunk 163] R=+0.0319 accept=0.86 flock=2.85 | KL=0.0156 EV=0.99 | gini=0.061 n=526 pend=27
+20:59:53 [INFO] [chunk 164] R=+0.0282 accept=0.87 flock=3.07 | KL=0.0293 EV=0.97 | gini=0.064 n=554 pend=24
+20:59:54 [INFO] [chunk 165] R=+0.0343 accept=0.89 flock=2.77 | KL=0.0252 EV=0.98 | gini=0.068 n=501 pend=28
+20:59:55 [INFO] [chunk 166] R=+0.0326 accept=0.91 flock=2.86 | KL=0.0168 EV=0.96 | gini=0.075 n=517 pend=16
+20:59:56 [INFO] [chunk 167] R=+0.0354 accept=0.91 flock=2.78 | KL=0.0118 EV=0.99 | gini=0.075 n=506 pend=26
+20:59:56 [INFO] [chunk 168] R=+0.0268 accept=0.90 flock=3.10 | KL=0.0078 EV=0.98 | gini=0.076 n=562 pend=36
+20:59:57 [INFO] [chunk 169] R=+0.0306 accept=0.92 flock=3.04 | KL=0.0161 EV=0.97 | gini=0.076 n=543 pend=36 |PASS-BARU
+20:59:58 [INFO] [chunk 170] R=+0.0287 accept=0.75 flock=2.78 | KL=0.0297 EV=0.98 | gini=0.144 n=496 pend=15
+20:59:59 [INFO] [chunk 171] R=+0.0286 accept=0.78 flock=2.91 | KL=0.0174 EV=0.96 | gini=0.103 n=531 pend=23
+21:00:00 [INFO] [chunk 172] R=+0.0270 accept=0.83 flock=3.01 | KL=0.0200 EV=0.98 | gini=0.092 n=545 pend=20
+21:00:00 [INFO] [chunk 173] R=+0.0316 accept=0.87 flock=2.83 | KL=0.0160 EV=0.98 | gini=0.105 n=512 pend=33
+21:00:01 [INFO] [chunk 174] R=+0.0254 accept=0.85 flock=3.14 | KL=0.0044 EV=0.98 | gini=0.101 n=568 pend=18
+21:00:02 [INFO] [chunk 175] R=+0.0354 accept=0.89 flock=2.70 | KL=0.0149 EV=0.97 | gini=0.099 n=497 pend=25
+21:00:03 [INFO] [chunk 176] R=+0.0311 accept=0.91 flock=2.85 | KL=0.0281 EV=0.96 | gini=0.096 n=508 pend=23
+21:00:03 [INFO] [chunk 177] R=+0.0333 accept=0.90 flock=2.86 | KL=0.0278 EV=0.99 | gini=0.093 n=521 pend=19
+21:00:04 [INFO] [chunk 178] R=+0.0279 accept=0.86 flock=3.05 | KL=0.0106 EV=0.98 | gini=0.095 n=554 pend=36
+21:00:05 [INFO] [chunk 179] R=+0.0266 accept=0.87 flock=3.12 | KL=0.0085 EV=0.97 | gini=0.098 n=555 pend=24 |PASS-BARU
+21:00:06 [INFO] [chunk 180] R=+0.0183 accept=0.74 flock=3.11 | KL=0.0169 EV=0.98 | gini=0.068 n=495 pend=16
+21:00:07 [INFO] [chunk 181] R=+0.0278 accept=0.80 flock=2.96 | KL=0.0269 EV=0.98 | gini=0.083 n=539 pend=16
+21:00:08 [INFO] [chunk 182] R=+0.0264 accept=0.83 flock=3.02 | KL=0.0149 EV=0.98 | gini=0.071 n=545 pend=13
+21:00:08 [INFO] [chunk 183] R=+0.0313 accept=0.85 flock=2.88 | KL=0.0297 EV=0.97 | gini=0.074 n=524 pend=16
+21:00:09 [INFO] [chunk 184] R=+0.0256 accept=0.88 flock=3.09 | KL=0.0168 EV=0.99 | gini=0.080 n=558 pend=10
+21:00:10 [INFO] [chunk 185] R=+0.0357 accept=0.88 flock=2.73 | KL=0.0117 EV=0.98 | gini=0.081 n=494 pend=20
+21:00:11 [INFO] [chunk 186] R=+0.0329 accept=0.89 flock=2.87 | KL=0.0069 EV=0.96 | gini=0.086 n=506 pend=18
+21:00:11 [INFO] [chunk 187] R=+0.0362 accept=0.93 flock=2.79 | KL=0.0073 EV=0.98 | gini=0.082 n=510 pend=26
+21:00:12 [INFO] [chunk 188] R=+0.0288 accept=0.90 flock=3.07 | KL=0.0176 EV=0.98 | gini=0.080 n=555 pend=42
+21:00:13 [INFO] [chunk 189] R=+0.0285 accept=0.91 flock=3.11 | KL=0.0168 EV=0.99 | gini=0.080 n=560 pend=25 |PASS-BARU
+21:00:14 [INFO] [chunk 190] R=+0.0296 accept=0.73 flock=2.75 | KL=0.0121 EV=0.98 | gini=0.110 n=491 pend=20
+21:00:15 [INFO] [chunk 191] R=+0.0285 accept=0.83 flock=2.96 | KL=0.0261 EV=0.98 | gini=0.109 n=543 pend=16
+21:00:15 [INFO] [chunk 192] R=+0.0304 accept=0.85 flock=2.94 | KL=0.0263 EV=0.97 | gini=0.109 n=527 pend=30
+21:00:16 [INFO] [chunk 193] R=+0.0329 accept=0.87 flock=2.84 | KL=0.0332 EV=0.99 | gini=0.106 n=524 pend=34
+21:00:17 [INFO] [chunk 194] R=+0.0260 accept=0.87 flock=3.15 | KL=0.0586 EV=0.97 | gini=0.108 n=560 pend=25
+21:00:18 [INFO] [chunk 195] R=+0.0350 accept=0.87 flock=2.75 | KL=0.0200 EV=0.98 | gini=0.113 n=497 pend=33
+21:00:18 [INFO] [chunk 196] R=+0.0347 accept=0.92 flock=2.85 | KL=0.0141 EV=0.96 | gini=0.110 n=512 pend=26
+21:00:19 [INFO] [chunk 197] R=+0.0333 accept=0.90 flock=2.88 | KL=0.0217 EV=0.99 | gini=0.106 n=522 pend=20
+21:00:20 [INFO] [chunk 198] R=+0.0290 accept=0.91 flock=3.09 | KL=0.0123 EV=0.98 | gini=0.104 n=550 pend=42
+21:00:21 [INFO] [chunk 199] R=+0.0284 accept=0.91 flock=3.08 | KL=0.0054 EV=0.99 | gini=0.100 n=549 pend=37 |PASS-BARU
+[SELESAI] t2_masterbid_30d_abs_seed2 (161s)
+[masterbid_30d_abs] seed=2 selesai 2.7 mnt
+
+================================================================
+[masterbid_30d_sgn] seed=2 aturan-trust=signed dataset=scenario_dataset_klaster12_4x.json
+================================================================
+21:00:21 [INFO] CONFIG {'dataset': '/home/iskandar/Alan/TesisRepo/scenario_dataset_klaster12_4x.json', 'N': 6, 'obs_dim': 42, 'willingness_ratio': None, 'k': 2, 't_max': 120.0, 'rollout_steps': 288, 'seed': 2, 'alpha_wait': 0.0046, 'beta_prox': 0.1, 'alpha_gini': 2.6019, 'alpha_flock': 0.0208, 'lr': 0.0003, 'gamma': 0.99, 'avg_reward': True, 'clip': 0.2, 'ent_coef': 0.01, 'epochs': 10, 'minibatch': 64}
+21:00:22 [INFO] [chunk   0] R=+0.0292 accept=0.67 flock=2.79 | KL=0.0175 EV=0.86 | gini=0.076 n=497 pend=14
+21:00:23 [INFO] [chunk   1] R=+0.0227 accept=0.64 flock=2.96 | KL=0.0073 EV=0.96 | gini=0.086 n=527 pend=26
+21:00:24 [INFO] [chunk   2] R=+0.0219 accept=0.67 flock=3.03 | KL=0.0145 EV=0.92 | gini=0.084 n=543 pend=24
+21:00:26 [INFO] [chunk   3] R=+0.0250 accept=0.65 flock=2.86 | KL=0.0033 EV=0.89 | gini=0.087 n=522 pend=30
+21:00:27 [INFO] [chunk   4] R=+0.0195 accept=0.62 flock=3.10 | KL=0.0157 EV=0.90 | gini=0.083 n=559 pend=23
+21:00:27 [INFO] [chunk   5] R=+0.0259 accept=0.65 flock=2.76 | KL=-0.0010 EV=0.88 | gini=0.086 n=499 pend=26
+21:00:28 [INFO] [chunk   6] R=+0.0258 accept=0.66 flock=2.81 | KL=0.0090 EV=0.87 | gini=0.087 n=501 pend=32
+21:00:29 [INFO] [chunk   7] R=+0.0247 accept=0.66 flock=2.85 | KL=0.0053 EV=0.95 | gini=0.089 n=513 pend=35
+21:00:30 [INFO] [chunk   8] R=+0.0170 accept=0.65 flock=3.18 | KL=0.0007 EV=0.93 | gini=0.090 n=564 pend=42
+21:00:31 [INFO] [chunk   9] R=+0.0182 accept=0.64 flock=3.12 | KL=0.0100 EV=0.94 | gini=0.092 n=563 pend=24 |PASS-BARU
+21:00:32 [INFO] [chunk  10] R=+0.0274 accept=0.67 flock=2.75 | KL=0.0225 EV=0.96 | gini=0.128 n=497 pend=14
+21:00:33 [INFO] [chunk  11] R=+0.0245 accept=0.67 flock=2.92 | KL=0.0027 EV=0.98 | gini=0.109 n=533 pend=19
+21:00:34 [INFO] [chunk  12] R=+0.0219 accept=0.65 flock=2.99 | KL=0.0014 EV=0.93 | gini=0.117 n=538 pend=24
+21:00:35 [INFO] [chunk  13] R=+0.0253 accept=0.69 flock=2.89 | KL=0.0027 EV=0.94 | gini=0.112 n=526 pend=25
+21:00:37 [INFO] [chunk  14] R=+0.0185 accept=0.64 flock=3.12 | KL=0.0061 EV=0.93 | gini=0.107 n=564 pend=13
+21:00:37 [INFO] [chunk  15] R=+0.0291 accept=0.69 flock=2.72 | KL=0.0027 EV=0.88 | gini=0.102 n=496 pend=21
+21:00:38 [INFO] [chunk  16] R=+0.0261 accept=0.64 flock=2.80 | KL=0.0166 EV=0.87 | gini=0.096 n=500 pend=25
+21:00:39 [INFO] [chunk  17] R=+0.0234 accept=0.65 flock=2.89 | KL=0.0006 EV=0.97 | gini=0.095 n=524 pend=19
+21:00:40 [INFO] [chunk  18] R=+0.0216 accept=0.68 flock=3.09 | KL=0.0040 EV=0.93 | gini=0.096 n=552 pend=38
+21:00:41 [INFO] [chunk  19] R=+0.0232 accept=0.69 flock=3.01 | KL=0.0001 EV=0.94 | gini=0.095 n=548 pend=33 |PASS-BARU
+21:00:42 [INFO] [chunk  20] R=+0.0299 accept=0.69 flock=2.76 | KL=0.0124 EV=0.97 | gini=0.067 n=487 pend=24
+21:00:43 [INFO] [chunk  21] R=+0.0236 accept=0.65 flock=2.97 | KL=0.0193 EV=0.98 | gini=0.079 n=537 pend=25
+21:00:44 [INFO] [chunk  22] R=+0.0223 accept=0.70 flock=3.04 | KL=0.0035 EV=0.96 | gini=0.094 n=553 pend=14
+21:00:44 [INFO] [chunk  23] R=+0.0276 accept=0.72 flock=2.84 | KL=0.0220 EV=0.95 | gini=0.100 n=515 pend=25
+21:00:45 [INFO] [chunk  24] R=+0.0220 accept=0.72 flock=3.09 | KL=0.0125 EV=0.93 | gini=0.098 n=567 pend=12
+21:00:46 [INFO] [chunk  25] R=+0.0294 accept=0.70 flock=2.68 | KL=-0.0014 EV=0.92 | gini=0.096 n=481 pend=35
+21:00:47 [INFO] [chunk  26] R=+0.0270 accept=0.72 flock=2.84 | KL=0.0139 EV=0.91 | gini=0.088 n=517 pend=23
+21:00:47 [INFO] [chunk  27] R=+0.0269 accept=0.70 flock=2.83 | KL=0.0076 EV=0.98 | gini=0.086 n=512 pend=26
+21:00:48 [INFO] [chunk  28] R=+0.0208 accept=0.72 flock=3.14 | KL=0.0190 EV=0.94 | gini=0.090 n=571 pend=28
+21:00:49 [INFO] [chunk  29] R=+0.0238 accept=0.73 flock=3.01 | KL=0.0156 EV=0.96 | gini=0.093 n=536 pend=35 |PASS-BARU
+21:00:50 [INFO] [chunk  30] R=+0.0302 accept=0.69 flock=2.73 | KL=0.0047 EV=0.98 | gini=0.098 n=496 pend=15
+21:00:51 [INFO] [chunk  31] R=+0.0233 accept=0.67 flock=2.91 | KL=0.0188 EV=0.98 | gini=0.096 n=530 pend=23
+21:00:51 [INFO] [chunk  32] R=+0.0226 accept=0.70 flock=3.03 | KL=0.0203 EV=0.94 | gini=0.101 n=544 pend=22
+21:00:52 [INFO] [chunk  33] R=+0.0251 accept=0.68 flock=2.89 | KL=0.0308 EV=0.97 | gini=0.106 n=526 pend=22
+21:00:53 [INFO] [chunk  34] R=+0.0215 accept=0.69 flock=3.07 | KL=-0.0001 EV=0.96 | gini=0.104 n=554 pend=21
+21:00:54 [INFO] [chunk  35] R=+0.0259 accept=0.68 flock=2.82 | KL=-0.0014 EV=0.95 | gini=0.099 n=511 pend=14
+21:00:54 [INFO] [chunk  36] R=+0.0283 accept=0.67 flock=2.73 | KL=0.0123 EV=0.91 | gini=0.100 n=489 pend=30
+21:00:55 [INFO] [chunk  37] R=+0.0272 accept=0.71 flock=2.84 | KL=0.0142 EV=0.96 | gini=0.099 n=524 pend=23
+21:00:56 [INFO] [chunk  38] R=+0.0197 accept=0.72 flock=3.16 | KL=0.0113 EV=0.96 | gini=0.100 n=568 pend=26
+21:00:57 [INFO] [chunk  39] R=+0.0210 accept=0.70 flock=3.03 | KL=0.0142 EV=0.95 | gini=0.100 n=540 pend=30 |PASS-BARU
+21:00:58 [INFO] [chunk  40] R=+0.0170 accept=0.75 flock=3.04 | KL=0.0064 EV=0.97 | gini=0.156 n=490 pend=20
+21:00:58 [INFO] [chunk  41] R=+0.0250 accept=0.71 flock=2.97 | KL=0.0075 EV=0.97 | gini=0.134 n=546 pend=14
+21:00:59 [INFO] [chunk  42] R=+0.0228 accept=0.71 flock=2.99 | KL=0.0148 EV=0.97 | gini=0.120 n=539 pend=17
+21:01:00 [INFO] [chunk  43] R=+0.0257 accept=0.71 flock=2.90 | KL=0.0179 EV=0.95 | gini=0.113 n=520 pend=23
+21:01:01 [INFO] [chunk  44] R=+0.0208 accept=0.71 flock=3.06 | KL=0.0319 EV=0.92 | gini=0.110 n=553 pend=22
+21:01:02 [INFO] [chunk  45] R=+0.0284 accept=0.74 flock=2.79 | KL=0.0066 EV=0.93 | gini=0.109 n=497 pend=30
+21:01:03 [INFO] [chunk  46] R=+0.0267 accept=0.71 flock=2.87 | KL=0.0106 EV=0.90 | gini=0.107 n=515 pend=20
+21:01:03 [INFO] [chunk  47] R=+0.0261 accept=0.74 flock=2.89 | KL=0.0112 EV=0.97 | gini=0.104 n=516 pend=21
+21:01:04 [INFO] [chunk  48] R=+0.0210 accept=0.74 flock=3.16 | KL=0.0095 EV=0.94 | gini=0.102 n=564 pend=28
+21:01:05 [INFO] [chunk  49] R=+0.0246 accept=0.71 flock=2.97 | KL=0.0096 EV=0.96 | gini=0.103 n=531 pend=40 |PASS-BARU
+21:01:06 [INFO] [chunk  50] R=+0.0278 accept=0.68 flock=2.77 | KL=0.0146 EV=0.97 | gini=0.110 n=488 pend=23
+21:01:07 [INFO] [chunk  51] R=+0.0255 accept=0.69 flock=2.93 | KL=0.0128 EV=0.97 | gini=0.104 n=533 pend=28
+21:01:07 [INFO] [chunk  52] R=+0.0222 accept=0.72 flock=3.02 | KL=0.0205 EV=0.97 | gini=0.114 n=548 pend=23
+21:01:08 [INFO] [chunk  53] R=+0.0271 accept=0.74 flock=2.84 | KL=0.0053 EV=0.95 | gini=0.105 n=514 pend=33
+21:01:09 [INFO] [chunk  54] R=+0.0203 accept=0.70 flock=3.10 | KL=0.0209 EV=0.94 | gini=0.099 n=566 pend=22
+21:01:10 [INFO] [chunk  55] R=+0.0300 accept=0.73 flock=2.69 | KL=0.0084 EV=0.91 | gini=0.094 n=485 pend=40
+21:01:10 [INFO] [chunk  56] R=+0.0277 accept=0.74 flock=2.82 | KL=0.0170 EV=0.91 | gini=0.095 n=516 pend=29
+21:01:11 [INFO] [chunk  57] R=+0.0275 accept=0.74 flock=2.86 | KL=0.0089 EV=0.96 | gini=0.099 n=524 pend=23
+21:01:12 [INFO] [chunk  58] R=+0.0229 accept=0.76 flock=3.08 | KL=0.0124 EV=0.95 | gini=0.100 n=551 pend=43
+21:01:13 [INFO] [chunk  59] R=+0.0220 accept=0.73 flock=3.09 | KL=0.0057 EV=0.98 | gini=0.099 n=568 pend=18 |PASS-BARU
+21:01:14 [INFO] [chunk  60] R=+0.0299 accept=0.68 flock=2.75 | KL=0.0251 EV=0.98 | gini=0.102 n=496 pend=15
+21:01:14 [INFO] [chunk  61] R=+0.0255 accept=0.72 flock=2.97 | KL=0.0568 EV=0.98 | gini=0.070 n=539 pend=15
+21:01:15 [INFO] [chunk  62] R=+0.0244 accept=0.73 flock=3.00 | KL=0.0061 EV=0.98 | gini=0.071 n=540 pend=17
+21:01:16 [INFO] [chunk  63] R=+0.0270 accept=0.74 flock=2.84 | KL=0.0237 EV=0.96 | gini=0.075 n=516 pend=28
+21:01:17 [INFO] [chunk  64] R=+0.0227 accept=0.76 flock=3.09 | KL=0.0072 EV=0.95 | gini=0.081 n=561 pend=19
+21:01:18 [INFO] [chunk  65] R=+0.0319 accept=0.75 flock=2.70 | KL=0.0026 EV=0.95 | gini=0.083 n=484 pend=38
+21:01:19 [INFO] [chunk  66] R=+0.0286 accept=0.76 flock=2.84 | KL=0.0129 EV=0.93 | gini=0.084 n=514 pend=29
+21:01:20 [INFO] [chunk  67] R=+0.0260 accept=0.71 flock=2.88 | KL=0.0195 EV=0.98 | gini=0.086 n=524 pend=23
+21:01:21 [INFO] [chunk  68] R=+0.0224 accept=0.77 flock=3.14 | KL=0.0152 EV=0.95 | gini=0.091 n=566 pend=28
+21:01:22 [INFO] [chunk  69] R=+0.0250 accept=0.77 flock=3.03 | KL=0.0082 EV=0.98 | gini=0.093 n=543 pend=29 |PASS-BARU
+21:01:23 [INFO] [chunk  70] R=+0.0157 accept=0.71 flock=3.03 | KL=0.0275 EV=0.96 | gini=0.076 n=479 pend=29
+21:01:24 [INFO] [chunk  71] R=+0.0235 accept=0.72 flock=2.97 | KL=0.0190 EV=0.98 | gini=0.073 n=545 pend=26
+21:01:25 [INFO] [chunk  72] R=+0.0241 accept=0.73 flock=3.01 | KL=0.0036 EV=0.97 | gini=0.085 n=540 pend=28
+21:01:25 [INFO] [chunk  73] R=+0.0286 accept=0.79 flock=2.86 | KL=0.0132 EV=0.97 | gini=0.087 n=520 pend=35
+21:01:26 [INFO] [chunk  74] R=+0.0210 accept=0.74 flock=3.12 | KL=0.0153 EV=0.95 | gini=0.094 n=566 pend=21
+21:01:27 [INFO] [chunk  75] R=+0.0298 accept=0.81 flock=2.79 | KL=0.0051 EV=0.96 | gini=0.095 n=504 pend=21
+21:01:28 [INFO] [chunk  76] R=+0.0305 accept=0.82 flock=2.80 | KL=0.0199 EV=0.91 | gini=0.092 n=498 pend=26
+21:01:29 [INFO] [chunk  77] R=+0.0294 accept=0.80 flock=2.84 | KL=0.0196 EV=0.98 | gini=0.089 n=517 pend=26
+21:01:29 [INFO] [chunk  78] R=+0.0235 accept=0.84 flock=3.12 | KL=0.0131 EV=0.96 | gini=0.090 n=558 pend=41
+21:01:30 [INFO] [chunk  79] R=+0.0246 accept=0.86 flock=3.14 | KL=0.0177 EV=0.97 | gini=0.091 n=566 pend=18 |PASS-BARU
+21:01:31 [INFO] [chunk  80] R=+0.0295 accept=0.77 flock=2.85 | KL=0.0063 EV=0.99 | gini=0.143 n=498 pend=13
+21:01:32 [INFO] [chunk  81] R=+0.0253 accept=0.71 flock=2.94 | KL=0.0148 EV=0.98 | gini=0.124 n=533 pend=19
+21:01:33 [INFO] [chunk  82] R=+0.0263 accept=0.81 flock=2.99 | KL=0.0038 EV=0.97 | gini=0.125 n=531 pend=30
+21:01:33 [INFO] [chunk  83] R=+0.0292 accept=0.81 flock=2.84 | KL=0.0228 EV=0.97 | gini=0.113 n=522 pend=35
+21:01:34 [INFO] [chunk  84] R=+0.0223 accept=0.79 flock=3.15 | KL=0.0195 EV=0.97 | gini=0.111 n=568 pend=19
+21:01:35 [INFO] [chunk  85] R=+0.0320 accept=0.79 flock=2.74 | KL=0.0058 EV=0.95 | gini=0.109 n=496 pend=26
+21:01:36 [INFO] [chunk  86] R=+0.0310 accept=0.84 flock=2.81 | KL=0.0113 EV=0.93 | gini=0.109 n=494 pend=38
+21:01:36 [INFO] [chunk  87] R=+0.0264 accept=0.84 flock=2.94 | KL=0.0149 EV=0.97 | gini=0.106 n=536 pend=19
+21:01:37 [INFO] [chunk  88] R=+0.0253 accept=0.84 flock=3.12 | KL=0.0049 EV=0.96 | gini=0.109 n=561 pend=29
+21:01:38 [INFO] [chunk  89] R=+0.0241 accept=0.79 flock=3.07 | KL=0.0286 EV=0.97 | gini=0.108 n=548 pend=25 |PASS-BARU
+21:01:39 [INFO] [chunk  90] R=+0.0278 accept=0.68 flock=2.77 | KL=0.0200 EV=0.99 | gini=0.098 n=494 pend=17
+21:01:40 [INFO] [chunk  91] R=+0.0252 accept=0.73 flock=2.96 | KL=0.0158 EV=0.98 | gini=0.090 n=537 pend=19
+21:01:40 [INFO] [chunk  92] R=+0.0236 accept=0.77 flock=3.05 | KL=0.0213 EV=0.98 | gini=0.099 n=544 pend=17
+21:01:41 [INFO] [chunk  93] R=+0.0275 accept=0.79 flock=2.90 | KL=0.0257 EV=0.97 | gini=0.098 n=525 pend=19
+21:01:42 [INFO] [chunk  94] R=+0.0248 accept=0.85 flock=3.09 | KL=0.0059 EV=0.95 | gini=0.092 n=549 pend=22
+21:01:43 [INFO] [chunk  95] R=+0.0312 accept=0.82 flock=2.79 | KL=0.0194 EV=0.95 | gini=0.094 n=501 pend=25
+21:01:43 [INFO] [chunk  96] R=+0.0298 accept=0.82 flock=2.85 | KL=0.0013 EV=0.92 | gini=0.096 n=514 pend=15
+21:01:44 [INFO] [chunk  97] R=+0.0306 accept=0.84 flock=2.85 | KL=0.0171 EV=0.98 | gini=0.099 n=511 pend=21
+21:01:45 [INFO] [chunk  98] R=+0.0234 accept=0.83 flock=3.18 | KL=0.0171 EV=0.94 | gini=0.102 n=562 pend=31
+21:01:46 [INFO] [chunk  99] R=+0.0242 accept=0.83 flock=3.14 | KL=0.0088 EV=0.97 | gini=0.102 n=558 pend=17 |PASS-BARU
+21:01:47 [INFO] [chunk 100] R=+0.0298 accept=0.74 flock=2.75 | KL=0.0097 EV=0.98 | gini=0.118 n=484 pend=26
+21:01:47 [INFO] [chunk 101] R=+0.0252 accept=0.76 flock=3.02 | KL=0.0120 EV=0.99 | gini=0.101 n=552 pend=13
+21:01:48 [INFO] [chunk 102] R=+0.0253 accept=0.82 flock=3.07 | KL=0.0154 EV=0.97 | gini=0.108 n=547 pend=9
+21:01:49 [INFO] [chunk 103] R=+0.0308 accept=0.85 flock=2.76 | KL=0.0123 EV=0.97 | gini=0.109 n=498 pend=37
+21:01:50 [INFO] [chunk 104] R=+0.0226 accept=0.83 flock=3.18 | KL=0.0377 EV=0.97 | gini=0.101 n=577 pend=13
+21:01:50 [INFO] [chunk 105] R=+0.0335 accept=0.82 flock=2.68 | KL=0.0087 EV=0.96 | gini=0.096 n=480 pend=37
+21:01:51 [INFO] [chunk 106] R=+0.0295 accept=0.85 flock=2.91 | KL=0.0262 EV=0.94 | gini=0.095 n=530 pend=12
+21:01:52 [INFO] [chunk 107] R=+0.0323 accept=0.87 flock=2.77 | KL=0.0191 EV=0.98 | gini=0.096 n=497 pend=32
+21:01:53 [INFO] [chunk 108] R=+0.0221 accept=0.85 flock=3.22 | KL=0.0297 EV=0.96 | gini=0.105 n=572 pend=31
+21:01:54 [INFO] [chunk 109] R=+0.0257 accept=0.86 flock=3.06 | KL=0.0086 EV=0.96 | gini=0.109 n=546 pend=29 |PASS-BARU
+21:01:54 [INFO] [chunk 110] R=+0.0301 accept=0.77 flock=2.76 | KL=0.0078 EV=0.98 | gini=0.098 n=495 pend=16
+21:01:55 [INFO] [chunk 111] R=+0.0256 accept=0.78 flock=2.98 | KL=-0.0008 EV=0.98 | gini=0.076 n=542 pend=12
+21:01:56 [INFO] [chunk 112] R=+0.0262 accept=0.78 flock=3.00 | KL=0.0124 EV=0.98 | gini=0.085 n=538 pend=17
+21:01:57 [INFO] [chunk 113] R=+0.0305 accept=0.84 flock=2.84 | KL=0.0497 EV=0.94 | gini=0.091 n=516 pend=28
+21:01:58 [INFO] [chunk 114] R=+0.0257 accept=0.89 flock=3.09 | KL=0.0144 EV=0.96 | gini=0.088 n=554 pend=26
+21:01:58 [INFO] [chunk 115] R=+0.0317 accept=0.85 flock=2.79 | KL=0.0049 EV=0.97 | gini=0.089 n=508 pend=22
+21:01:59 [INFO] [chunk 116] R=+0.0321 accept=0.88 flock=2.81 | KL=0.0138 EV=0.94 | gini=0.086 n=502 pend=25
+21:02:00 [INFO] [chunk 117] R=+0.0291 accept=0.89 flock=2.93 | KL=0.0188 EV=0.97 | gini=0.090 n=528 pend=14
+21:02:01 [INFO] [chunk 118] R=+0.0277 accept=0.85 flock=3.03 | KL=0.0199 EV=0.97 | gini=0.087 n=544 pend=41
+21:02:02 [INFO] [chunk 119] R=+0.0261 accept=0.87 flock=3.08 | KL=0.0226 EV=0.97 | gini=0.088 n=552 pend=32 |PASS-BARU
+21:02:02 [INFO] [chunk 120] R=+0.0274 accept=0.68 flock=2.75 | KL=0.0563 EV=0.96 | gini=0.099 n=495 pend=15
+21:02:03 [INFO] [chunk 121] R=+0.0271 accept=0.75 flock=2.92 | KL=0.0092 EV=0.98 | gini=0.088 n=537 pend=17
+21:02:04 [INFO] [chunk 122] R=+0.0257 accept=0.78 flock=3.01 | KL=0.0195 EV=0.98 | gini=0.098 n=544 pend=15
+21:02:05 [INFO] [chunk 123] R=+0.0312 accept=0.85 flock=2.83 | KL=0.0105 EV=0.95 | gini=0.092 n=515 pend=28
+21:02:05 [INFO] [chunk 124] R=+0.0271 accept=0.87 flock=3.07 | KL=0.0207 EV=0.95 | gini=0.090 n=558 pend=22
+21:02:06 [INFO] [chunk 125] R=+0.0337 accept=0.85 flock=2.73 | KL=0.0084 EV=0.96 | gini=0.094 n=497 pend=29
+21:02:07 [INFO] [chunk 126] R=+0.0319 accept=0.88 flock=2.83 | KL=0.0178 EV=0.95 | gini=0.096 n=505 pend=28
+21:02:08 [INFO] [chunk 127] R=+0.0312 accept=0.90 flock=2.87 | KL=0.0225 EV=0.98 | gini=0.097 n=531 pend=15
+21:02:08 [INFO] [chunk 128] R=+0.0271 accept=0.90 flock=3.12 | KL=0.0182 EV=0.98 | gini=0.097 n=555 pend=31
+21:02:09 [INFO] [chunk 129] R=+0.0281 accept=0.88 flock=3.03 | KL=0.0017 EV=0.97 | gini=0.095 n=542 pend=32 |PASS-BARU
+21:02:10 [INFO] [chunk 130] R=+0.0306 accept=0.68 flock=2.71 | KL=0.0110 EV=0.99 | gini=0.085 n=492 pend=19
+21:02:11 [INFO] [chunk 131] R=+0.0272 accept=0.78 flock=3.00 | KL=0.0133 EV=0.99 | gini=0.110 n=542 pend=16
+21:02:12 [INFO] [chunk 132] R=+0.0265 accept=0.82 flock=3.04 | KL=0.0075 EV=0.98 | gini=0.114 n=545 pend=13
+21:02:12 [INFO] [chunk 133] R=+0.0299 accept=0.87 flock=2.89 | KL=0.0225 EV=0.98 | gini=0.107 n=523 pend=17
+21:02:13 [INFO] [chunk 134] R=+0.0275 accept=0.88 flock=3.04 | KL=0.0173 EV=0.97 | gini=0.106 n=553 pend=16
+21:02:14 [INFO] [chunk 135] R=+0.0326 accept=0.85 flock=2.79 | KL=0.0033 EV=0.96 | gini=0.106 n=503 pend=17
+21:02:15 [INFO] [chunk 136] R=+0.0351 accept=0.88 flock=2.71 | KL=0.0164 EV=0.94 | gini=0.099 n=493 pend=29
+21:02:15 [INFO] [chunk 137] R=+0.0330 accept=0.90 flock=2.82 | KL=0.0150 EV=0.98 | gini=0.102 n=520 pend=26
+21:02:16 [INFO] [chunk 138] R=+0.0249 accept=0.87 flock=3.15 | KL=0.0255 EV=0.98 | gini=0.105 n=562 pend=35
+21:02:17 [INFO] [chunk 139] R=+0.0282 accept=0.92 flock=3.07 | KL=0.0134 EV=0.97 | gini=0.107 n=553 pend=25 |PASS-BARU
+21:02:18 [INFO] [chunk 140] R=+0.0281 accept=0.73 flock=2.72 | KL=0.0231 EV=0.98 | gini=0.104 n=492 pend=19
+21:02:19 [INFO] [chunk 141] R=+0.0268 accept=0.81 flock=2.95 | KL=0.0146 EV=0.99 | gini=0.087 n=546 pend=12
+21:02:19 [INFO] [chunk 142] R=+0.0277 accept=0.82 flock=2.94 | KL=0.0117 EV=0.98 | gini=0.093 n=526 pend=27
+21:02:20 [INFO] [chunk 143] R=+0.0312 accept=0.83 flock=2.83 | KL=0.0291 EV=0.98 | gini=0.089 n=521 pend=33
+21:02:21 [INFO] [chunk 144] R=+0.0257 accept=0.83 flock=3.15 | KL=0.0150 EV=0.98 | gini=0.092 n=575 pend=11
+21:02:22 [INFO] [chunk 145] R=+0.0328 accept=0.86 flock=2.73 | KL=0.0009 EV=0.97 | gini=0.086 n=494 pend=21
+21:02:22 [INFO] [chunk 146] R=+0.0329 accept=0.90 flock=2.82 | KL=0.0188 EV=0.95 | gini=0.086 n=499 pend=27
+21:02:23 [INFO] [chunk 147] R=+0.0324 accept=0.90 flock=2.82 | KL=0.0208 EV=0.99 | gini=0.085 n=512 pend=31
+21:02:24 [INFO] [chunk 148] R=+0.0243 accept=0.88 flock=3.15 | KL=0.0208 EV=0.97 | gini=0.088 n=573 pend=30
+21:02:25 [INFO] [chunk 149] R=+0.0294 accept=0.89 flock=3.00 | KL=0.0051 EV=0.97 | gini=0.085 n=542 pend=31 |PASS-BARU
+21:02:26 [INFO] [chunk 150] R=+0.0239 accept=0.71 flock=2.81 | KL=0.0409 EV=0.99 | gini=0.107 n=502 pend=9
+21:02:26 [INFO] [chunk 151] R=+0.0283 accept=0.79 flock=2.91 | KL=0.0087 EV=0.98 | gini=0.086 n=531 pend=17
+21:02:27 [INFO] [chunk 152] R=+0.0277 accept=0.84 flock=2.96 | KL=-0.0001 EV=0.98 | gini=0.094 n=527 pend=31
+21:02:28 [INFO] [chunk 153] R=+0.0298 accept=0.83 flock=2.89 | KL=0.0301 EV=0.99 | gini=0.096 n=533 pend=26
+21:02:29 [INFO] [chunk 154] R=+0.0257 accept=0.86 flock=3.09 | KL=0.0218 EV=0.98 | gini=0.098 n=559 pend=19
+21:02:30 [INFO] [chunk 155] R=+0.0347 accept=0.89 flock=2.69 | KL=0.0186 EV=0.97 | gini=0.099 n=487 pend=35
+21:02:30 [INFO] [chunk 156] R=+0.0327 accept=0.89 flock=2.83 | KL=0.0130 EV=0.97 | gini=0.099 n=511 pend=30
+21:02:31 [INFO] [chunk 157] R=+0.0313 accept=0.87 flock=2.83 | KL=0.0083 EV=0.99 | gini=0.098 n=522 pend=25
+21:02:32 [INFO] [chunk 158] R=+0.0264 accept=0.85 flock=3.12 | KL=0.0101 EV=0.98 | gini=0.099 n=559 pend=37
+21:02:33 [INFO] [chunk 159] R=+0.0266 accept=0.88 flock=3.08 | KL=0.0067 EV=0.98 | gini=0.100 n=560 pend=21 |PASS-BARU
+21:02:33 [INFO] [chunk 160] R=+0.0307 accept=0.73 flock=2.74 | KL=0.0247 EV=0.99 | gini=0.088 n=488 pend=23
+21:02:34 [INFO] [chunk 161] R=+0.0280 accept=0.77 flock=2.91 | KL=0.0476 EV=0.97 | gini=0.068 n=537 pend=24
+21:02:35 [INFO] [chunk 162] R=+0.0285 accept=0.83 flock=2.97 | KL=0.0149 EV=0.99 | gini=0.085 n=539 pend=28
+21:02:36 [INFO] [chunk 163] R=+0.0300 accept=0.86 flock=2.89 | KL=0.0240 EV=0.99 | gini=0.091 n=532 pend=23
+21:02:37 [INFO] [chunk 164] R=+0.0270 accept=0.85 flock=3.03 | KL=0.0087 EV=0.98 | gini=0.089 n=545 pend=28
+21:02:37 [INFO] [chunk 165] R=+0.0325 accept=0.85 flock=2.76 | KL=0.0086 EV=0.97 | gini=0.088 n=503 pend=31
+21:02:38 [INFO] [chunk 166] R=+0.0310 accept=0.89 flock=2.85 | KL=0.0284 EV=0.97 | gini=0.085 n=523 pend=13
+21:02:39 [INFO] [chunk 167] R=+0.0329 accept=0.90 flock=2.76 | KL=0.0355 EV=0.99 | gini=0.087 n=502 pend=27
+21:02:40 [INFO] [chunk 168] R=+0.0260 accept=0.86 flock=3.12 | KL=0.0146 EV=0.98 | gini=0.090 n=561 pend=38
+21:02:40 [INFO] [chunk 169] R=+0.0270 accept=0.86 flock=3.06 | KL=0.0101 EV=0.97 | gini=0.093 n=553 pend=28 |PASS-BARU
+21:02:41 [INFO] [chunk 170] R=+0.0318 accept=0.73 flock=2.73 | KL=-0.0019 EV=0.99 | gini=0.123 n=500 pend=11
+21:02:42 [INFO] [chunk 171] R=+0.0269 accept=0.76 flock=2.92 | KL=0.0272 EV=0.99 | gini=0.102 n=527 pend=23
+21:02:43 [INFO] [chunk 172] R=+0.0259 accept=0.81 flock=3.02 | KL=0.0103 EV=0.99 | gini=0.106 n=550 pend=14
+21:02:44 [INFO] [chunk 173] R=+0.0297 accept=0.84 flock=2.83 | KL=0.0297 EV=0.99 | gini=0.100 n=510 pend=30
+21:02:44 [INFO] [chunk 174] R=+0.0249 accept=0.85 flock=3.11 | KL=0.0090 EV=0.98 | gini=0.099 n=566 pend=18
+21:02:45 [INFO] [chunk 175] R=+0.0330 accept=0.85 flock=2.71 | KL=0.0025 EV=0.98 | gini=0.098 n=493 pend=29
+21:02:46 [INFO] [chunk 176] R=+0.0307 accept=0.86 flock=2.85 | KL=0.0233 EV=0.97 | gini=0.097 n=515 pend=19
+21:02:47 [INFO] [chunk 177] R=+0.0330 accept=0.89 flock=2.78 | KL=0.0185 EV=0.98 | gini=0.098 n=508 pend=28
+21:02:47 [INFO] [chunk 178] R=+0.0272 accept=0.89 flock=3.08 | KL=0.0091 EV=0.98 | gini=0.101 n=556 pend=43
+21:02:48 [INFO] [chunk 179] R=+0.0269 accept=0.88 flock=3.12 | KL=0.0178 EV=0.98 | gini=0.101 n=562 pend=24 |PASS-BARU
+21:02:49 [INFO] [chunk 180] R=+0.0309 accept=0.70 flock=2.73 | KL=0.0124 EV=0.99 | gini=0.072 n=496 pend=15
+21:02:50 [INFO] [chunk 181] R=+0.0265 accept=0.76 flock=2.93 | KL=0.0264 EV=0.98 | gini=0.065 n=539 pend=15
+21:02:51 [INFO] [chunk 182] R=+0.0258 accept=0.84 flock=3.02 | KL=0.0015 EV=0.98 | gini=0.075 n=543 pend=14
+21:02:51 [INFO] [chunk 183] R=+0.0295 accept=0.86 flock=2.89 | KL=0.0238 EV=0.98 | gini=0.086 n=526 pend=15
+21:02:52 [INFO] [chunk 184] R=+0.0284 accept=0.88 flock=3.04 | KL=0.0193 EV=0.98 | gini=0.087 n=554 pend=13
+21:02:53 [INFO] [chunk 185] R=+0.0329 accept=0.84 flock=2.76 | KL=0.0115 EV=0.98 | gini=0.088 n=501 pend=16
+21:02:54 [INFO] [chunk 186] R=+0.0336 accept=0.87 flock=2.74 | KL=0.0134 EV=0.96 | gini=0.092 n=492 pend=28
+21:02:55 [INFO] [chunk 187] R=+0.0312 accept=0.88 flock=2.86 | KL=0.0152 EV=0.99 | gini=0.091 n=523 pend=22
+21:02:55 [INFO] [chunk 188] R=+0.0266 accept=0.86 flock=3.08 | KL=0.0004 EV=0.96 | gini=0.090 n=550 pend=44
+21:02:56 [INFO] [chunk 189] R=+0.0260 accept=0.88 flock=3.11 | KL=0.0190 EV=0.97 | gini=0.091 n=560 pend=27 |PASS-BARU
+21:02:57 [INFO] [chunk 190] R=+0.0311 accept=0.69 flock=2.75 | KL=0.0041 EV=0.99 | gini=0.046 n=491 pend=20
+21:02:58 [INFO] [chunk 191] R=+0.0261 accept=0.76 flock=2.96 | KL=0.0235 EV=0.97 | gini=0.073 n=540 pend=19
+21:02:59 [INFO] [chunk 192] R=+0.0267 accept=0.81 flock=2.96 | KL=0.0272 EV=0.97 | gini=0.077 n=533 pend=28
+21:02:59 [INFO] [chunk 193] R=+0.0315 accept=0.83 flock=2.87 | KL=0.0176 EV=0.98 | gini=0.090 n=525 pend=30
+21:03:00 [INFO] [chunk 194] R=+0.0244 accept=0.83 flock=3.17 | KL=0.0134 EV=0.98 | gini=0.095 n=556 pend=26
+21:03:01 [INFO] [chunk 195] R=+0.0335 accept=0.87 flock=2.75 | KL=0.0116 EV=0.97 | gini=0.092 n=500 pend=30
+21:03:02 [INFO] [chunk 196] R=+0.0322 accept=0.87 flock=2.84 | KL=0.0158 EV=0.97 | gini=0.089 n=519 pend=16
+21:03:02 [INFO] [chunk 197] R=+0.0316 accept=0.89 flock=2.83 | KL=0.0181 EV=0.99 | gini=0.091 n=512 pend=21
+21:03:03 [INFO] [chunk 198] R=+0.0279 accept=0.88 flock=3.05 | KL=0.0242 EV=0.98 | gini=0.087 n=551 pend=41
+21:03:04 [INFO] [chunk 199] R=+0.0265 accept=0.89 flock=3.09 | KL=0.0065 EV=0.98 | gini=0.085 n=561 pend=24 |PASS-BARU
+[SELESAI] t2_masterbid_30d_sgn_seed2 (163s)
+[masterbid_30d_sgn] seed=2 selesai 2.7 mnt
+
+SEMUA TRAINING SELESAI dalam 16.2 mnt
