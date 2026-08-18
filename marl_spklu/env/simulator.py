@@ -16,7 +16,8 @@ class Simulator:
     def __init__(self, spklu_dict: dict, users: list, history_buffer,
                  log_actor_states: bool = False, log_active_only: bool = True,
                  log_every: int = 1, user_willingness_radius_km: float = None,
-                 user_willingness_ratio: float = None):
+                 user_willingness_ratio: float = None,
+                 rekam_deret: bool = False):
         self.recent_recs = defaultdict(int)
         self.spklus = spklu_dict
         self.users = users
@@ -39,6 +40,18 @@ class Simulator:
         # SAAT memutuskan. Hanya operasi append -- tidak menyentuh RNG, tidak mengubah
         # perilaku simulasi.
         self.decision_log = []
+
+        # DERET WAKTU (opsional, `rekam_deret=True`) -- lubang terbesar sebelumnya: kondisi
+        # jaringan hanya diketahui pada AKHIR simulasi (`total_served` kumulatif), sehingga
+        # Gini akhir tak dapat dibedakan antara "merata sepanjang horizon" dan "timpang di
+        # awal lalu terkoreksi". Dimatikan saat PELATIHAN (300 iterasi x banyak lengan akan
+        # membengkak); dinyalakan saat EVALUASI.
+        self.rekam_deret = bool(rekam_deret)
+        self.station_log = []      # snapshot per JAM per stasiun
+        self.daily_log = []        # snapshot per HARI tingkat jaringan
+        self._served_hari_lalu = {}
+        self._log_terakhir_jam = -1
+        self._log_terakhir_hari = -1
 
         # Trace state per-aktor per-step (OPSIONAL; bisa besar untuk horizon
         # panjang). Nonaktif secara default -> nol overhead untuk run validasi.
@@ -342,7 +355,14 @@ class Simulator:
                         # (Trip tanpa rekomendasi: last_rec_complied=False -> trust tetap.)
                         if u.last_rec_complied:
                             u.update_trust(u.est_wait_presented, u.wait_time)
+                        # Tulis hasil AKTUAL balik ke entri keputusan -> satu berkas memuat
+                        # janji DAN hasilnya, sehingga untung/rugi dapat dihitung.
+                        self._backfill_keputusan(u)
                         self.logs.append({
+                            # `step`/`time` DITAMBAHKAN 2026-08-18: tanpa penanda waktu,
+                            # trip tak dapat diiris per hari -> analisis harian mustahil.
+                            "step": step, "time": time_now,
+                            "hari": int(time_now // 1440),
                             "user": u.user_id, "spklu": sid, "wait_time": u.wait_time,
                             "est_wait": u.est_wait_presented, "complied": u.last_rec_complied,
                             "trust_after": u.trust,
@@ -483,6 +503,23 @@ class Simulator:
                     "est_pilih": float(est_waits.get(chosen_spklu_id, float("nan"))),
                     "est_terdekat": float(est_waits.get(sid_terdekat, float("nan")))
                     if sid_terdekat else float("nan"),
+                    "hari": int(time_now // 1440), "jam_hari": int(time_now // 60) % 24,
+                    # Peringkat stasiun terpilih di dalam daftar rekomendasi: 0 = primer,
+                    # 1 = sekunder, -1 = menolak. Menjawab apakah slot sekunder terpakai.
+                    "peringkat_pilih": (recs.index(chosen_spklu_id)
+                                        if chosen_spklu_id in recs else -1),
+                    # --- PENGARUH JANJI TERHADAP KEPUTUSAN (kontrafaktual) ---
+                    # `sid_pref` = stasiun yang AKAN dipilih pengguna tanpa rekomendasi
+                    # (argmax utilitas pribadi). Tersedia utk SEMUA agen krn
+                    # `decide_spklu` selalu menghitung `last_u_pref`.
+                    **self._jejak_pengaruh_janji(user, chosen_spklu_id, est_waits),
+                    # Kondisi SELURUH stasiun feasible saat keputusan -- tanpa ini tak
+                    # dapat dinilai apakah rekomendasi memang lebih buruk bagi individu,
+                    # atau justru pilihan mandiri pengguna yang lebih buruk.
+                    "est_feasible": {sid: float(est_waits.get(sid, float("nan")))
+                                     for sid in feasible_ids},
+                    "queue_feasible": {sid: int(self.spklus[sid].get_queue_length())
+                                       for sid in feasible_ids},
                 })
             else:
                 # (Fix Bug C) User masih sibuk -> TUNDA event ke step berikutnya,
@@ -528,6 +565,205 @@ class Simulator:
         #    ini. Dipanggil di akhir step agar semua transisi state sudah selesai.
         if self.log_actor_states and (step % self.log_every == 0):
             self._record_actor_states(step, time_now)
+
+        # 8. (Opsional) Deret waktu: snapshot per JAM per stasiun + per HARI tingkat
+        #    jaringan. Dipanggil paling akhir supaya seluruh transisi step ini selesai.
+        if self.rekam_deret:
+            self._rekam_deret_waktu(step, time_now)
+
+    # -------------------------------------------------- pengaruh janji thd keputusan
+    def _jejak_pengaruh_janji(self, user, chosen_spklu_id, est_waits):
+        """Seberapa jauh JANJI waktu tunggu menggeser keputusan, dan apakah pengguna
+        UNTUNG atau RUGI karenanya.
+
+        `decide_spklu` mencampur dua kanal: P = (1-T)*P_pref + T*P_rec. Kontrafaktual yang
+        relevan adalah keputusan pada kanal preferensi SAJA (T=0) -- yaitu apa yang akan
+        dipilih pengguna seandainya tak ada rekomendasi. Itu tersedia dari `last_u_pref`
+        yang selalu dihitung, sehingga ukuran ini berlaku utk greedy dan S0 juga, bukan
+        hanya lengan RL.
+
+        Yang direkam:
+          sid_pref      stasiun kontrafaktual (argmax utilitas pribadi)
+          est_pref      janji waktu tunggu DI stasiun kontrafaktual itu
+          est_pilih     janji di stasiun yang benar-benar dipilih
+          untung_janji  est_pref - est_pilih; POSITIF = janji mengarahkan ke stasiun yang
+                        DIJANJIKAN lebih cepat drpd pilihan alaminya
+          p_pilih_pref  peluang memilih stasiun itu tanpa rekomendasi
+          p_pilih_akhir peluang setelah dicampur rekomendasi
+          geser_p       selisihnya -- besar pengaruh janji pada keputusan INI
+
+        CATATAN: `untung_janji` bersifat EX-ANTE (janji vs janji). Untung/rugi EX-POST
+        memerlukan waktu tunggu AKTUAL, yang baru diketahui saat sesi selesai -- di-backfill
+        ke `wait_aktual` oleh `_backfill_keputusan`.
+        """
+        ids = getattr(user, "last_candidate_ids", None)
+        up = getattr(user, "last_u_pref", None)
+        fp = getattr(user, "last_final_probs", None)
+        if not ids or up is None or len(up) != len(ids):
+            return {}
+        up = np.asarray(up, dtype=float)
+        tau = max(float(getattr(user, "tau", 1.0)), 1e-9)
+        e = np.exp(up / tau - np.max(up / tau))
+        p_pref = e / e.sum()
+        i_pref = int(np.argmax(up))
+        sid_pref = str(ids[i_pref])
+        try:
+            i_pilih = ids.index(chosen_spklu_id)
+        except (ValueError, AttributeError):
+            i_pilih = None
+        est_pref = float(est_waits.get(sid_pref, float("nan")))
+        est_pilih = float(est_waits.get(chosen_spklu_id, float("nan")))
+        jejak = {
+            "sid_pref": sid_pref, "est_pref": est_pref,
+            "untung_janji": est_pref - est_pilih,
+            "pilih_sama_pref": bool(chosen_spklu_id == sid_pref),
+            "p_pilih_pref": float(p_pref[i_pilih]) if i_pilih is not None else float("nan"),
+            "p_pilih_akhir": (float(np.asarray(fp)[i_pilih])
+                              if (fp is not None and i_pilih is not None) else float("nan")),
+            "wait_aktual": None,     # di-backfill saat sesi selesai
+        }
+        jejak["geser_p"] = jejak["p_pilih_akhir"] - jejak["p_pilih_pref"]
+        # Indeks entri ini supaya hasil aktualnya bisa ditulis balik nanti.
+        user._idx_keputusan = len(self.decision_log)
+        return jejak
+
+    def _backfill_keputusan(self, user):
+        """Tulis waktu tunggu AKTUAL ke entri keputusan pengguna ini.
+
+        Tanpa ini, `decision_log` hanya memuat janji (ex-ante) dan tak pernah tahu apakah
+        janji itu ditepati -- sehingga pertanyaan "apakah pengguna untung atau rugi karena
+        mengikuti janji" tak dapat dijawab dari satu berkas.
+        """
+        i = getattr(user, "_idx_keputusan", None)
+        if i is None or not (0 <= i < len(self.decision_log)):
+            return
+        e = self.decision_log[i]
+        if e.get("user_id") != user.user_id:
+            return
+        e["wait_aktual"] = float(user.wait_time)
+        ep = e.get("est_pref")
+        # EX-POST: janji di stasiun kontrafaktual vs yang BENAR-BENAR dialami.
+        # Membandingkan prediksi (alternatif) dgn realisasi (pilihan) -- satu-satunya cara
+        # tanpa menjalankan dunia tandingan; harus dilaporkan sbg perkiraan, bukan ukuran
+        # eksak.
+        e["untung_expost"] = (None if ep is None or not np.isfinite(ep)
+                              else float(ep - user.wait_time))
+        user._idx_keputusan = None
+
+    # ------------------------------------------------------------------ deret waktu
+    def _rekam_deret_waktu(self, step, time_now):
+        """Snapshot berkala. Per JAM utk stasiun (bukan per step: 15 mnt x 6 stasiun x 90
+        hari = 51.840 baris, terlalu besar utk manfaat yg sama)."""
+        jam = int(time_now // 60)
+        hari = int(time_now // 1440)
+
+        if jam != self._log_terakhir_jam:
+            self._log_terakhir_jam = jam
+            for sid, s in self.spklus.items():
+                self.station_log.append({
+                    "step": step, "time": time_now, "hari": hari, "jam_hari": jam % 24,
+                    "spklu": sid,
+                    "queue": s.get_queue_length(),
+                    "n_charging": sum(len(v) for v in s.charging.values())
+                    if isinstance(s.charging, dict) else len(s.charging),
+                    "utilisasi": float(s.get_utilization()),
+                    "served_kum": int(s.total_served),
+                    "wait_kum": float(s.total_wait_time),
+                })
+
+        if hari != self._log_terakhir_hari:
+            self._log_terakhir_hari = hari
+            self.daily_log.append(self._ringkas_hari(hari, time_now))
+
+    def _ringkas_hari(self, hari, time_now):
+        """Ringkasan tingkat jaringan utk hari yang BARU SAJA selesai (hari-1).
+
+        Menyediakan lintasan Gini/wait/acceptance/trust tanpa perlu menjalankan simulasi
+        berulang -- sebelumnya lintasan trust dihasilkan skrip terpisah yang menjalankan
+        ulang seluruh simulasi utk tiap titik waktu.
+        """
+        h = hari - 1
+        served = np.array([s.total_served for s in self.spklus.values()], dtype=float)
+        # Served KUMULATIF -> Gini kumulatif; served HARIAN -> Gini hari itu saja.
+        harian = served - np.array([self._served_hari_lalu.get(sid, 0.0)
+                                    for sid in self.spklus], dtype=float)
+        self._served_hari_lalu = {sid: float(s.total_served)
+                                  for sid, s in self.spklus.items()}
+
+        trip = [l for l in self.logs if l.get("hari") == h]
+        w = np.array([l["wait_time"] for l in trip], dtype=float)
+        c = np.array([bool(l["complied"]) for l in trip], dtype=bool)
+        tr = np.array([u.trust for u in self.users], dtype=float)
+
+        def _gini(x):
+            x = np.sort(np.asarray(x, dtype=float))
+            n = x.size
+            if n == 0 or x.sum() <= 0:
+                return 0.0
+            return float((2.0 * np.arange(1, n + 1) - n - 1).dot(x) / (n * x.sum()))
+
+        return {
+            "hari": h, "time": time_now,
+            "gini_kumulatif": _gini(served),
+            "gini_harian": _gini(harian),
+            "served_harian": float(harian.sum()),
+            "n_trip": len(trip),
+            "wait_mean": float(w.mean()) if w.size else float("nan"),
+            "wait_p50": float(np.percentile(w, 50)) if w.size else float("nan"),
+            "wait_p90": float(np.percentile(w, 90)) if w.size else float("nan"),
+            "acceptance": float(c.mean()) if c.size else float("nan"),
+            "trust_mean": float(tr.mean()), "trust_p10": float(np.percentile(tr, 10)),
+            "trust_min": float(tr.min()),
+        }
+
+    def ringkas_pengguna(self):
+        """Ringkasan PER PENGGUNA, dihitung di akhir run (bukan direkam tiap step).
+
+        Menjawab pertanyaan yang tak dapat dijawab metrik agregat: apakah beban pemerataan
+        ditanggung merata, atau ditimpakan ke sebagian kecil pengguna. Gini stasiun yang
+        membaik sementara ketimpangan antar-PENGGUNA memburuk adalah hasil yang berbeda
+        maknanya -- dan sebelumnya tak terdeteksi sama sekali.
+        """
+        per_user = defaultdict(lambda: {"wait": [], "spklu": [], "patuh": 0, "n": 0,
+                                        "hari_pertama": None})
+        for l in self.logs:
+            d = per_user[l["user"]]
+            d["n"] += 1
+            d["wait"].append(l["wait_time"])
+            d["spklu"].append(l["spklu"])
+            d["patuh"] += 1 if l["complied"] else 0
+            hh = l.get("hari")
+            if hh is not None and (d["hari_pertama"] is None or hh < d["hari_pertama"]):
+                d["hari_pertama"] = hh
+
+        dorong = defaultdict(list)
+        for e in self.decision_log:
+            if e.get("dorong_pilih") is not None:
+                dorong[e["user_id"]].append(e["dorong_pilih"])
+
+        out = []
+        for u in self.users:
+            d = per_user.get(u.user_id)
+            n = d["n"] if d else 0
+            wait = np.array(d["wait"], dtype=float) if n else np.array([])
+            sids = d["spklu"] if n else []
+            unik, cacah = np.unique(sids, return_counts=True) if sids else ([], [])
+            p = cacah / cacah.sum() if len(cacah) else np.array([])
+            entropi = float(-(p * np.log2(p + 1e-12)).sum()) if p.size else 0.0
+            dd = np.array(dorong.get(u.user_id, []), dtype=float)
+            out.append({
+                "user_id": u.user_id, "n_trip": n,
+                "n_patuh": d["patuh"] if n else 0,
+                "rasio_patuh": (d["patuh"] / n) if n else float("nan"),
+                "trust_akhir": float(u.trust),
+                "wait_mean": float(wait.mean()) if wait.size else float("nan"),
+                "wait_maks": float(wait.max()) if wait.size else float("nan"),
+                "n_spklu_unik": int(len(unik)),
+                "entropi_spklu": entropi,
+                "dorong_mean": float(dd.mean()) if dd.size else float("nan"),
+                "hari_pertama": d["hari_pertama"] if n else None,
+            })
+        return out
 
         # Hook RL: akhir step -> agen RL hitung Phi & bagikan shaping ΔPhi ke transisi
         # yang direkam pada step ini. Non-invasif (hanya jika agent punya on_step_end).

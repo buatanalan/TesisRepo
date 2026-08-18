@@ -64,7 +64,8 @@ class FakePolicyTrainer:
         return np.zeros((0, 7)), np.zeros(0)
 
 
-def _fresh_sim(dataset_path, willingness_ratio=None, willingness_radius_km=None) -> Simulator:
+def _fresh_sim(dataset_path, willingness_ratio=None, willingness_radius_km=None,
+               rekam_deret: bool = False) -> Simulator:
     """Perbaikan T1-serupa (Validasi_Generik/LAPORAN_VALIDASI.md, Addendum 2 §"Fase 4"):
     default SEMULA `willingness_ratio=5.0` menyimpang dari jalur kalibrasi (`None`, Tier
     6/9) -- sama seperti bug lama `harness.DEFAULT_WILLINGNESS_RATIO`. `wait_mean` baseline
@@ -73,7 +74,8 @@ def _fresh_sim(dataset_path, willingness_ratio=None, willingness_radius_km=None)
     skala relatif dinamika wait yang sesungguhnya terjadi."""
     sim = Simulator({}, [], None,
                     user_willingness_radius_km=willingness_radius_km,
-                    user_willingness_ratio=willingness_ratio)
+                    user_willingness_ratio=willingness_ratio,
+                    rekam_deret=rekam_deret)
     sim.load_from_dataset(dataset_path)
     return sim
 

@@ -65,14 +65,21 @@ def gini(a) -> float:
     return float(np.sum((2 * idx - n - 1) * a) / (n * np.sum(a)))
 
 
-def fresh_sim(dataset_path=None, willingness_ratio=None, willingness_radius_km=None):
-    """Sim baru dari substrat kanonik (default) atau dataset lain (mis. sapuan beban)."""
+def fresh_sim(dataset_path=None, willingness_ratio=None, willingness_radius_km=None,
+              rekam_deret=False):
+    """Sim baru dari substrat kanonik (default) atau dataset lain (mis. sapuan beban).
+
+    `rekam_deret=True` menyalakan snapshot per-jam (stasiun) dan per-hari (jaringan).
+    Dipakai saat EVALUASI; biarkan False saat PELATIHAN -- 300 iterasi x banyak lengan
+    akan menghasilkan jutaan baris tanpa dipakai.
+    """
     from marl_spklu.rl.training import _fresh_sim
     dataset_path = dataset_path or DATASET_KANONIK
     return _fresh_sim(dataset_path,
                       willingness_ratio=willingness_ratio if willingness_ratio is not None
                       else SUBSTRAT["willingness_ratio"],
-                      willingness_radius_km=willingness_radius_km)
+                      willingness_radius_km=willingness_radius_km,
+                      rekam_deret=rekam_deret)
 
 
 # ---------------------------------------------------------------------------
