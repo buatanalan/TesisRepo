@@ -306,7 +306,10 @@ def main():
             ("bid+hist(abs)", None, f"bidhist_{TAG}_abs"),
             ("bid+hist(sgn)", None, f"bidhist_{TAG}_sgn"),
             ("bid+pref(abs)", None, f"bidpref_{TAG}_abs"),
-            ("bid+pref(sgn)", None, f"bidpref_{TAG}_sgn")]
+            ("bid+pref(sgn)", None, f"bidpref_{TAG}_sgn"),
+            # MASTER + preference: pembandingnya MASTER-bid (sama-sama tanpa riwayat)
+            ("MASTER-bid+P(abs)", None, f"masterbidp_{TAG}_abs"),
+            ("MASTER-bid+P(sgn)", None, f"masterbidp_{TAG}_sgn")]
 
     out = {"horizon": TAG, "seeds": SEEDS, "trust_beku": TRUST_BEKU,
            "per_seed": {}, "agregat": {}, "harian": {}, "stasiun": {}}

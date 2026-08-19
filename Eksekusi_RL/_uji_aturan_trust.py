@@ -28,7 +28,8 @@ from marl_spklu.rl.master_policy import (MasterPolicy, MasterPolicyEqCap,
                                          MasterPrefPolicy)
 from marl_spklu.rl.master_bidding_policy import (MasterBiddingPolicy,
                                                  BiddingHistPolicy,
-                                                 BiddingPrefPolicy)
+                                                 BiddingPrefPolicy,
+                                                 MasterBiddingPrefPolicy)
 import _tahap2_jalankan as T2
 
 # Horizon yang tersedia. Kuncinya ikut jadi bagian nama berkas keluaran.
@@ -105,6 +106,11 @@ def main():
         # HANYA apakah agen mengondisikan riwayat pengguna (=> agen permintaan).
         jobs.append((nama_lengan("bidhist", mode), BiddingHistPolicy, mode))
         jobs.append((nama_lengan("bidpref", mode), BiddingPrefPolicy, mode))
+        # MASTER + preference (2026-08-19): bidding TANPA riwayat + modul
+        # preferensi PDQN. Pembanding: `masterbid`. Satu pertambahan (3.329
+        # param), tak ada faktor lain berubah -- lihat docstring kelasnya
+        # untuk premis & prediksi hipotesisnya.
+        jobs.append((nama_lengan("masterbidp", mode), MasterBiddingPrefPolicy, mode))
 
     # argv[3] (opsional): saring lengan, dipisah koma -- mis. `masterbid` untuk menjalankan
     # HANYA lengan T2 tanpa melatih ulang lengan yang sudah selesai. Dicocokkan pada nama
@@ -113,7 +119,7 @@ def main():
     if len(sys.argv) > 3:
         pilih = {s for s in sys.argv[3].replace(" ", "").split(",") if s}
         tak_dikenal = pilih - {"hppo", "pppo", "master", "mastereq", "masterp", "masterbid",
-                              "bidhist", "bidpref"}
+                              "bidhist", "bidpref", "masterbidp"}
         if tak_dikenal:
             raise SystemExit(f"lengan tak dikenal: {sorted(tak_dikenal)}")
         jobs = [j for j in jobs if j[0].split("_")[0] in pilih]

@@ -59,7 +59,7 @@ import torch.nn as nn
 
 from marl_spklu.rl.policy import HPPOPolicy
 from marl_spklu.rl.p_ppo_policy import PPPOPolicy
-from marl_spklu.rl.master_policy import MasterPolicy
+from marl_spklu.rl.master_policy import MasterPolicy, MasterPrefPolicy
 
 # Bid stasiun tak-feasible tak pernah boleh menang. Dipakai sbg pengganti +inf supaya
 # aman secara numerik saat di-argsort (inf ikut terurut benar, tetapi nan bila 0*inf).
@@ -178,7 +178,14 @@ class _BiddingMixin:
 
 
 class MasterBiddingPolicy(_BiddingMixin, MasterPolicy):
-    """Agen = STASIUN. Tanpa riwayat pengguna -- setia pada kondisi informasi MASTER.
+    """Agen = STASIUN. Tanpa riwayat per-pengguna.
+
+    ⚠️ KOREKSI (audit 2026-08-19, temuan #15b). Versi sebelumnya menulis "setia pada
+    kondisi informasi MASTER". Itu TERLALU LUAS: `_build_obs` tetap menyiarkan `soc`,
+    koordinat pengguna, dan `battery_norm` ke tiap stasiun (`rollout.py`), padahal
+    observasi stasiun MASTER (§3.1) hanya memuat indeks stasiun, waktu, slot tersedia,
+    permintaan mendatang, daya, ETA, dan CP -- tanpa SoC, tanpa kapasitas baterai, tanpa
+    koordinat mentah. Kesetiaan yang benar-benar berlaku hanya untuk RIWAYAT.
 
     Nama & parameter DIPERTAHANKAN persis (`bid_log_std`) supaya checkpoint yang sudah
     dilatih (2026-08-19) tetap dapat dimuat.
@@ -191,6 +198,53 @@ class BiddingHistPolicy(_BiddingMixin, HPPOPolicy):
     Pembanding yang benar adalah `MasterBiddingPolicy`: bentuk aksi, reward, kritik, dan
     lingkungan identik -- yang berbeda HANYA apakah agen mengondisikan pada riwayat
     pengguna yang sedang meminta, yaitu apakah agennya permintaan atau stasiun.
+    """
+
+
+class MasterBiddingPrefPolicy(_BiddingMixin, MasterPrefPolicy):
+    """**MASTER + preference** -- bidding tanpa riwayat, DITAMBAH modul preferensi PDQN.
+
+    Pembanding yang benar adalah `MasterBiddingPolicy`: bentuk aksi, kritik, reward, dan
+    lingkungan identik; satu-satunya pertambahan adalah `pref_lstm` + `PreferenceAttention`
+    + `pref_gate`. Satu faktor, satu jawaban.
+
+    HIPOTESIS YANG DIUJI
+    --------------------
+    Premis (seluruhnya lolos audit kesetiaan 2026-08-19):
+
+      M-a  bid stasiun hanya bergantung observasi stasiun, `a^i_t = b^i(o^i_t)`
+           (MASTER Pers. 11) -- identitas peminta masuk hanya lewat ETA
+      M-b  penolak pergi ke stasiun ground-truth; MCWT/MCP/CFR dihitung HANYA atas yang
+           menerima (MASTER Lampiran A) -> penolak di LUAR fungsi objektif
+      P-a  preferensi dapat diekstraksi dari riwayat pasangan (a_hat, a) (PDQN §III-D)
+      P-b  kinerja PDQN MENURUN seiring naiknya ketidakpatuhan `p_check` (PDQN §V-B)
+
+    Penalaran: dari M-a, dua pengguna dengan keadaan stasiun sama menerima bid sama. Dari
+    M-b, yang menolak tak memberi tekanan gradien apa pun. Di bawah kepatuhan EKSOGEN
+    keduanya tak berbiaya -- probabilitas penerimaan tetap. Di bawah kepatuhan ENDOGEN
+    keduanya jadi cacat: kebijakan tak dapat menjangkau populasi yang gagal dipersuasinya,
+    dan populasi itu dibentuk riwayat kebijakan itu sendiri (P-b menunjukkan persoalan ini
+    nyata di papernya sendiri). Dari P-a, riwayat (a_hat, a) menandai SIAPA yang meminta
+    dalam istilah preferensi. Karena itu mengondisikan bid pada riwayat tersebut memulihkan
+    kanal yang hilang.
+
+    PREDIKSI
+      (a) tingkat penerimaan NAIK dibanding `MasterBiddingPolicy`
+      (b) keuntungannya LEBIH BESAR pada rezim ketidakpatuhan MENENGAH -- meniru bentuk
+          PDQN §V-B Gbr. 10b (selisih terbesar pada p_check = 0,6). Prediksi (b) meramalkan
+          BENTUK KURVA, bukan sekadar arah, sehingga sulit dipenuhi secara kebetulan.
+      pemalsu: penerimaan tak naik, ATAU naik seragam tanpa bergantung tingkat kepatuhan.
+
+    ⚠️ BATAS KLAIM. Klaimnya adalah "bid buta terhadap RIWAYAT PREFERENSI", BUKAN "buta
+    terhadap pengguna" -- aktor tetap melihat SoC/koordinat/baterai (lihat koreksi di
+    `MasterBiddingPolicy`). Langkah penalaran tetap sah karena SoC dan lokasi bukan
+    preferensi. Penyimpangan lain dari paper: k=2 pemenang (MASTER k=1, §3.1 `argmax`),
+    bid terendah menang (MASTER tertinggi -- tak substantif), tanpa penyaringan top-50,
+    objektif pemerataan, horizon continuing, PPO bukan DDPG, tanpa replay, kritik `V(s)`.
+
+    ⚠️ BUKTI AWAL CONDONG MELAWAN: pada lengan seleksi-himpunan, modul preferensi
+    MENURUNKAN penerimaan (0,608->0,561 abs; 0,748->0,700 signed). Bila pola itu berulang
+    di bidding, hipotesis ditolak -- dan itu hasil yang tetap layak dilaporkan.
     """
 
 

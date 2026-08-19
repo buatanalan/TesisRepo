@@ -20,7 +20,8 @@ from marl_spklu.rl.master_policy import (MasterPolicy, MasterPolicyEqCap,
                                          MasterPrefPolicy)
 from marl_spklu.rl.master_bidding_policy import (MasterBiddingPolicy,
                                                  BiddingHistPolicy,
-                                                 BiddingPrefPolicy)
+                                                 BiddingPrefPolicy,
+                                                 MasterBiddingPrefPolicy)
 
 KELAS_KEBIJAKAN = {
     "HPPOPolicy": HPPOPolicy,
@@ -31,11 +32,13 @@ KELAS_KEBIJAKAN = {
     "MasterBiddingPolicy": MasterBiddingPolicy,
     "BiddingHistPolicy": BiddingHistPolicy,
     "BiddingPrefPolicy": BiddingPrefPolicy,
+    "MasterBiddingPrefPolicy": MasterBiddingPrefPolicy,
 }
 
 # Kelas yang memuat modul preferensi PDQN -- dimensinya harus dibaca dari meta, karena
 # nilai bakunya (64) BERBEDA dari nilai yang dipakai eksperimen (16).
-_BUTUH_DIM_PREF = (PPPOPolicy, MasterPrefPolicy, BiddingPrefPolicy)
+_BUTUH_DIM_PREF = (PPPOPolicy, MasterPrefPolicy, BiddingPrefPolicy,
+                   MasterBiddingPrefPolicy)
 
 
 def kelas_dari_meta(meta):
