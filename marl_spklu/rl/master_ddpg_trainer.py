@@ -268,7 +268,13 @@ class MasterDDPGTrainer:
         sim0 = self._fresh_sim()
         self.dt_minutes = sim0.dt_minutes
         self.delay_steps = max(1, round(float(delay_minutes) / self.dt_minutes))
-        self._slot_log = _SlotAvailLog(maxlen=self.delay_steps + 4)
+        # PERBAIKAN (2026-08-20): `_push_ready_pairs` hanya dipanggil SEKALI per chunk
+        # (`rollout_steps` langkah), bukan tiap langkah -- jendela HARUS bertahan selama
+        # itu, bukan cuma `delay_steps+4`. Dgn maxlen lama (contoh delay_steps=1 -> 5),
+        # snapshot bagi transisi yg diputuskan di AWAL chunk (91 dari 96 langkah) sudah
+        # terhapus sebelum gerbang diperiksa -> buffer nyaris tak terisi (terukur:
+        # 5 entri setelah 29 hari simulasi, vs batch_size=64).
+        self._slot_log = _SlotAvailLog(maxlen=self.rollout_steps + self.delay_steps + 4)
 
         self.N = len(sim0.spklus)
         self.actor = MasterStationActor(STATION_FEAT_DIM_MASTER)
@@ -312,7 +318,12 @@ class MasterDDPGTrainer:
         for u in new_sim.users:
             old = old_users_by_id.get(u.user_id)
             if old is not None:
-                u.trust = old.trust
+                # PERBAIKAN (2026-08-20): `trust` adalah @property HANYA-BACA
+                # (`trust = alpha/(alpha+beta)`, user.py:218) -- `u.trust = old.trust`
+                # melempar AttributeError. Carry-forward yg benar menyalin alpha/beta
+                # (bug yg sama, tak pernah tereksekusi, ada di pdqn_ddpg.py:334).
+                u.trust_alpha = old.trust_alpha
+                u.trust_beta = old.trust_beta
                 u.compliance_history = list(old.compliance_history)
                 u.interaction_history = list(old.interaction_history)
         agent.sim = new_sim

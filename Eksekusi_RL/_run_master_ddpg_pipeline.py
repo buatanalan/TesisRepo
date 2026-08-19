@@ -36,9 +36,29 @@ p.add_argument("--n-updates", type=int, default=300, help="jumlah chunk rollout 
 p.add_argument("--rollout-steps", type=int, default=96, help="langkah simulasi per chunk")
 p.add_argument("--delay-minutes", type=float, default=15.0, help="d Delayed Access Strategy")
 p.add_argument("--k", type=int, default=3, help="langit-langit jumlah stasiun direkomendasikan")
+p.add_argument("--dataset", type=str, default="4x",
+              help="'4x' (BAKU, regime dibekukan Tahap 1, dipakai SELURUH lengan lain di "
+                   "uji_konsolidasi_30d.json) | '1x' (DATASET_KANONIK, TIDAK sepadan "
+                   "dgn lengan lain) | path berkas .json eksplisit")
 args = p.parse_args()
 
-DATASET = common.DATASET_KANONIK
+# PERBAIKAN (2026-08-20): baku LAMA (DATASET_KANONIK) adalah regime 1x -- TIDAK sepadan
+# dgn lengan lain (H-PPO, P-PPO, MASTER, MASTER-bid, dst semuanya regime 4x lewat
+# _uji_aturan_trust.py::HORIZON["30d"]). Membandingkan lintas regime pernah MEMBALIK
+# TOTAL kesimpulan Tahap 2/3 (lihat memori "bug rezim 1x vs 4x") -- gerbang ini mencegah
+# pengulangan bug yg sama scr diam-diam.
+_DATASET_4X = os.path.join(common.ROOT, "scenario_dataset_klaster12_4x.json")
+if args.dataset == "4x":
+    DATASET = _DATASET_4X
+    assert os.path.exists(DATASET), f"dataset 4x tak ditemukan: {DATASET}"
+elif args.dataset == "1x":
+    DATASET = common.DATASET_KANONIK
+    print(f"[{elapsed()}] !! PERINGATAN: regime 1x dipilih eksplisit -- hasil TAK SEPADAN "
+         f"dgn uji_konsolidasi_30d.json (regime 4x). Hanya utk debug/kalibrasi.", flush=True)
+else:
+    DATASET = args.dataset
+    assert os.path.exists(DATASET), f"dataset tak ditemukan: {DATASET}"
+
 print(f"[{elapsed()}] Dataset: {DATASET}", flush=True)
 print(f"[{elapsed()}] Anggaran: n_updates={args.n_updates} rollout_steps={args.rollout_steps} "
      f"delay_minutes={args.delay_minutes} k={args.k}", flush=True)
