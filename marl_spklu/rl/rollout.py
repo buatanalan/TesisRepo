@@ -60,7 +60,7 @@ class Transition:
     __slots__ = ("obs", "critic_obs", "hist", "mask", "chosen_indices", "n_rec",
                  "logp", "value", "step", "reward_streams", "done",
                  "complied", "disp_estwait", "wait_default", "resolved", "flock_penalty",
-                 "pref_hist", "bids")
+                 "pref_hist", "bids", "trust_before")
 
     def __init__(self, obs, critic_obs, hist, mask, chosen_indices, n_rec, logp, value, step,
                 pref_hist=None):
@@ -85,6 +85,10 @@ class Transition:
         self.resolved = False
         # Diagnostik perilaku (diisi di on_decision):
         self.complied = False; self.disp_estwait = 0.0; self.wait_default = 0.0
+        # `trust` (MENTAH, bukan trust_effective) milik pengguna SAAT keputusan diambil --
+        # diisi on_decision, dibandingkan dgn nilai SETELAH sesi selesai (on_charge_complete)
+        # utk suku shaping trust opsional (RewardCalculator.alpha_trust, baku 0.0 = mati).
+        self.trust_before = 0.5
 
     @property
     def reward(self) -> float:
@@ -432,6 +436,7 @@ class RLRolloutAgent:
         tr, _, primary_idx, wait_hat, default_idx, recent_rec_count = self._pending
         complied = chosen_spklu_id in set(recs)
         tr.complied = bool(complied)
+        tr.trust_before = float(user.trust)   # snapshot SEBELUM sesi ini bisa mengubahnya
         # Suku Prox (segera): kedekatan fitur fisik SPKLU rekomendasi PRIMER vs SPKLU
         # terpilih. Terdefinisi baik saat diterima maupun ditolak (tidak dikalikan
         # indikator kepatuhan).
@@ -516,6 +521,14 @@ class RLRolloutAgent:
                 tr.add_reward(
                     self.rc.wait_reward(tr.wait_default, user.wait_time, tr.disp_estwait),
                     STREAM_INDIVIDUAL)   # perbaikan wait = konsekuensi bagi PENGGUNA
+                # Suku shaping trust (opsional, BAKU MATI -- rc.alpha_trust=0.0 tak
+                # mengubah reward sama sekali, murni penjumlahan +0.0). `User.update_trust`
+                # SUDAH dipanggil simulator SEBELUM hook ini (simulator.py) bila
+                # `last_rec_complied` -- `user.trust` di sini sudah nilai TERBARU.
+                if self.rc.alpha_trust != 0.0:
+                    delta_trust = float(user.trust) - tr.trust_before
+                    tr.add_reward(self.rc.trust_shaping_reward(delta_trust),
+                                 STREAM_INDIVIDUAL)
             tr.resolved = True
             if tr.complied and user.interaction_history:
                 complied_v, disp_v, wdef_v, _ = user.interaction_history[-1]
@@ -581,6 +594,7 @@ class RewardCalculatorStub:
     beta_prox = 0.0
     alpha_gini = 0.0
     alpha_flock = 0.0
+    alpha_trust = 0.0
 
     def prox(self, feat_rec, feat_chosen):
         return 0.0

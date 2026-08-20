@@ -107,13 +107,23 @@ class RewardCalculator:
     def __init__(self, alpha_wait: float = 1.0, beta_prox: float = 0.1,
                  alpha_gini: float = 0.5,
                  alpha_flock: float = 0.3, prox_lambda: float = 0.1,
-                 wait_scale: float = 60.0, use_delta_gini: bool = False):
+                 wait_scale: float = 60.0, use_delta_gini: bool = False,
+                 alpha_trust: float = 0.0):
         self.alpha_wait = float(alpha_wait)
         self.beta_prox = float(beta_prox)
         self.alpha_gini = float(alpha_gini)
         self.alpha_flock = float(alpha_flock)
         self.prox_lambda = float(prox_lambda)
         self.wait_scale = float(wait_scale)
+        # Suku SHAPING trust eksplisit (BAKU MATI, alpha_trust=0.0 -- TAK mengubah
+        # perilaku lengan manapun yg sudah ada). Menghargai LANGSUNG kenaikan
+        # `user.trust` (raw alpha/(alpha+beta)) milik pengguna yg baru menyelesaikan
+        # sesi -- lihat `trust_shaping_reward` & `rollout.py::on_decision/
+        # on_charge_complete` utk gerbang kausal (hanya trip PATUH, sama syarat
+        # `User.update_trust` sendiri di simulator.py). Diusulkan sbg jawaban
+        # struktural atas "trust tak pernah jadi target reward" (diskusi analisis
+        # kegagalan RL meningkatkan trust/acceptance).
+        self.alpha_trust = float(alpha_trust)
         # Delta-gini (bukan level absolut) -- lihat catatan kelas. `_prev_gini` disimpan
         # per-instance (state internal), direset otomatis di keputusan pertama tiap episode
         # (None -> delta pertama = 0, tak ada sinyal palsu di awal).
@@ -216,6 +226,17 @@ class RewardCalculator:
     def wait_reward(self, wait_default: float, wait_actual: float, disp_estwait: float = 0.0) -> float:
         improvement = max(0.0, float(wait_default) - float(wait_actual)) / self.wait_scale
         return self.alpha_wait * improvement
+
+    def trust_shaping_reward(self, delta_trust: float) -> float:
+        """`alpha_trust * (trust_baru - trust_lama)` -- BAKU MATI (alpha_trust=0.0).
+        `delta_trust` = perubahan `user.trust` MENTAH (bukan `trust_effective`, yg bisa
+        dibekukan via `constant_trust_shadow` di eksperimen ablasi lain -- suku ini harus
+        tetap mengukur trust SUNGGUHAN, terlepas dari eksperimen pembekuan apa pun) sejak
+        keputusan diambil hingga sesi selesai. TIDAK dikalikan `tr.complied` di sini --
+        gerbang itu tanggung jawab PEMANGGIL (rollout.py::on_charge_complete), sama pola
+        `wait_reward` (kedua suku individual delayed digerbang identik: hanya trip PATUH,
+        sesuai `User.update_trust` sendiri hanya berjalan bila `last_rec_complied`)."""
+        return self.alpha_trust * float(delta_trust)
 
     # ---- Penalti herding / flocking -- DEPRECATED (per-langkah/same-step). Aktif hanya
     # 10,1% transisi krn 75% langkah cuma punya 1 keputusan -- herding di sistem ini

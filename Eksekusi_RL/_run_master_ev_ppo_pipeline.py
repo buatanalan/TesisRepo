@@ -14,6 +14,7 @@ import torch
 import common
 from marl_spklu.rl.master_ev_ppo_policy import (MasterEVPPOTrainer, MasterEVPPOPolicy,
                                                 MasterEVPPOPrefPolicy, MasterEVPPOInferenceAgent)
+from marl_spklu.rl.rewards import RewardCalculator
 from marl_spklu.agents.greedy_agent import GreedyAgent
 from scipy.stats import wilcoxon
 
@@ -42,6 +43,10 @@ p.add_argument("--horizon", type=str, default="30d",
               help="penanda tag checkpoint/hasil -- WAJIB diubah ('90d') saat --dataset menunjuk "
                    "dataset 90-hari, supaya tak menimpa diam-diam checkpoint 30-hari yg sudah ada "
                    "(tag 'master_ev_ppo*' polos khusus utk horizon baku 30d)")
+p.add_argument("--alpha-trust", type=float, default=0.0,
+              help="bobot suku shaping trust eksplisit (RewardCalculator.alpha_trust, "
+                   "BAKU MATI=0.0 -- reward += alpha_trust*(trust_baru-trust_lama) tiap "
+                   "sesi PATUH selesai). >0 WAJIB tag terpisah, lihat di bawah.")
 args = p.parse_args()
 
 assert not (args.pref_feature_mode and not args.pref), "--pref-feature-mode butuh --pref"
@@ -66,19 +71,22 @@ else:
         "Sertakan --horizon eksplisit, mis. --horizon 90d.")
 
 _horizon_suffix = "" if args.horizon == "30d" else f"_{args.horizon}"
-_suffix = ("_pref_feat" if args.pref_feature_mode else ("_pref" if args.pref else "")) + _horizon_suffix
+_trust_suffix = "" if args.alpha_trust == 0.0 else f"_trust{args.alpha_trust:g}"
+_suffix = ("_pref_feat" if args.pref_feature_mode else ("_pref" if args.pref else "")) + _trust_suffix + _horizon_suffix
 TAG_ARM = "master_ev_ppo" + _suffix
 print(f"[{elapsed()}] Dataset: {DATASET}", flush=True)
 print(f"[{elapsed()}] Lengan: tag={TAG_ARM} (perspektif-EV, PPOTrainer standar, V(s) atensi tunggal, "
-     f"pref={args.pref} pref_feature_mode={args.pref_feature_mode})", flush=True)
+     f"pref={args.pref} pref_feature_mode={args.pref_feature_mode} alpha_trust={args.alpha_trust})",
+     flush=True)
 print(f"[{elapsed()}] Anggaran: n_updates={args.n_updates} rollout_steps={args.rollout_steps} "
      f"k={args.k} n_critics={args.n_critics}", flush=True)
 
 
 def train_one(seed, tag):
     from marl_spklu.rl.forecaster import FormulaForecaster
+    rc = RewardCalculator(alpha_trust=args.alpha_trust)
     tr = MasterEVPPOTrainer(DATASET, rollout_steps=args.rollout_steps, seed=seed, verbose=False,
-                            k=args.k, n_critics=args.n_critics,
+                            reward_calc=rc, k=args.k, n_critics=args.n_critics,
                             policy_cls=POLICY_CLS, policy_kw=POLICY_KW)
     policy = tr.train(FormulaForecaster(), n_updates=args.n_updates)
     ckpt = os.path.join(common.OUTDIR, f"{tag}_actor_seed{seed}.pt")
@@ -184,7 +192,7 @@ common.save_json(dict(
                n_updates=args.n_updates, rollout_steps=args.rollout_steps, k=args.k,
                n_critics=args.n_critics, pref=args.pref,
                pref_feature_mode=args.pref_feature_mode, horizon=args.horizon,
-               dataset=DATASET)),
+               alpha_trust=args.alpha_trust, dataset=DATASET)),
     f"{TAG_ARM}_eval_results.json")
 
 print(f"[{elapsed()}] === SEMUA SELESAI (MasterEV-PPO) ===", flush=True)
