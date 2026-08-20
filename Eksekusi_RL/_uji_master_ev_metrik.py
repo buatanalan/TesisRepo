@@ -3,10 +3,7 @@ mirror `_uji_master_ddpg_metrik.py`, lihat docstring di sana utk alasan terpisah
 dari loop 19-lengan.
 
 Pemakaian (checkpoint HARUS sudah ada, hasil `_run_master_ev_pipeline.py`):
-    python _uji_master_ev_metrik.py 0,1,2 30d [tag_arm]
-    tag_arm opsional -- default "master_ev" (preset seimbang4x+gap_ratio baku). Utk
-    varian ablasi (mis. "master_ev_default" atau "master_ev_default_fixed", lihat
-    akhiran tag di `_run_master_ev_pipeline.py`), berikan eksplisit sbg argumen ke-3.
+    python _uji_master_ev_metrik.py 0,1,2 30d
 """
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -22,11 +19,12 @@ from marl_spklu.rl.master_ev_policy import MasterEVActor
 from marl_spklu.rl.master_ev_trainer import MasterEVInferenceAgent
 from marl_spklu.rl.master_paper_obs import STATION_FEAT_DIM_MASTER_EV
 
+TAG_ARM = "master_ev"
+LABEL_ARM = "MASTER-EV"
+
 SEEDS = ([int(s) for s in sys.argv[1].replace(" ", "").split(",") if s]
         if len(sys.argv) > 1 else [0, 1, 2])
 TAG = sys.argv[2] if len(sys.argv) > 2 else "30d"
-TAG_ARM = sys.argv[3] if len(sys.argv) > 3 else "master_ev"
-LABEL_ARM = "MASTER-EV" if TAG_ARM == "master_ev" else f"MASTER-EV[{TAG_ARM}]"
 K.DS = os.path.join(common.ROOT, K.HORIZON[TAG])
 K_REC = 3
 
