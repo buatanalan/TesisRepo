@@ -2,7 +2,10 @@
 mirror `_uji_master_ev_metrik.py`, checkpoint dari `_run_master_ev_ppo_pipeline.py`.
 
 Pemakaian:
-    python _uji_master_ev_ppo_metrik.py 0,1,2 30d
+    python _uji_master_ev_ppo_metrik.py 0,1,2 30d [tag_arm]
+    tag_arm opsional -- default "master_ev_ppo". Utk varian +P (lihat `--pref`/
+    `--pref-feature-mode` di `_run_master_ev_ppo_pipeline.py`), berikan eksplisit:
+    "master_ev_ppo_pref" atau "master_ev_ppo_pref_feat".
 """
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -14,15 +17,18 @@ sys.argv = ["_uji_konsolidasi.py", "0", "30d"]
 import _uji_konsolidasi as K
 sys.argv = _argv_asli
 
-from marl_spklu.rl.master_ev_ppo_policy import MasterEVPPOPolicy, MasterEVPPOInferenceAgent
+from marl_spklu.rl.master_ev_ppo_policy import (MasterEVPPOPolicy, MasterEVPPOPrefPolicy,
+                                                MasterEVPPOInferenceAgent)
 from marl_spklu.rl.forecaster import FormulaForecaster
-
-TAG_ARM = "master_ev_ppo"
-LABEL_ARM = "MASTER-EV-PPO"
 
 SEEDS = ([int(s) for s in sys.argv[1].replace(" ", "").split(",") if s]
         if len(sys.argv) > 1 else [0, 1, 2])
 TAG = sys.argv[2] if len(sys.argv) > 2 else "30d"
+TAG_ARM = sys.argv[3] if len(sys.argv) > 3 else "master_ev_ppo"
+LABEL_ARM = {"master_ev_ppo": "MASTER-EV-PPO", "master_ev_ppo_pref": "MASTER-EV-PPO+P",
+            "master_ev_ppo_pref_feat": "MASTER-EV-PPO+P(fitur)"}.get(TAG_ARM, f"MASTER-EV-PPO[{TAG_ARM}]")
+POLICY_CLS = MasterEVPPOPrefPolicy if "pref" in TAG_ARM else MasterEVPPOPolicy
+POLICY_KW = dict(pref_feature_mode=True) if TAG_ARM == "master_ev_ppo_pref_feat" else dict()
 K.DS = os.path.join(common.ROOT, K.HORIZON[TAG])
 K_REC = 3
 
@@ -32,7 +38,7 @@ def muat_policy(seed, n_spklu):
     assert os.path.exists(ckpt), (
         f"checkpoint tak ditemukan: {ckpt}\n"
         f"latih dulu lewat: python _run_master_ev_ppo_pipeline.py --n-train-seed {seed+1} ...")
-    pol = MasterEVPPOPolicy(n_spklu)
+    pol = POLICY_CLS(n_spklu, **POLICY_KW)
     pol.load_state_dict(torch.load(ckpt, map_location="cpu"))
     pol.eval()
     return pol

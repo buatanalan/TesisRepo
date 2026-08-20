@@ -12,7 +12,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
 import torch
 import common
-from marl_spklu.rl.master_ev_ppo_policy import MasterEVPPOTrainer, MasterEVPPOPolicy, MasterEVPPOInferenceAgent
+from marl_spklu.rl.master_ev_ppo_policy import (MasterEVPPOTrainer, MasterEVPPOPolicy,
+                                                MasterEVPPOPrefPolicy, MasterEVPPOInferenceAgent)
 from marl_spklu.agents.greedy_agent import GreedyAgent
 from scipy.stats import wilcoxon
 
@@ -27,8 +28,19 @@ p.add_argument("--n-updates", type=int, default=300)
 p.add_argument("--rollout-steps", type=int, default=96)
 p.add_argument("--k", type=int, default=3)
 p.add_argument("--n-critics", type=int, default=1)
+p.add_argument("--pref", action="store_true",
+              help="tambahkan modul preferensi PDQN (MasterEVPPOPrefPolicy) -- pengujian "
+                   "ULANG hipotesis 'P gagal krn identitas-ambigu di perspektif stasiun', "
+                   "kini di unit-agen-EV + kritik V(s) stabil")
+p.add_argument("--pref-feature-mode", action="store_true",
+              help="riwayat preferensi sbg vektor fitur (bukan one-hot identitas) -- "
+                   "hanya berlaku bila --pref diberikan")
 p.add_argument("--dataset", type=str, default="4x")
 args = p.parse_args()
+
+assert not (args.pref_feature_mode and not args.pref), "--pref-feature-mode butuh --pref"
+POLICY_CLS = MasterEVPPOPrefPolicy if args.pref else MasterEVPPOPolicy
+POLICY_KW = dict(pref_feature_mode=args.pref_feature_mode) if args.pref else dict()
 
 _DATASET_4X = os.path.join(common.ROOT, "scenario_dataset_klaster12_4x.json")
 if args.dataset == "4x":
@@ -41,10 +53,11 @@ else:
     DATASET = args.dataset
     assert os.path.exists(DATASET), f"dataset tak ditemukan: {DATASET}"
 
-TAG_ARM = "master_ev_ppo"
+_suffix = "_pref_feat" if args.pref_feature_mode else ("_pref" if args.pref else "")
+TAG_ARM = "master_ev_ppo" + _suffix
 print(f"[{elapsed()}] Dataset: {DATASET}", flush=True)
-print(f"[{elapsed()}] Lengan: tag={TAG_ARM} (perspektif-EV, PPOTrainer standar, V(s) atensi tunggal)",
-     flush=True)
+print(f"[{elapsed()}] Lengan: tag={TAG_ARM} (perspektif-EV, PPOTrainer standar, V(s) atensi tunggal, "
+     f"pref={args.pref} pref_feature_mode={args.pref_feature_mode})", flush=True)
 print(f"[{elapsed()}] Anggaran: n_updates={args.n_updates} rollout_steps={args.rollout_steps} "
      f"k={args.k} n_critics={args.n_critics}", flush=True)
 
@@ -52,7 +65,8 @@ print(f"[{elapsed()}] Anggaran: n_updates={args.n_updates} rollout_steps={args.r
 def train_one(seed, tag):
     from marl_spklu.rl.forecaster import FormulaForecaster
     tr = MasterEVPPOTrainer(DATASET, rollout_steps=args.rollout_steps, seed=seed, verbose=False,
-                            k=args.k, n_critics=args.n_critics)
+                            k=args.k, n_critics=args.n_critics,
+                            policy_cls=POLICY_CLS, policy_kw=POLICY_KW)
     policy = tr.train(FormulaForecaster(), n_updates=args.n_updates)
     ckpt = os.path.join(common.OUTDIR, f"{tag}_actor_seed{seed}.pt")
     torch.save(policy.state_dict(), ckpt)
@@ -60,7 +74,7 @@ def train_one(seed, tag):
 
 
 def load_policy(ckpt_path, n_spklu):
-    pol = MasterEVPPOPolicy(n_spklu, n_critics=args.n_critics)
+    pol = POLICY_CLS(n_spklu, n_critics=args.n_critics, **POLICY_KW)
     pol.load_state_dict(torch.load(ckpt_path, map_location="cpu"))
     pol.eval()
     return pol
@@ -155,7 +169,8 @@ common.save_json(dict(
     per_seed_means={str(k): float(np.mean(v)) for k, v in per_seed.items()},
     config=dict(n_train_seed=args.n_train_seed, n_eval_seed=args.n_eval_seed,
                n_updates=args.n_updates, rollout_steps=args.rollout_steps, k=args.k,
-               n_critics=args.n_critics)),
+               n_critics=args.n_critics, pref=args.pref,
+               pref_feature_mode=args.pref_feature_mode)),
     f"{TAG_ARM}_eval_results.json")
 
 print(f"[{elapsed()}] === SEMUA SELESAI (MasterEV-PPO) ===", flush=True)

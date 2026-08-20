@@ -48,6 +48,9 @@ from marl_spklu.rl.master_paper_obs import STATION_FEAT_DIM_MASTER_EV, build_joi
 from marl_spklu.rl.rollout import RLRolloutAgent, Transition, RewardCalculatorStub, _gini
 from marl_spklu.rl.rewards import RewardCalculator
 from marl_spklu.rl.ppo import PPOTrainer, _make_logger
+from marl_spklu.rl.pdqn_policy import (PreferenceAttention, hist_feat_dim,
+                                       hist_feat_dim_feature, PREF_STATION_FEAT_DIM)
+from marl_spklu.rl.p_ppo_policy import PREF_D_LSTM, PREF_D_ATTN
 
 
 class MasterEVPPOPolicy(nn.Module):
@@ -98,20 +101,31 @@ class MasterEVPPOPolicy(nn.Module):
         value = self.critic_head(pooled)                     # (B,n_critics)
         return logits, value
 
+    def _fwd(self, obs, hist, critic_obs, pref_hist):
+        """Panggil `forward()` polimorfik -- teruskan `pref_hist` HANYA bila subclass
+        (`MasterEVPPOPrefPolicy`) benar2 punya modul preferensi. Pola SAMA PERSIS
+        `_BiddingMixin._fwd` (master_bidding_policy.py) -- disalin, bukan diwarisi,
+        krn kelas ini basisnya nn.Module langsung (bukan _BiddingMixin)."""
+        if pref_hist is not None and hasattr(self, "pref_lstm"):
+            return self.forward(obs, hist, critic_obs, pref_hist=pref_hist)
+        return self.forward(obs, hist, critic_obs)
+
     # ---------------- act()/evaluate(): IDENTIK `HPPOPolicy` (policy.py), disalin ----
     # apa adanya (bukan re-implementasi) -- top-K/threshold+epsilon-greedy, log-prob
     # Categorical berurutan-tanpa-pengembalian. Lihat `policy.py::HPPOPolicy.act` utk
     # penjelasan lengkap tiap cabang; komentar di sini dipangkas (tak diduplikasi).
     @torch.no_grad()
     def act(self, obs_np, feasible_mask_np, hist_np, k: int = 3, critic_obs_np=None,
-           epsilon: float = 0.0, threshold: float = 0.20):
+           epsilon: float = 0.0, threshold: float = 0.20, pref_hist_np=None, **_abaikan):
         obs = torch.as_tensor(obs_np, dtype=torch.float32).unsqueeze(0)
         mask = torch.as_tensor(feasible_mask_np, dtype=torch.bool).unsqueeze(0)
         hist = torch.as_tensor(hist_np, dtype=torch.float32).unsqueeze(0)
         critic_obs = (torch.as_tensor(critic_obs_np, dtype=torch.float32).unsqueeze(0)
                      if critic_obs_np is not None else None)
 
-        logits, value = self.forward(obs, hist, critic_obs)
+        pref_hist = (torch.as_tensor(pref_hist_np, dtype=torch.float32).unsqueeze(0)
+                    if pref_hist_np is not None else None)
+        logits, value = self._fwd(obs, hist, critic_obs, pref_hist)
         if not torch.isfinite(logits).all():
             warnings.warn("MasterEVPPOPolicy.act: logits non-finite (NaN/Inf).", RuntimeWarning)
             logits = torch.nan_to_num(logits, nan=0.0, posinf=0.0, neginf=NEG_INF)
@@ -153,8 +167,9 @@ class MasterEVPPOPolicy(nn.Module):
             "value": value[0].detach().cpu().numpy().astype("float64"),
         }
 
-    def evaluate(self, obs_b, mask_b, chosen_indices_b, n_rec_b, hist_b, critic_obs_b=None):
-        logits, value = self.forward(obs_b, hist_b, critic_obs_b)
+    def evaluate(self, obs_b, mask_b, chosen_indices_b, n_rec_b, hist_b, critic_obs_b=None,
+                pref_hist_b=None, **_abaikan):
+        logits, value = self._fwd(obs_b, hist_b, critic_obs_b, pref_hist_b)
         logits = logits.masked_fill(~mask_b, NEG_INF)
 
         B, k = chosen_indices_b.shape
@@ -178,6 +193,65 @@ class MasterEVPPOPolicy(nn.Module):
         return logp, entropy, value
 
 
+class MasterEVPPOPrefPolicy(MasterEVPPOPolicy):
+    """`MasterEVPPOPolicy` + modul ekstraksi preferensi PDQN (`pref_lstm` +
+    `PreferenceAttention` + `pref_gate`) -- pola SAMA PERSIS `MasterStationPPOPrefPolicy`/
+    `PPPOPolicy`, disuntikkan sbg konteks tambahan yg di-broadcast ke seluruh kandidat
+    stasiun saat encoding.
+
+    BEDA PENTING dgn `MasterStationPPOPrefPolicy`: di sana P dianggap "melanggar" §3.1
+    murni krn stasiun SEHARUSNYA buta terhadap pemohon (Pers. 11 MASTER). Di sini TIDAK
+    ADA tegangan itu -- unit agen MEMANG permintaan EV itu sendiri, jadi riwayat
+    (a_hat,a) MILIK SATU EV YANG SAMA yang sedang membuat keputusan adalah identitas
+    yang alami, bukan tempelan. Ini pengujian ULANG hipotesis "P gagal krn identitas-
+    ambigu di perspektif stasiun" (5x gagal sebelumnya, SEMUA di arsitektur stasiun-
+    sbg-agen atau kritik-per-timestep yg belum stabil) pada kondisi yg sudah dibersihkan
+    dari KEDUA confound itu sekaligus."""
+
+    def __init__(self, n_spklu: int, hidden: int = 64, critic_hidden: int = 128,
+                n_critics: int = 1, pref_d_lstm: int = PREF_D_LSTM, pref_d_attn: int = PREF_D_ATTN,
+                pref_feature_mode: bool = False, use_preference: bool = True):
+        super().__init__(n_spklu, hidden=hidden, critic_hidden=critic_hidden, n_critics=n_critics)
+        self.pref_feature_mode = bool(pref_feature_mode)
+        self.use_preference = bool(use_preference)
+        self.pref_d_attn = int(pref_d_attn)
+        self.pref_hist_feat_dim = (hist_feat_dim_feature(PREF_STATION_FEAT_DIM)
+                                   if self.pref_feature_mode else hist_feat_dim(n_spklu))
+        self.pref_lstm = nn.LSTM(self.pref_hist_feat_dim, pref_d_lstm, batch_first=True)
+        self.pref_attn = PreferenceAttention(STATION_FEAT_DIM_MASTER_EV, pref_d_lstm, pref_d_attn)
+        # Gerbang nol-awal (GTrXL/Parisotto dkk. 2019) -- modul baru diinisialisasi acak,
+        # disuntik penuh langsung akan jadi derau besar bagi station_encoder yg sedianya
+        # belajar lancar tanpa itu (sama alasan seluruh kelas +P lain di repo ini).
+        self.pref_gate = nn.Parameter(torch.tensor(0.0))
+        self.station_encoder = StationEncoder(STATION_FEAT_DIM_MASTER_EV, pref_d_attn, hidden)
+
+    def _encode_pref(self, pref_hist):
+        if not self.use_preference:
+            return torch.zeros(pref_hist.shape[0], self.pref_lstm.hidden_size,
+                               device=pref_hist.device, dtype=pref_hist.dtype)
+        _, (h_n, _) = self.pref_lstm(pref_hist)
+        return h_n[-1]
+
+    def forward(self, obs, hist=None, critic_obs=None, pref_hist=None):
+        _, station_feats = self._split_station_block(obs, STATION_FEAT_DIM_MASTER_EV, 0)
+
+        if pref_hist is not None and self.use_preference:
+            c_pref = self._encode_pref(pref_hist)
+            attended_pref, _ = self.pref_attn(station_feats, c_pref)
+            attended_pref = self.pref_gate * attended_pref
+        else:
+            attended_pref = torch.zeros(obs.shape[0], self.pref_d_attn, device=obs.device)
+
+        emb = self.station_encoder(station_feats, attended_pref)
+        logits = self.disc_head(emb).squeeze(-1)
+
+        c_emb = self.critic_station_encoder(station_feats,
+                                            torch.zeros(obs.shape[0], 0, device=obs.device))
+        pooled = self.critic_pool(c_emb)
+        value = self.critic_head(pooled)
+        return logits, value
+
+
 class MasterEVPPORolloutAgent(RLRolloutAgent):
     """Override HANYA `get_recommendation` -- observasi §3.1+state-EV via
     `build_joint_obs_master_ev`. `on_decision`/`on_step_end`/`on_charge_complete`
@@ -196,8 +270,17 @@ class MasterEVPPORolloutAgent(RLRolloutAgent):
         mask = self._feasible_mask(feasible_ids)
         dummy_hist = np.zeros((1, 1), dtype=np.float32)
 
-        act = self.policy.act(obs_flat, mask, dummy_hist, k=self.k, critic_obs_np=obs_flat,
-                              epsilon=self.epsilon, threshold=self.threshold)
+        # Modul preferensi (opsional): _use_pref/_build_pref_hist DIWARISI dari
+        # RLRolloutAgent.__init__ -- pola sama `MasterStationPPORolloutAgent`.
+        if self._use_pref:
+            pref_hist = self._build_pref_hist(user)
+            act = self.policy.act(obs_flat, mask, dummy_hist, k=self.k, critic_obs_np=obs_flat,
+                                  epsilon=self.epsilon, threshold=self.threshold,
+                                  pref_hist_np=pref_hist)
+        else:
+            pref_hist = None
+            act = self.policy.act(obs_flat, mask, dummy_hist, k=self.k, critic_obs_np=obs_flat,
+                                  epsilon=self.epsilon, threshold=self.threshold)
 
         chosen_indices = act["chosen_indices"]
         n_rec = act["n_rec"]
@@ -215,7 +298,8 @@ class MasterEVPPORolloutAgent(RLRolloutAgent):
         idx_arr[:n_rec] = chosen_indices
 
         tr = Transition(obs_flat, obs_flat, dummy_hist, mask, idx_arr, n_rec,
-                        act["logp"], act["value"], self.sim.current_step)
+                        act["logp"], act["value"], self.sim.current_step,
+                        pref_hist=pref_hist)
         tr.disp_estwait = primary_disp
         tr.wait_default = float(self.sim.compute_virtual_wait(
             user, self.sim.spklus[self.sids[default_idx]], time_now)
@@ -228,11 +312,15 @@ class MasterEVPPORolloutAgent(RLRolloutAgent):
 
 
 class MasterEVPPOInferenceAgent:
-    """Evaluasi bersih -- pola sama `MasterStationPPOInferenceAgent`."""
+    """Evaluasi bersih -- pola sama `MasterStationPPOInferenceAgent`. `pref_feature_mode`
+    DIAMBIL OTOMATIS dari `policy.pref_feature_mode` (bila ada) -- latih & uji tak pernah
+    bisa berbeda mode encoding riwayat (kelas bug berulang, lihat docstring kelas itu)."""
 
     def __init__(self, policy, sim, forecaster=None, k: int = 3, epsilon: float = 0.0,
                 threshold: float = 0.20):
-        self._roll = MasterEVPPORolloutAgent(policy, sim, RewardCalculatorStub(), forecaster, k=k)
+        pref_feature_mode = bool(getattr(policy, "pref_feature_mode", False))
+        self._roll = MasterEVPPORolloutAgent(policy, sim, RewardCalculatorStub(), forecaster, k=k,
+                                             pref_feature_mode=pref_feature_mode)
         self._roll.epsilon = epsilon
         self._roll.threshold = threshold
 
@@ -259,7 +347,7 @@ class MasterEVPPOTrainer:
     def __init__(self, dataset_path, rollout_steps: int = 96, seed: int = 0,
                 verbose: bool = True, reward_calc=None, hidden: int = 64,
                 critic_hidden: int = 128, k: int = 3, n_critics: int = 1,
-                equity_calc=None, **ppo_kw):
+                equity_calc=None, policy_cls=MasterEVPPOPolicy, policy_kw=None, **ppo_kw):
         self.dataset_path = dataset_path
         self.rollout_steps = int(rollout_steps)
         self.k = int(k)
@@ -271,8 +359,8 @@ class MasterEVPPOTrainer:
 
         sim0 = self._fresh_sim()
         self.N = len(sim0.spklus)
-        self.policy = MasterEVPPOPolicy(self.N, hidden=hidden, critic_hidden=critic_hidden,
-                                        n_critics=n_critics)
+        self.policy = policy_cls(self.N, hidden=hidden, critic_hidden=critic_hidden,
+                                 n_critics=n_critics, **(policy_kw or {}))
         self.ppo = PPOTrainer(self.policy, avg_reward=True, **ppo_kw)
         self.history = []
         self._it_global = 0
@@ -309,8 +397,10 @@ class MasterEVPPOTrainer:
         chunk = self.rollout_steps
         sim = self._fresh_sim()
         self._reset_rc()
+        pref_feature_mode = bool(getattr(self.policy, "pref_feature_mode", False))
         agent = MasterEVPPORolloutAgent(self.policy, sim, self.rc, forecaster, k=self.k,
-                                        equity_calc=self.equity_calc)
+                                        equity_calc=self.equity_calc,
+                                        pref_feature_mode=pref_feature_mode)
         step = 0
         for _ in range(n_updates):
             it = self._it_global
