@@ -95,7 +95,18 @@ class ForecasterBase:
 
 
 class FormulaForecaster(ForecasterBase):
-    """Mode A — ŵ = min estimate_wait_time antar tipe konektor. Tanpa pelatihan."""
+    """Mode A — ŵ = min estimate_wait_time antar tipe konektor. Tanpa pelatihan.
+
+    KASAR SECARA SENGAJA: `SPKLU.estimate_wait_time` memakai rata-rata waktu-charge
+    TETAP per tipe konektor (AC~136mnt/DC~49mnt), BUKAN `remaining_time` SESUNGGUHNYA
+    EV yang sedang charging. Ini estimasi yang DITAMPILKAN ke pengguna & dipakai
+    `User.update_trust` -- BERBEDA dari `eta_norm` yang dilihat AKTOR di observasi
+    (`master_paper_obs.py::build_station_obs`, via `sim.compute_virtual_wait`, yang
+    JAUH lebih rinci/akurat). Lihat `VirtualWaitForecaster` di bawah utk basis yang
+    disamakan -- diagnosis event-trust menemukan bias sistematis besar (-70an menit)
+    persis di celah dua estimator ini (agen "tahu" antrean akan cepat kosong via
+    compute_virtual_wait, tapi forecaster kasar tetap menjanjikan wait rata-rata
+    lama, membuat janji yang ditampilkan ke pengguna jauh meleset -> trust tererosi)."""
 
     def predict(self, spklus: dict, time_now_min: float = 0.0, user=None, soc: float = 50.0, sim=None) -> dict:
         est = {}
@@ -103,6 +114,23 @@ class FormulaForecaster(ForecasterBase):
             waits = [s.estimate_wait_time(c) for c, cap in s.capacities.items() if cap > 0]
             est[sid] = float(min(waits)) if waits else 0.0
         return est
+
+
+class VirtualWaitForecaster(ForecasterBase):
+    """Basis estimasi DISAMAKAN dengan yang dilihat aktor (`eta_norm`, §3.1): memakai
+    `sim.compute_virtual_wait` (simulasi FIFO dgn `remaining_time` SESUNGGUHNYA tiap EV
+    yang sedang charging + EV yang sedang menuju stasiun) UNTUK KEDUANYA -- observasi
+    aktor DAN estimasi yang ditampilkan/dinilai trust. Menghapus celah struktural yang
+    memungkinkan agen "mengeksploitasi" info akurat yang tak terlihat forecaster kasar
+    (`FormulaForecaster`) tanpa sengaja merusak akurasi janji ke pengguna.
+
+    WAJIB `sim` diberikan (beda dari `FormulaForecaster` yang bisa jalan tanpanya) --
+    `compute_virtual_wait` metode `Simulator`, bukan `SPKLU`."""
+
+    def predict(self, spklus: dict, time_now_min: float = 0.0, user=None, soc: float = 50.0, sim=None) -> dict:
+        assert sim is not None, "VirtualWaitForecaster butuh `sim` (compute_virtual_wait)"
+        return {sid: float(sim.compute_virtual_wait(user, s, time_now_min))
+               for sid, s in spklus.items()}
 
 
 class MLPForecaster(nn.Module):

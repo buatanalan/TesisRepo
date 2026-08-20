@@ -47,6 +47,12 @@ p.add_argument("--alpha-trust", type=float, default=0.0,
               help="bobot suku shaping trust eksplisit (RewardCalculator.alpha_trust, "
                    "BAKU MATI=0.0 -- reward += alpha_trust*(trust_baru-trust_lama) tiap "
                    "sesi PATUH selesai). >0 WAJIB tag terpisah, lihat di bawah.")
+p.add_argument("--forecaster", type=str, default="formula", choices=["formula", "vwf"],
+              help="'formula' (BAKU, FormulaForecaster -- kasar, rata2 tetap per konektor) "
+                   "| 'vwf' (VirtualWaitForecaster -- basis DISAMAKAN dgn eta_norm yg dilihat "
+                   "aktor, sim.compute_virtual_wait; diagnosis event-trust menemukan celah "
+                   "besar antara keduanya sbg penyebab dominan erosi trust RL). >0 WAJIB tag "
+                   "terpisah, lihat di bawah.")
 args = p.parse_args()
 
 assert not (args.pref_feature_mode and not args.pref), "--pref-feature-mode butuh --pref"
@@ -72,23 +78,29 @@ else:
 
 _horizon_suffix = "" if args.horizon == "30d" else f"_{args.horizon}"
 _trust_suffix = "" if args.alpha_trust == 0.0 else f"_trust{args.alpha_trust:g}"
-_suffix = ("_pref_feat" if args.pref_feature_mode else ("_pref" if args.pref else "")) + _trust_suffix + _horizon_suffix
+_fc_suffix = "" if args.forecaster == "formula" else f"_{args.forecaster}"
+_suffix = (("_pref_feat" if args.pref_feature_mode else ("_pref" if args.pref else ""))
+          + _trust_suffix + _fc_suffix + _horizon_suffix)
 TAG_ARM = "master_ev_ppo" + _suffix
 print(f"[{elapsed()}] Dataset: {DATASET}", flush=True)
 print(f"[{elapsed()}] Lengan: tag={TAG_ARM} (perspektif-EV, PPOTrainer standar, V(s) atensi tunggal, "
-     f"pref={args.pref} pref_feature_mode={args.pref_feature_mode} alpha_trust={args.alpha_trust})",
-     flush=True)
+     f"pref={args.pref} pref_feature_mode={args.pref_feature_mode} alpha_trust={args.alpha_trust} "
+     f"forecaster={args.forecaster})", flush=True)
 print(f"[{elapsed()}] Anggaran: n_updates={args.n_updates} rollout_steps={args.rollout_steps} "
      f"k={args.k} n_critics={args.n_critics}", flush=True)
 
 
+def make_forecaster():
+    from marl_spklu.rl.forecaster import FormulaForecaster, VirtualWaitForecaster
+    return VirtualWaitForecaster() if args.forecaster == "vwf" else FormulaForecaster()
+
+
 def train_one(seed, tag):
-    from marl_spklu.rl.forecaster import FormulaForecaster
     rc = RewardCalculator(alpha_trust=args.alpha_trust)
     tr = MasterEVPPOTrainer(DATASET, rollout_steps=args.rollout_steps, seed=seed, verbose=False,
                             reward_calc=rc, k=args.k, n_critics=args.n_critics,
                             policy_cls=POLICY_CLS, policy_kw=POLICY_KW)
-    policy = tr.train(FormulaForecaster(), n_updates=args.n_updates)
+    policy = tr.train(make_forecaster(), n_updates=args.n_updates)
     ckpt = os.path.join(common.OUTDIR, f"{tag}_actor_seed{seed}.pt")
     torch.save(policy.state_dict(), ckpt)
     return dict(seed=seed, ckpt=ckpt, history=tr.history)
@@ -102,14 +114,13 @@ def load_policy(ckpt_path, n_spklu):
 
 
 def eval_policy_gini(ckpt_path, dataset_path, n_eval_seed, k):
-    from marl_spklu.rl.forecaster import FormulaForecaster
     sim0 = common.fresh_sim(dataset_path)
     pol = load_policy(ckpt_path, len(sim0.spklus))
     ginis = []
     for s in range(n_eval_seed):
         sim = common.fresh_sim(dataset_path)
         random.seed(s); np.random.seed(s)
-        agent = MasterEVPPOInferenceAgent(pol, sim, FormulaForecaster(), k=k)
+        agent = MasterEVPPOInferenceAgent(pol, sim, make_forecaster(), k=k)
         sim.run(max_steps=sim.max_steps, agent=agent)
         served = np.array([sp.total_served for sp in sim.spklus.values()], float)
         ginis.append(common.gini(served))
@@ -192,7 +203,7 @@ common.save_json(dict(
                n_updates=args.n_updates, rollout_steps=args.rollout_steps, k=args.k,
                n_critics=args.n_critics, pref=args.pref,
                pref_feature_mode=args.pref_feature_mode, horizon=args.horizon,
-               alpha_trust=args.alpha_trust, dataset=DATASET)),
+               alpha_trust=args.alpha_trust, forecaster=args.forecaster, dataset=DATASET)),
     f"{TAG_ARM}_eval_results.json")
 
 print(f"[{elapsed()}] === SEMUA SELESAI (MasterEV-PPO) ===", flush=True)

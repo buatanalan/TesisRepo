@@ -31,11 +31,17 @@ TAG_ARM = sys.argv[3] if len(sys.argv) > 3 else "master_ev_ppo"
 # RuntimeError size-mismatch saat load_state_dict.
 _is_pref_feat = "pref_feat" in TAG_ARM
 _is_pref = "pref" in TAG_ARM
+# `vwf`: forecaster HARUS SAMA dgn yg dipakai `_run_master_ev_ppo_pipeline.py --forecaster
+# vwf` saat melatih checkpoint ini -- pakai `K.VW` (_uji_konsolidasi.py), BUKAN kelas
+# terpisah, supaya identik persis dgn yg dipakai evaluasi H-PPO/P-PPO/MASTER (konvensi
+# Tahap 2: "Prediktor EstWait SERAGAM lintas semua metode -- syarat perbandingan setara").
+_is_vwf = "vwf" in TAG_ARM
 LABEL_ARM = (f"MASTER-EV-PPO+P(fitur)[{TAG_ARM}]" if _is_pref_feat
             else f"MASTER-EV-PPO+P[{TAG_ARM}]" if _is_pref
             else f"MASTER-EV-PPO[{TAG_ARM}]")
 POLICY_CLS = MasterEVPPOPrefPolicy if _is_pref else MasterEVPPOPolicy
 POLICY_KW = dict(pref_feature_mode=True) if _is_pref_feat else dict()
+FORECASTER_CLS = K.VW if _is_vwf else FormulaForecaster
 K.DS = os.path.join(common.ROOT, K.HORIZON[TAG])
 K_REC = 3
 
@@ -53,7 +59,7 @@ def muat_policy(seed, n_spklu):
 
 def fac_dari_policy(policy):
     def fac(sim, _pol=policy):
-        return MasterEVPPOInferenceAgent(_pol, sim, FormulaForecaster(), k=K_REC)
+        return MasterEVPPOInferenceAgent(_pol, sim, FORECASTER_CLS(), k=K_REC)
     return fac
 
 
