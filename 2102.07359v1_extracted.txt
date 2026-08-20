@@ -1,0 +1,1707 @@
+--- PAGE 1 ---
+Intelligent Electric Vehicle Charging Recommendation
+Based on Multi-Agent Reinforcement Learning
+Weijia Zhang1†, Hao Liu2∗, Fan Wang3, Tong Xu1, Haoran Xin1, Dejing Dou2, Hui Xiong4∗
+1 University of Science and Technology of China, 2 Business Intelligence Lab, Baidu Research,
+3 Baidu Inc., 4 Rutgers University
+{wjzhang3,xinhaoran}@mail.ustc.edu.com, {liuhao30,wangfan04,doudejing}@baidu.com,
+tongxu@ustc.edu.com, hxiong@rutgers.edu
+ABSTRACT
+Electric Vehicle (EV) has become a preferable choice in the modern
+transportation system due to its environmental and energy sus-
+tainability. However, in many large cities, EV drivers often fail to
+find the proper spots for charging, because of the limited charg-
+ing infrastructures and the spatiotemporally unbalanced charg-
+ing demands. Indeed, the recent emergence of deep reinforcement
+learning provides great potential to improve the charging expe-
+rience from various aspects over a long-term horizon. In this pa-
+per, we propose a framework, named Multi-Agent Spatio-Temporal
+Reinforcement Learning (Master), for intelligently recommending
+public accessible charging stations by jointly considering various
+long-term spatiotemporal factors. Specifically, by regarding each
+charging station as an individual agent, we formulate this prob-
+lem as a multi-objective multi-agent reinforcement learning task.
+We first develop a multi-agent actor-critic framework with the
+centralized attentive critic to coordinate the recommendation be-
+tween geo-distributed agents. Moreover, to quantify the influence
+of future potential charging competition, we introduce a delayed
+access strategy to exploit the knowledge of future charging compe-
+tition during training. After that, to effectively optimize multiple
+learning objectives, we extend the centralized attentive critic to
+multi-critics and develop a dynamic gradient re-weighting strategy
+to adaptively guide the optimization direction. Finally, extensive
+experiments on two real-world datasets demonstrate that Master
+achieves the best comprehensive performance compared with nine
+baseline approaches.
+KEYWORDS
+Charging station recommendation, multi-agent reinforcement learn-
+ing, multi-objective optimization
+ACM Reference Format:
+Weijia Zhang1†, Hao Liu2∗, Fan Wang3, Tong Xu1, Haoran Xin1, Dejing
+Dou2, Hui Xiong4∗. 2021. Intelligent Electric Vehicle Charging Recommen-
+dation Based on Multi-Agent Reinforcement Learning. In Proceedings of the
+∗ Corresponding author.
+† The research was done when the first author was an intern in Baidu Research under
+the supervision of the second author.
+This paper is published under the Creative Commons Attribution 4.0 International
+(CC-BY 4.0) license. Authors reserve their rights to disseminate the work on their
+personal and corporate Web sites with the appropriate attribution.
+WWW ’21, April 19–23, 2021, Ljubljana, Slovenia
+© 2021 IW3C2 (International World Wide Web Conference Committee), published
+under Creative Commons CC-BY 4.0 License.
+ACM ISBN 978-1-4503-8312-7/21/04.
+https://doi.org/10.1145/3442381.3449934
+Web Conference 2021 (WWW ’21), April 19–23, 2021, Ljubljana, Slovenia.ACM,
+New York, NY, USA, 12 pages. https://doi.org/10.1145/3442381.3449934
+1 INTRODUCTION
+Due to the low-carbon emission and energy efficiency, Electric
+vehicles (EVs) are emerging as a favorable choice in the modern
+transportation system to meet the increasing environmental con-
+cerns [10] and energy insufficiency [ 30]. In 2018, there are over
+2.61 million EVs on the road in China, and this number will reach
+80 million in 2030 [ 48]. Although the government is expanding
+the publicly accessible charging network to fulfill the explosively
+growing on-demand charging requirement, it is still difficult for EV
+drivers to charge their vehicles due to the fully-occupied stations
+and long waiting time [3, 16, 35, 39]. Undoubtedly, such an unsatis-
+factory charging experience raises undesirable charging cost and
+inefficiency, and may even increase the EV driver’s "range anxi-
+ety", which prevents the further prevalence of EVs. Therefore, it
+is appealing to provide intelligent charging recommendations to
+improve the EV drivers’ charging experience from various aspects,
+such as minimize the charging wait time (CWT), reduce the charg-
+ing price (CP), as well as optimize the charging failure rate (CFR)
+to improve the efficiency of the global charging network.
+The charging recommendation problem distinguishes itself from
+traditional recommendation tasks [ 7, 42] from two perspectives.
+First, the number of charging spots in a target geographical area
+may be limited, which may induce potential resource competition
+between EVs. Second, depending on the battery capacity and charg-
+ing power, the battery recharging process may block the charging
+spot for several hours. As a result, the current recommendation
+may influence future EV charging recommendations and produce a
+long-term effect on the global charging network. Previously, some
+efforts [1, 8, 35, 38, 39, 43] have been made for charging recom-
+mendations via greedy-based strategies by suggesting the most
+proper station for the current EV driver in each step concerning
+a single objective ( e.g., minimizing the overall CWT). However,
+such an approach overlooks the long-term contradiction between
+the space-constrained charging capacity and the spatiotemporally
+unbalanced charging demands, which leads to sub-optimal recom-
+mendations from a global perspective (e.g., longer overall CWT and
+higher CFR).
+Recently, Reinforcement Learning (RL) has shown great advan-
+tages in optimizing sequential decision problems in the dynamic
+environment, such as order dispatching for ride-hailing and shared-
+bike rebalancing [15, 17]. By interacting with the environment, the
+arXiv:2102.07359v1  [cs.LG]  15 Feb 2021
+--- PAGE 2 ---
+WWW ’21, April 19–23, 2021, Ljubljana, Slovenia Weijia Zhang 1†, Hao Liu2∗, Fan Wang3, Tong Xu1, Haoran Xin1, Dejing Dou2, Hui Xiong4∗
+13:18 
+Future EV
+……
+13:0513:00 13:15
+Charging 
+station
+has available spots no available spot
+ Go to charge
+Current EV
+Figure 1: Illustrative example of future potential charging
+competition between EVs. The last available charging spot
+is preoccupied by a future EV, leading to extra CWT for cur-
+rent EV.
+agent in RL learns the policy to achieve the global optimal long-
+term reward [4]. Therefore, it is intuitive for us to improve charging
+recommendations based on RL, with long-term goals such as mini-
+mizing the overall CWT, the average CP, and the CFR. However,
+there exist several technical challenges in achieving this goal.
+The first challenge comes from the large state and action space .
+There are millions of EVs and thousands of publicly accessible
+charging stations in a metropolis such as Beijing. Directly learning
+a centralized agent system across the city requires handling large
+state and action space and high-dimensional environment, which
+will induce severe scalability and efficiency issues [2, 28]. Moreover,
+the "single point of failure" [25] in the centralized approach may fail
+the whole system [15]. As an alternative, an existing approach Wang
+et al. [36] tried to model a small set of vehicles as multiple agents
+and maximize the cumulative reward in terms of the number of
+served orders. However, in our charging recommendation task,
+most charging requests are ad-hoc and from non-repetitive dri-
+vers, which renders it impossible to learn a dedicated policy for
+each individual EV. To address the first challenge, we regard each
+charging station as an individual agent and formulate EV charging
+recommendation as a multi-agent reinforcement learning (MARL)
+task, and we propose a multi-agent actor-critic framework. In this
+way, each individual agent has a quantity-independent state action
+space, which can be scaled to more complicated environments and
+is more robust to other agents’ potential failure.
+The second challenge is the coordination and cooperation in the
+large-scale agent system. For a charging request, only one station
+will finally serve for charging. Different agents should be coordi-
+nated to achieve better recommendations. Moreover, the cooper-
+ation between agents is the key for long-term recommendation
+optimization. For example, consider a heavily occupied charging
+station with a large number of incoming charging requests. Other
+stations with sufficient available charging spots can help balance
+the charging demands via cross-agent cooperation. To tackle this
+challenge, we analogy the process of agents taking actions to a
+bidding game [47], and propose a tailor designed centralized at-
+tentive critic module to stimulate multiple agents to learn globally
+coordinated and cooperative policies.
+The third challenge is thepotential competition of future charging
+requests. As illustrated in Figure 1, the competition comes from
+the temporally distributed charging requests for the limited charg-
+ing resource. In the real world, the potential competition of future
+charging requests may happen in arbitrary charging stations, lead-
+ing to problems such as extra CWT and charging failure. However,
+it is hard to quantify the influence of such future charging requests
+in advance. To this end, we integrate the future charging competi-
+tion information into centralized attentive critic module through a
+delayed access strategy and transform our framework to a central-
+ized training with decentralized execution architecture to enable
+online recommendation. In this way, the agents can fully harness
+future knowledge in training phase and take actions immediately
+without requiring future information during execution.
+Finally, it is challenging to jointly optimize multiple optimization
+objectives. As aforementioned, it is desirable to simultaneously con-
+sider various long-term goals, such as the overall CWT, average CP,
+and the CFR. However, these objectives may in different scales and
+lie on different manifold structures. Seamlessly optimizing multiple
+objectives may lead to poor convergence and induce sub-optimal
+recommendations for certain objectives. Therefore, we extend the
+centralized attentive critic module to multi-critics for multiple ob-
+jectives and develop a dynamic gradient re-weighting strategy to
+adaptively guide the optimization direction by forcing the agents
+to pay more attention to these poorly optimized objectives.
+Along these lines, in this paper, we propose the Multi-Agent
+Spatio-Temporal Reinforcement Learning (Master) framework for
+intelligent charging recommendation. Our major contributions are
+summarized as follows: (1) We formulate the EV charging recom-
+mendation problem as a MARL task. To the best of our knowledge,
+this is the first attempt to apply MARL for multi-objective intelligent
+charging station recommendations. (2) We develop the multi-agent
+actor-critic framework with centralized training decentralized ex-
+ecution. In particular, the centralized attentive critic achieves co-
+ordination and cooperation between multiple agents globally and
+exploits future charging competition information through a de-
+layed access strategy during model training. Simultaneously, the
+decentralized execution of multiple agents avoids the large state
+action space problem and enables immediate online recommen-
+dations without requiring future competition information. (3) We
+extend the centralized attentive critic to multi-critics to support
+multiple optimization objectives. By adaptively guiding the opti-
+mization direction via a dynamic gradient re-weighting strategy,
+we improve the learned policy from potential local optima induced
+by dominating objectives. (4) We conduct extensive experiments on
+two real-world datasets collected from Beijing and Shanghai. The
+results demonstrate our model achieves the best comprehensive
+performance against nine baselines.
+2 PROBLEM DEFINITION
+In this section, we introduce some important definitions and for-
+malize the EV charging recommendation problem.
+Consider a set of 𝑁 charging stations𝐶 ={𝑐1,𝑐 2,...,𝑐 𝑁}, by
+regarding each day as an episode, we first define the charging
+request as below.
+Definition 1. Charging request. A charging request 𝑞𝑡 =⟨𝑙𝑡,
+𝑇𝑡,𝑇𝑐
+𝑡⟩∈ 𝑄 is defined as the 𝑡-th request ( i.e., step𝑡) of a day. Specif-
+ically,𝑙𝑡 is the location of 𝑞𝑡 ,𝑇𝑡 is the real-world time of the step 𝑡,
+and𝑇𝑐
+𝑡 is the real-world time 𝑞𝑡 finishes the charging request.
+--- PAGE 3 ---
+Intelligent Electric Vehicle Charging Recommendation
+Based on Multi-Agent Reinforcement Learning WWW ’21, April 19–23, 2021, Ljubljana, Slovenia
+We say a charging request is finished if it successfully takes
+the charging action or finally gives up (i.e., charging failure). We
+further denote|𝑄| as the cardinality of 𝑄. In the following, we
+interchangeably use𝑞𝑡 to denote the corresponding EV of𝑞𝑡 .
+Definition 2. Charging wait time (CWT) . The charging wait
+time is defined as the summation of travel time from the location 𝑙𝑡 of
+charging request𝑞𝑡 to the target charging station 𝑐𝑖 and the queuing
+time at𝑐𝑖 until𝑞𝑡 is finished.
+Definition 3. Charging price (CP) . The charging price is de-
+fined as the unit price per kilowatt hour (kWh). In general, the charg-
+ing price is a combination of electricity cost and service fee.
+Definition 4. Charging failure rate (CFR). The charging fail-
+ure rate is defined as the ratio of the number of charging requests who
+accept our recommendation but fail to charge over the total number
+of charging requests who accept our recommendation.
+Problem 1. EV Charging Recommendation . Consider a set of
+charging requests 𝑄 in a day, our problem is to recommend each
+𝑞𝑡∈𝑄 to the most proper charging station 𝑟𝑐𝑡∈𝐶, with the long-
+term goals of simultaneously minimizing the overall CWT, average
+CP, and the CFR for the 𝑞𝑡∈𝑄 who accept our recommendation.
+3 METHODOLOGY
+In this section, we present the MARL formulation for the EV charg-
+ing recommendation task and detail our Master framework with
+centralized training decentralized execution (CTDE). Moreover, we
+elaborate on the generalized multi-critic architecture for multiple
+objectives optimization.
+3.1 MARL Formulation
+We first present our MARL formulation for the EV Charging Rec-
+ommendation task.
+• Agent𝑐𝑖. In this paper, we regard each charging station
+𝑐𝑖∈𝐶 as an individual agent. Each agent will make timely
+recommendation decisions for a sequence of charging re-
+quests𝑄 that keep coming throughout a day with multiple
+long-term optimization goals.
+• Observation𝑜𝑖
+𝑡 . Given a charging request𝑞𝑡 , we define the
+observation𝑜𝑖
+𝑡 of agent 𝑐𝑖 as a combination of the index
+of𝑐𝑖, the real-world time 𝑇𝑡 , the number of current avail-
+able charging spots of𝑐𝑖 (supply), the number of charging
+requests around𝑐𝑖 in the near future (future demand), the
+charging power of 𝑐𝑖, the estimated time of arrival (ETA)
+from location𝑙𝑡 to𝑐𝑖, and the CP of𝑐𝑖 at the next ETA. We
+further define𝑠𝑡 ={𝑜1
+𝑡,𝑜 2
+𝑡,...,𝑜 𝑁
+𝑡 } as the state of all agents
+at step𝑡.
+• Action𝑎𝑖
+𝑡 . Given an observation𝑜𝑖
+𝑡 , an intuitional design for
+the action of agent𝑐𝑖 is a binary decision, i.e., recommending
+𝑞𝑡 to itself for charging or not. However, because one 𝑞𝑡
+can only choose one station for charging, multiple agents’
+actions may be tied together and are difficult to coordinate.
+Inspired by the bidding mechanism [ 47], we design each
+agent𝑐𝑖 offers a scalar value to "bid" for𝑞𝑡 as its action𝑎𝑖
+𝑡 .
+By defining𝑢𝑡 ={𝑎1
+𝑡,𝑎 2
+𝑡,...,𝑎 𝑁
+𝑡 } as the joint action,𝑞𝑡 will
+be recommended to the agent with the highest "bid" value,
+i.e.,𝑟𝑐𝑡 =𝑐𝑖, where𝑖 = arg max(𝑢𝑡).
+13:2013:00 12:55 13:18 
+𝑜𝑡
+𝑖𝑜𝑡−ℎ
+𝑖 𝑜𝑡+𝑗
+𝑖
+Observation 
+transition
+𝑅𝑡:𝑡+𝑗
+Observation
+𝑞𝑡−ℎ
+𝑇𝑡
+𝑐𝑇𝑡 𝑇𝑡+𝑗𝑇𝑡−ℎ 𝑇𝑡−ℎ
+𝑐
+Charging
+station 𝑐𝑖
+Charging request 𝑞𝑡
+ 𝑞𝑡+𝑗
+… …
+Figure 2: Illustrative example of transition in Master.
+• Transition. For each agent𝑐𝑖, its observation transition is
+defined as the transition from the current charging request
+𝑞𝑡 to the next charging request𝑞𝑡+𝑗 after𝑞𝑡 is finished. Let’s
+elaborate on this via an illustrative example as shown in
+Figure 2. Consider a charging request𝑞𝑡 arises at𝑇𝑡 (13:00).
+At this moment, each agent𝑐𝑖 takes action𝑎𝑖
+𝑡 based on its ob-
+servation𝑜𝑖
+𝑡 and jointly decide the recommended station𝑟𝑐𝑡 .
+After the request finish time𝑇𝑐
+𝑡 (13:18), the subsequent charg-
+ing request𝑞𝑡+𝑗 will arise at𝑇𝑡+𝑗 (13:20). In this case, the
+observation transition of agent𝑐𝑖 is defined as(𝑜𝑖
+𝑡,𝑎𝑖
+𝑡,𝑜𝑖
+𝑡+𝑗),
+where𝑜𝑖
+𝑡 is the current observation,𝑜𝑖
+𝑡+𝑗 is the observation
+corresponding to𝑞𝑡+𝑗 .
+• Reward. In our MARL formulation, we propose a lazy re-
+ward settlement scheme (i.e., return rewards when a charging
+request is finished), and integrate three goals into two nat-
+ural reward functions. Specifically, if a charging request𝑞𝑡
+succeeds in charging, then the environment will return the
+negative of CWT and negative of CP as the part of reward
+𝑟𝑐𝑤𝑡(𝑠𝑡,𝑢𝑡) and reward𝑟𝑐𝑝(𝑠𝑡,𝑢𝑡) respectively. For the case
+that the CWT of𝑞𝑡 exceeds a threshold, the recommendation
+will be regarded as failure and environment will return much
+smaller rewards as penalty to stimulate agents reducing the
+CFR. Overall, we define two immediate rewards function for
+three goals as
+𝑟𝑐𝑤𝑡(𝑠𝑡,𝑢𝑡) =
+−𝐶𝑊𝑇, 𝑐ℎ𝑎𝑟𝑔𝑖𝑛𝑔𝑠𝑢𝑐𝑐𝑒𝑠𝑠
+𝜖𝑐𝑤𝑡, 𝑐ℎ𝑎𝑟𝑔𝑖𝑛𝑔 𝑓𝑎𝑖𝑙𝑢𝑟𝑒 , (1)
+𝑟𝑐𝑝(𝑠𝑡,𝑢𝑡) =
+−𝐶𝑃, 𝑐ℎ𝑎𝑟𝑔𝑖𝑛𝑔𝑠𝑢𝑐𝑐𝑒𝑠𝑠
+𝜖𝑐𝑝, 𝑐ℎ𝑎𝑟𝑔𝑖𝑛𝑔 𝑓𝑎𝑖𝑙𝑢𝑟𝑒 , (2)
+where𝜖𝑐𝑤𝑡 and𝜖𝑐𝑝 are penalty rewards. All agents in our
+model share the unified rewards, means agents make the
+recommendation decisions cooperatively. Since the obser-
+vation transition from 𝑜𝑖
+𝑡 to𝑜𝑖
+𝑡+𝑗 may cross multiple lazy
+rewards (e.g.,𝑇𝑐
+𝑡−ℎ and𝑇𝑐
+𝑡 as illustrated in Figure 2), we cal-
+culate the cumulative discounted reward by summing the
+rewards of all recommended charging requests𝑞𝑡′ (e.g.,𝑞𝑡−ℎ
+and𝑞𝑡 ) whose𝑇𝑐
+𝑡′ is between𝑇𝑡 and𝑇𝑡+𝑗 , denoted by
+𝑅𝑡 :𝑡+𝑗 =
+∑︁
+𝑇𝑡 <𝑇 𝑐
+𝑡′≤𝑇𝑡+𝑗
+𝛾(𝑇 𝑐
+𝑡′−𝑇𝑡−1)𝑟(𝑠𝑡′,𝑢𝑡′), (3)
+where𝛾 is the discount factor, and𝑟(·,·) can be one of the
+two reward functions or the average of them depending on
+the learning objectives.
+--- PAGE 4 ---
+WWW ’21, April 19–23, 2021, Ljubljana, Slovenia Weijia Zhang 1†, Hao Liu2∗, Fan Wang3, Tong Xu1, Haoran Xin1, Dejing Dou2, Hui Xiong4∗
+Environment
+Actor 1 Actor 𝑘
+Centralized
+Attentive Critic
+𝑜𝑡
+1
+𝑎𝑡
+1 𝑎𝑡
+𝑘
+𝑜𝑡
+𝑘
+∇𝜃𝒃
+1𝐽(𝒃1) ∇𝜃𝒃
+𝑘𝐽(𝒃𝑘)
+[𝑜𝑡
+1, 𝑎𝑡
+1, 𝑝𝑡
+1] [𝑜𝑡
+𝑘, 𝑎𝑡
+𝑘, 𝑝𝑡
+𝑘]
+… …
+𝑟(𝑠𝑡, 𝑢𝑡)
+Centralized training Decentralized execution
+(a) 
+Highest action “bid”
+Go to charge
+Active station Inactive station
+Charging request Action “bid”
+𝑞𝑡
+𝑐2
+𝑐𝑘
+𝑐1
+𝑎𝑡
+1
+𝑎𝑡
+2
+𝑎𝑡
+𝑘
+(b) 
+Figure 3: (a) Decentralized execution of active agents. The
+charging request will be recommended to the active charg-
+ing station with the highest action "bid". (b) The centralized
+training decentralized execution process of Master.
+3.2 Centralized Training Decentralized
+Execution
+Centralized training decentralized execution is a class of meth-
+ods in MARL to stimulate agents to learn coordinated policies and
+address the non-stationary environment problem [6, 11, 24]. In Mas-
+ter, the CTDE consists of three modules, the centralized attentive
+critic, the delayed access information strategy to integrate future
+charging competition, and the decentralized execution process. The
+advantages of CTDE for EV charging recommendation are two
+folds. On one hand, the centralized training process can motivate
+multiple agents to learn cooperation and other specific policies by
+perceiving a more comprehensive landscape and exploiting future
+information in hindsight. On the other hand, the execution process
+is fully decentralized without requiring complete information in
+the training phase, which guarantees efficiency and flexibility in
+online recommendation.
+3.2.1 Centralized Attentive Critic. To motivate the agents to
+make recommendations cooperatively, we devise the multi-agent
+actor-critic framework with a centralized attentive critic for deter-
+ministic policies learning. A similar MARL algorithm with CTDE
+architecture is proposed in [24], which incorporates the full state
+𝑠𝑡 and joint action𝑢𝑡 of all agents into the critic to motivate agents
+to learn coordinated and cooperative policies. However, such an
+approach suffers from the large state and action space problem in
+our task.
+In practice, the EVs tend to go to nearby stations for charging.
+Based on this fact, given a charging request 𝑞𝑡 , we only activate
+the agents nearby𝑞𝑡 (e.g., top-𝑘 nearest𝑞𝑡 ) to take actions, denoted
+as𝐶𝑎
+𝑡 . We set other agents who are far away from𝑞𝑡 inactive and
+don’t participate in the recommendation for 𝑞𝑡 , as illustrated in
+Figure 3(a). In this way, only a small number of active agents are in-
+volved to learn cooperation for better recommendations. However,
+one intermediate problem is that the active agents of different𝑞𝑡
+are usually different. To this end, we propose to use the attention
+mechanism which is permutation-invariant to integrate informa-
+tion of the active agents. Specifically, the attention mechanism
+automatically quantifies the influence of each active agents by
+𝑒𝑖
+𝑡 = v⊤tanh
+
+W𝑎
+
+𝑜𝑖
+𝑡⊕𝑎𝑖
+𝑡⊕𝑝𝑖
+𝑡
+
+, (4)
+𝛼𝑖
+𝑡 = 𝑒𝑥𝑝(𝑒𝑖
+𝑡)
+Í
+𝑗∈𝐶𝑎
+𝑡 𝑒𝑥𝑝(𝑒𝑗
+𝑡)
+, (5)
+where v and W𝑎 are learnable parameters,⊕ is the concatenation
+operation, and 𝑝𝑖
+𝑡 are future information that will be detailed in
+Section 3.2.2. Once the influence weight 𝛼𝑖
+𝑡 of each active agent
+𝑐𝑖∈𝐶𝑎
+𝑡 is obtained, we can derive the attentive representation of
+all active agents by
+𝑥𝑡 = ReLU©­
+«
+W𝑐
+∑︁
+𝑖∈𝐶𝑎
+𝑡
+𝛼𝑖
+𝑡
+
+𝑜𝑖
+𝑡⊕𝑎𝑖
+𝑡⊕𝑝𝑖
+𝑡
+ª®
+¬
+, (6)
+where W𝑐 are learnable parameters.
+Given the state𝑠𝑎
+𝑡 , joint action𝑢𝑎
+𝑡 , and future information𝑝𝑡 of
+active agents, the actor policy of each agent𝑐𝑖∈𝐶𝑎
+𝑡 can be updated
+by the gradient of the expected return following the chain rule,
+which can be written by
+∇𝜃 𝑖
+𝒃
+𝐽(𝒃𝑖) = E𝑠𝑎
+𝑡,𝑝𝑡∼𝐷
+h
+∇𝜃 𝑖
+𝒃
+𝒃𝑖(𝑎𝑖
+𝑡|𝑜𝑖
+𝑡)∇𝑎𝑖
+𝑡
+𝑄𝒃(𝑥𝑡)|𝑎𝑖
+𝑡 =𝒃𝑖(𝑜𝑖
+𝑡)
+i
+, (7)
+where𝜃𝑖
+𝒃 are learnable parameters of actor policy 𝒃𝑖 of agent𝑐𝑖,
+𝐷 is the experience replay buffer containing the transition tuples
+(𝑠𝑎
+𝑡,𝑢𝑎
+𝑡,𝑝𝑡,𝑠𝑎
+𝑡+𝑗,𝑝𝑡+𝑗,𝑅𝑡 :𝑡+𝑗). Then, each agent updates its policy
+by the gradients propagated back from the centralized attentive
+critic. The entire process is shown in Figure 3(b). As the centralized
+attentive critic perceived more complete information of all active
+agents, it can motivate the agents to learn policies in a coordinated
+and cooperative way. The centralized attentive critic𝑄𝒃 is updated
+by minimizing the following loss:
+𝐿(𝜃𝑄) = E𝑠𝑎
+𝑡,𝑢𝑎
+𝑡,𝑝𝑡,𝑠𝑎
+𝑡+𝑗,𝑝𝑡+𝑗,𝑅𝑡 :𝑡+𝑗∼𝐷
+
+(𝑄𝒃(𝑥𝑡)− 𝑦𝑡)2
+, (8)
+𝑦𝑡 =𝑅𝑡 :𝑡+𝑗+𝛾(𝑇𝑡+𝑗−𝑇𝑡)𝑄
+′
+𝒃′(𝑥𝑡+𝑗)|𝑎𝑖
+𝑡+𝑗 =𝒃′𝑖(𝑜𝑖
+𝑡+𝑗), (9)
+where𝜃𝑄 are the learnable parameters of critic𝑄𝒃, 𝒃
+′𝑖 and𝑄
+′
+𝒃′ are
+the target actor policy of𝑐𝑖 and target critic function with delayed
+parameters𝜃
+′𝑖
+𝒃 and𝜃
+′
+𝑄.
+3.2.2 Integrate Future Charging Competition. The public ac-
+cessible charging stations are usually first-come-first-served, which
+induces future potential charging competition between the con-
+tinuously arriving EVs. Recommending charging requests without
+considering future potential competition will lead to extra CWT
+or even charging failure. However, it is a non-trivial task to incor-
+porate the future competition since we can not know the precise
+amount of forthcoming EVs and available charging spots at a future
+step in advance.
+In this work, we further extend the centralized attentive critic
+with a delayed access strategy to harness the future charging compe-
+tition information, so as to enable the agents learning policies with
+future knowledge in hindsight. Specifically, consider a charging
+request𝑞𝑡 , without changing the execution process, we postpone
+the access of transition tuples until the future charging competition
+information in transition with respect to𝑞𝑡 is fully available. Con-
+cretely, we extract the accurate number of available charging spots
+of𝑐𝑖 at every next𝑑 minutes after𝑇𝑡 to reflect the future potential
+charging competition for𝑞𝑡 , denoted as𝐼𝑖
+𝑡 . Note that we erase the
+influence of𝑞𝑡 for𝐼𝑖
+𝑡 , and the number of available charging spots
+can be negative, means the number of EVs queuing at the station.
+--- PAGE 5 ---
+Intelligent Electric Vehicle Charging Recommendation
+Based on Multi-Agent Reinforcement Learning WWW ’21, April 19–23, 2021, Ljubljana, Slovenia
+0.3 0.4 0.5 0.6 0.7 0.8 0.9
+Normalized Reward
+0.0000
+0.0025
+0.0050
+0.0075
+0.0100
+0.0125
+0.0150
+0.0175
+0.0200Probability Density
+(a) Reward about CWT
+0.3 0.4 0.5 0.6 0.7 0.8 0.9
+Normalized Reward
+0.00
+0.05
+0.10
+0.15
+0.20
+0.25
+0.30
+0.35Probability Density (b) Reward about CP
+Figure 4: Distributions of two normalized rewards.
+Overall, we obtain the future charging competition information of
+each𝑐𝑖 for𝑞𝑡 via a fully-connected layer
+𝑝𝑖
+𝑡 = ReLU
+
+W𝑝𝐼𝑖
+𝑡
+
+, (10)
+where W𝑝 are the learnable parameters. The𝑝𝑖
+𝑡 is integrated into
+the centralized attentive critic (Eq. (4)∼Eq. (6)) as the enhanced
+information to facilitate the agents’ cooperative policy learning.
+3.2.3 Decentralized Execution. The execution process is fully
+decentralized, by only invoking the learned actor policy with its
+own observation. Specifically, for a charging request𝑞𝑡 , the agent
+𝑐𝑖∈𝐶𝑎
+𝑡 takes action𝑎𝑖
+𝑡 based on its𝑜𝑖
+𝑡 by
+𝑎𝑖
+𝑡 = 𝒃𝑖(𝑜𝑖
+𝑡). (11)
+And𝑞𝑡 will be recommended to the active agent with the high-
+est𝑎𝑖
+𝑡 among all the actions of 𝐶𝑎
+𝑡 . The execution of each agent
+is lightweight and does not require future charging competition
+information. More importantly, the large-scale agent system is fault-
+tolerant even part of the agents are failing.
+3.3 Multiple Objectives Optimization
+The goal of Electric Vehicle Charging Recommendation task is to
+simultaneously minimize the overall CWT, average CP and the CFR.
+We integrate these goals into two objectives corresponding to two
+reward functions, i.e.,𝑟𝑐𝑤𝑡 and𝑟𝑐𝑝 as defined in Eq. (1) and Eq. (2).
+Figure 4 depicts the normalized reward distributions of𝑟𝑐𝑤𝑡 and
+𝑟𝑐𝑝 by a random policy executing on a set of charging requests
+that charging success. As can be seen, the distribution of different
+objectives can be very different. More importantly, the optimal
+solution of different objectives may be divergent, e.g., a cheaper
+charging station may be very popular and need a longer CWT. The
+above facts imply one policy that performs well on one objective
+may get stuck on another objective. A recommender that is biased
+to a particular objective is risky to induce unsatisfactory experience
+to most users.
+A simple way to optimize multiple objectives is to average the
+reward of multiple objectives with a set of prior weights and max-
+imize the combined reward as a single objective. However, such
+a static approach is inefficient for convergence and may induce a
+biased solution to a particular objective. To this end, we develop
+a dynamic gradient re-weighting strategy to self-adjust the opti-
+mization direction to adapt different training stages and enforce
+the policy to perform well on multiple objectives. Specifically, we
+extend the centralized attentive critic to multi-critics, where each
+Algorithm 1 Master algorithm
+1: Randomly initialize critic networks𝑄𝑐𝑤𝑡
+𝒃 ,𝑄𝑐𝑝
+𝒃 and each actor
+network 𝒃𝑖 with weights𝜃𝑐𝑤𝑡
+𝑄 ,𝜃𝑐𝑝
+𝑄 and𝜃𝑖
+𝒃.
+2: Initialize target networks 𝑄𝑐𝑤𝑡′
+𝒃′ ,𝑄𝑐𝑝′
+𝒃′ and 𝒃
+′𝑖 with weights
+𝜃𝑐𝑤𝑡′
+𝑄 ←𝜃𝑐𝑤𝑡
+𝑄 ,𝜃𝑐𝑝′
+𝑄 ←𝜃𝑐𝑝
+𝑄 ,𝜃
+′𝑖
+𝒃←𝜃𝑖
+𝒃.
+3: Initialize objective-specific optimal networks𝑄𝑐𝑤𝑡∗
+𝒃∗
+𝑐𝑤𝑡
+,𝑄𝑐𝑝∗
+𝒃∗
+𝑐𝑝
+, 𝒃
+∗𝑖
+𝑐𝑤𝑡
+and 𝒃
+∗𝑖𝑐𝑝 with well-trained weights𝜃𝑐𝑤𝑡∗
+𝑄 ,𝜃𝑐𝑝∗
+𝑄 ,𝜃
+∗𝑖
+𝒃𝑐𝑤𝑡
+and𝜃
+∗𝑖
+𝒃𝑐𝑝
+.
+4: Initialize replay buffer𝐷.
+5: for𝑚 = 1 to max-iterations do
+6: Reset environment.
+7: for𝑡− = 1 to|𝑄| do
+8: for agent𝑐𝑖∈𝐶𝑎
+𝑡− do
+9: Take action𝑎𝑖
+𝑡− = 𝒃𝑖(𝑜𝑖
+𝑡−) for charging request𝑞𝑡−.
+10: end for
+11: Store available delayed transition tuples(𝑠𝑎
+𝑡′,𝑢𝑎
+𝑡′,𝑝𝑡′,
+12: 𝑠𝑎
+𝑡′+𝑗′,𝑝𝑡′+𝑗′,𝑅𝑐𝑤𝑡
+𝑡′:𝑡′+𝑗′,𝑅𝑐𝑝
+𝑡′:𝑡′+𝑗′) into𝐷.
+13: Sample a random minibatch of𝑀 transitions
+14: (𝑠𝑎
+𝑡,𝑢𝑎
+𝑡,𝑝𝑡,𝑠𝑎
+𝑡+𝑗,𝑝𝑡+𝑗,𝑅𝑐𝑤𝑡
+𝑡 :𝑡+𝑗,𝑅𝑐𝑝
+𝑡 :𝑡+𝑗) from𝐷.
+15: Set𝑦𝑐𝑤𝑡
+𝑡 =𝑅𝑐𝑤𝑡
+𝑡 :𝑡+𝑗+𝛾(𝑇𝑡+𝑗−𝑇𝑡)𝑄𝑐𝑤𝑡′
+𝒃′ (𝑥𝑡+𝑗)|𝑎𝑖
+𝑡+𝑗 =𝒃′𝑖(𝑜𝑖
+𝑡+𝑗) .
+16: Set𝑦𝑐𝑝
+𝑡 =𝑅𝑐𝑝
+𝑡 :𝑡+𝑗+𝛾(𝑇𝑡+𝑗−𝑇𝑡)𝑄𝑐𝑝′
+𝒃′ (𝑥𝑡+𝑗)|𝑎𝑖
+𝑡+𝑗 =𝒃′𝑖(𝑜𝑖
+𝑡+𝑗).
+17: Update Critic𝑄𝑐𝑤𝑡
+𝒃 and𝑄𝑐𝑝
+𝒃 by minimizing the losses:
+18: 𝐿(𝜃𝑐𝑤𝑡
+𝑄 ) = 1
+𝑀
+Í
+𝑡
+
+𝑄𝑐𝑤𝑡
+𝒃 (𝑥𝑡)− 𝑦𝑐𝑤𝑡
+𝑡
+ 2
+.
+19: 𝐿(𝜃𝑐𝑝
+𝑄) = 1
+𝑀
+Í
+𝑡
+
+𝑄𝑐𝑝
+𝒃 (𝑥𝑡)− 𝑦𝑐𝑝
+𝑡
+ 2
+.
+20: Compute𝛽𝑡 through Eq. (13) and Eq. (14).
+21: for agent𝑐𝑖∈𝐶𝑎
+𝑡 do
+22: Update actor by the sampled policy gradient:
+23: ∇𝜃 𝑖
+𝒃
+𝐽(𝒃𝑖)≈ 1
+𝑀
+Í
+𝑡
+
+𝛽𝑡∇𝜃 𝑖
+𝒃
+𝒃𝑖(𝑎𝑖
+𝑡|𝑜𝑖
+𝑡)∇𝑎𝑖
+𝑡
+𝑄𝑐𝑤𝑡
+𝒃 (𝑥𝑡)
+24: +(1−𝛽𝑡)∇𝜃 𝑖
+𝒃
+𝒃𝑖(𝑎𝑖
+𝑡|𝑜𝑖
+𝑡)∇𝑎𝑖
+𝑡
+𝑄𝑐𝑝
+𝒃 (𝑥𝑡)
+
+|𝑎𝑖
+𝑡 =𝒃𝑖(𝑜𝑖
+𝑡).
+25: 𝜃𝑖
+𝒃←𝜃𝑖
+𝒃+𝜂∇𝜃 𝑖
+𝒃
+𝐽(𝒃𝑖).
+26: Update target actor networks:
+27: 𝜃
+′𝑖
+𝒃←𝜏𝜃𝑖
+𝒃+( 1−𝜏)𝜃
+′𝑖
+𝒃 .
+28: end for
+29: Update target critic networks:
+30: 𝜃𝑐𝑤𝑡′
+𝑄 ←𝜏𝜃𝑐𝑤𝑡
+𝑄 +( 1−𝜏)𝜃𝑐𝑤𝑡′
+𝑄 .
+31: 𝜃𝑐𝑝′
+𝑄 ←𝜏𝜃𝑐𝑝
+𝑄 +( 1−𝜏)𝜃𝑐𝑝′
+𝑄 .
+32: end for
+33: end for
+critic is corresponding to a particular objective. Particularly, in
+our task, we learn two centralized attentive critics,𝑄𝑐𝑤𝑡
+𝒃 and𝑄𝑐𝑝
+𝒃 ,
+which correspond to the expected returns of reward𝑟𝑐𝑤𝑡 and𝑟𝑐𝑝 ,
+respectively. Since the structure of two critics are identical, we only
+present𝑄𝑐𝑤𝑡
+𝒃 for explanation, which is formulated as
+𝑄𝑐𝑤𝑡
+𝒃 (𝑥𝑡) =E𝑠𝑎
+𝑡+𝑗,𝑝𝑡+𝑗,𝑅𝑐𝑤𝑡
+𝑡 :𝑡+𝑗∼𝐸
+h
+𝑅𝑐𝑤𝑡
+𝑡 :𝑡+𝑗+
+𝛾(𝑇𝑡+𝑗−𝑇𝑡)𝑄𝑐𝑤𝑡′
+𝒃′ (𝑥𝑡+𝑗)|𝑎𝑖
+𝑡+𝑗 =𝒃′𝑖(𝑜𝑖
+𝑡+𝑗)
+i
+,
+(12)
+--- PAGE 6 ---
+WWW ’21, April 19–23, 2021, Ljubljana, Slovenia Weijia Zhang 1†, Hao Liu2∗, Fan Wang3, Tong Xu1, Haoran Xin1, Dejing Dou2, Hui Xiong4∗
+where𝐸 denotes the environment, and 𝑅𝑐𝑤𝑡
+𝑡 :𝑡+𝑗 is the cumulative
+discounted reward (defined in Eq. (3)) with respect to𝑟𝑐𝑤𝑡 .
+To quantify the convergence degree of different objectives, we
+further define two centralized attentive critics associated with two
+objective-specific optimal policies with respect to reward𝑟𝑐𝑤𝑡 and
+𝑟𝑐𝑝 , denoted as𝑄𝑐𝑤𝑡∗
+𝒃∗
+𝑐𝑤𝑡
+and𝑄𝑐𝑝∗
+𝒃∗
+𝑐𝑝
+. The corresponding optimal policies
+of each𝑐𝑖 are denoted as𝒃
+∗𝑖
+𝑐𝑤𝑡 and 𝒃
+∗𝑖𝑐𝑝 , respectively. Above objective-
+specific optimal policies and critics can be obtained by pre-training
+Master on a single reward. Then, we quantify the gap ratio between
+multi-objective policy and objective-specific optimal policy by
+𝑔𝑐𝑤𝑡
+𝑡 =
+𝑄𝑐𝑤𝑡∗
+𝒃∗
+𝑐𝑤𝑡
+(𝑥𝑡)|𝑎𝑖
+𝑡 =𝒃∗𝑖
+𝑐𝑤𝑡(𝑜𝑖
+𝑡)−𝑄𝑐𝑤𝑡
+𝒃 (𝑥𝑡)|𝑎𝑖
+𝑡 =𝒃𝑖(𝑜𝑖
+𝑡)
+𝑄𝑐𝑤𝑡∗
+𝒃∗
+𝑐𝑤𝑡
+(𝑥𝑡)|𝑎𝑖
+𝑡 =𝒃∗𝑖
+𝑐𝑤𝑡(𝑜𝑖
+𝑡)
+. (13)
+The gap ratio 𝑔𝑐𝑝
+𝑡 can be derived in the same way. Intuitively, a
+larger gap ratio indicates a poorly-optimized objective and should
+be reinforced with a larger update weight, while a small gap ratio
+indicates a well-optimized objective can be fine-tuned with a smaller
+step size. Thus, we derive dynamic update weights to adaptively
+adjust the step size of the two objectives, which is learned by the
+Boltzmann softmax function,
+𝛽𝑡 = 𝑒𝑥𝑝(𝑔𝑐𝑤𝑡
+𝑡 /𝜎)
+𝑒𝑥𝑝(𝑔𝑐𝑤𝑡
+𝑡 /𝜎)+ 𝑒𝑥𝑝(𝑔𝑐𝑝
+𝑡 /𝜎)
+, (14)
+where𝜎 is the temperature controls the adjustment sensitivity.
+With the above two critics and adaptive update weights, the goal
+of each agent𝑐𝑖∈𝐶𝑎
+𝑡 is to learn an actor policy to maximize the
+following return,
+𝐽(𝒃𝑖) = E𝑠𝑎
+𝑡,𝑝𝑡∼𝐷
+h
+𝛽𝑡𝑄𝑐𝑤𝑡
+𝒃 (𝑥𝑡)+( 1−𝛽𝑡)𝑄𝑐𝑝
+𝒃 (𝑥𝑡)
+
+|𝑎𝑖
+𝑡 =𝒃𝑖(𝑜𝑖
+𝑡)
+i
+.
+(15)
+The complete learning procedure of Master is detailed in Algo-
+rithm 1. Note that for the consideration of scalability, we share the
+parameters of actor and critic networks by all agents.
+4 EXPERIMENTS
+4.1 Experimental setup
+Table 1: Statistics of datasets.
+Description Beijing Shanghai
+# of charging stations 596 367
+# of supplies records 38,620,800 23,781,600
+# of charging requests 152,889 87,142
+4.1.1 Data description. We evaluate Master on two real-world
+datasets, Beijing and Shanghai, which represent two metropolises
+in China. Both datasets are ranged from May 18, 2019, to July 01,
+2019. All real-time availability (supplies) records, charging prices
+and charging powers of charging stations are crawled from a pub-
+licly accessible app [ 46], in which all charging spot occupancy
+information is collected by real-time sensors. The charging request
+data is collected through Baidu Maps API [ 22, 45]. We split each
+city as 1× 1km2 grids, and aggregate the number of future 15
+minutes charging requests in the surrounding area ( i.e., the grid
+Figure 5: Spatial distribution of charging stations on Beijing.
+the station locates in and eight neighboring grids) as the future
+demands of the corresponding charging stations. We take the first
+28 consecutive days data as the training set, the following three
+days data as validation set, and the rest 14 days data for testing. All
+real-world data are loaded into an EV Charging Recommendation
+simulator (refer to Appendix A and source code for details) for
+simulation. The spatial distribution of charging stations on Beijing
+is shown in Figure 5. The statistics of two datasets are summarized
+in Table 1. More statistical analysis results of the dataset can be
+found in Appendix B.
+4.1.2 Implementation details. All experiments are performed on
+a Linux server with 26-core Intel(R) Xeon(R) Gold 5117 CPU @
+2:00 GHz and NVIDIA Tesla P40 GPU. We set 𝑑 = 30 minutes
+for charging competition modeling, set temperature 𝜎 = 0.2 for
+updated weights adjustment, and select discount factor𝛾 = 0.99 for
+learning all RL algorithms. The actor networks and critic networks
+both consist of three linear network layers with dimension 64 and
+ReLU activation function for hidden layers. The replay buffer size is
+1000, batch size is 32, and we set𝜏 = 0.001 for target networks soft
+update. We employ Adam optimizer for all learnable algorithms
+and set learning rate as5e−4 to train our model. We carefully tuned
+major hyper-parameters of each baseline via a grid search strategy.
+All RL algorithms are trained to recommend the top- 50 nearest
+charging stations for 60 iterations and chosen the best iteration by
+validation set for testing. Detailed settings of the simulator can be
+found in Appendix A.
+4.1.3 Evaluation metrics. We define four metrics to evaluate the
+performance of our approach and baseline recommendation al-
+gorithms. Define𝑄𝑎 as the set of charging requests who accept
+our recommendations. We further define 𝑄𝑠 ⊆ 𝑄𝑎 as the set of
+charging requests who accept our recommendations and finally
+succeed in charging.|𝑄𝑎| and|𝑄𝑠| are the cardinalities of𝑄𝑎 and
+𝑄𝑠, respectively.
+To evaluate the overall charging wait time of our recommen-
+dations, we define Mean Charging Wait Time (MCWT) over all
+charging requests𝑞𝑡∈𝑄𝑎:
+MCWT =
+Í
+𝑞𝑡∈𝑄𝑎𝐶𝑊𝑇(𝑞𝑡)
+|𝑄𝑎| ,
+where𝐶𝑊𝑇(𝑞𝑡) is the charging wait time (in minute) of charging
+request𝑞𝑡 .
+--- PAGE 7 ---
+Intelligent Electric Vehicle Charging Recommendation
+Based on Multi-Agent Reinforcement Learning WWW ’21, April 19–23, 2021, Ljubljana, Slovenia
+To evaluate the average charging price, we define Mean Charging
+Price (MCP) over all charging requests𝑞𝑡∈𝑄𝑠:
+MCP =
+Í
+𝑞𝑡∈𝑄𝑠𝐶𝑃(𝑞𝑡)
+|𝑄𝑠| ,
+where𝐶𝑃(𝑞𝑡) is the charging price (in CNY) of𝑞𝑡 .
+We further define the Total Saving Fee (TSF) to evaluate the av-
+erage total saving fees per day by comparing our recommendation
+algorithm with the ground truth charging actions:
+TSF =
+Í
+𝑞𝑡∈𝑄𝑠(𝑅𝐶𝑃(𝑞𝑡)− 𝐶𝑃(𝑞𝑡))×𝐶𝑄(𝑞𝑡)
+𝑁𝑑
+,
+where𝑅𝐶𝑃(𝑞𝑡) is the charging price of ground truth charging action
+and𝐶𝑄(𝑞𝑡) is the electric charging quantity of 𝑞𝑡 , and𝑁𝑑 is the
+number of evaluation days. Note the TSF can be a negative number
+which indicates how many fees overspend comparing with the
+ground truth charging actions.
+We finally define the Charging Failure Rate (CFR) to evaluate
+the ratio of charging failures in our recommendations:
+CFR =|𝑄𝑎|−| 𝑄𝑠|
+|𝑄𝑎| .
+4.1.4 Baselines. We compare our approach with the following nine
+baselines and one basic variant of Master:
+• Real is the ground truth charging actions of charging re-
+quests.
+• Random randomly recommends charging stations for charg-
+ing.
+• Greedy-N recommends the nearest charging station.
+• Greedy-P-5 recommends the least expensive charging sta-
+tion among the top-5 nearest stations.
+• Greedy-P-10 recommends the least expensive charging sta-
+tion among the top-10 nearest stations.
+• CDQN [27] is a centralized deep q-network approach, all
+charging stations are controlled by a centralized agent. CDQN
+makes recommendation based on the state of all charging
+stations. The action-value function is a 3 layers MLP with
+dimension 256 and ReLU activation for hidden layers. The
+replay buffer size is 2000 and batch size is 64. The learning
+rate is set to 1e−3 and we use the decayed𝜖-greedy strategy
+for exploration.
+• CPPO [31] is a centralized policy gradient approach, the
+recommendation mode is the same as CDQN. The policy
+network and value function network both consist of3 layers
+MLP with dimension 256 and ReLU activation for hidden
+layers. The learning rate for policy and value networks are
+both set to 5e−4, the𝜖 for clipping probability ratio is 0.2.
+• IDDPG [19] is a straight-forward approach to achieve MARL
+using DDPG, where all agents are completely independent.
+The critic network approximates the expected return only
+bases on agent-specific observation and action. Other hyper-
+parameter settings are the same as Master.
+• MADDPG [24] is a state-of-the-art algorithm for coopera-
+tive MARL. The actor takes action based on agent-specific
+observation, but the critic can access full state and joint ac-
+tion in training. The critic consists of 3 layers MLP with
+dimension 256 and ReLU activation for hidden layers. Other
+hyper-parameter settings are the same as Master. For scal-
+ing MADDPG to the large-scale agent system, we share actor
+and critic networks among all agents.
+• MASTER-ATT is a basic variant of Master without charg-
+ing competition information and multi-critic architecture.
+Table 2: Overall performance evaluated by MCWT, MCP, TSF
+and CFR on Beijing.
+Algorithm Beijing
+MCWT MCP TSF CFR
+Real 21.51 1.749 - 25.9%
+Random 38.77 1.756 -447 52.9%
+Greedy-N 20.27 1.791 -2527 31.3%
+Greedy-P-5 23.40 1.541 9701 35.4%
+Greedy-P-10 26.03 1.424 14059 39.9%
+CDQN 19.24 1.598 9683 7.4%
+CPPO 17.67 1.639 6707 5.3%
+IDDPG 13.26 1.583 11349 2.2%
+MADDPG 14.01 1.570 12033 4.7%
+Master-ATT 11.30 1.562 12661 1.8%
+Master 10.46 1.512 16219 0.9%
+Table 3: Overall performance evaluated by MCWT, MCP, TSF
+and CFR on Shanghai.
+Algorithm Shanghai
+MCWT MCP TSF CFR
+Real 19.31 1.787 - 16.7%
+Random 38.62 1.826 -698 46.1%
+Greedy-N 14.44 1.838 -1252 16.9%
+Greedy-P-5 16.65 1.502 10842 13.8%
+Greedy-P-10 19.60 1.357 15649 16.5%
+CDQN 20.74 1.686 4650 6.5%
+CPPO 18.84 1.750 1918 4.6%
+IDDPG 14.02 1.562 9720 2.6%
+MADDPG 13.63 1.553 10209 2.8%
+Master-ATT 12.24 1.548 10630 2.2%
+Master 11.80 1.497 12497 1.5%
+4.2 Overall Performance
+Table 2 and Table 3 report the overall results of our methods and
+all the compared baselines on two datasets with respect to our four
+metrics. As can be seen, overall, Master achieves the most well-
+rounded performance among all the baselines. Specifically, Mas-
+ter reduces(51.4%, 13.6%, 96.5%) and(38.9%, 16.2%, 91.0%)
+for (MCWT, MCP, CFR) compared with the ground truth charging
+actions on Beijing and Shanghai, respectively. And through our
+recommendation algorithm, we totally help users saving 16, 219
+and 12, 497 charging fees per day on Beijing and Shanghai. Be-
+sides, Master achieves(21.1%, 4.5%, 42.9%, 59.1%) and(25.3%,
+3.7%, 34.8%, 80.9%) improvements for (MCWT, MCP, TSF, CFR)
+--- PAGE 8 ---
+WWW ’21, April 19–23, 2021, Ljubljana, Slovenia Weijia Zhang 1†, Hao Liu2∗, Fan Wang3, Tong Xu1, Haoran Xin1, Dejing Dou2, Hui Xiong4∗
+BEIJING SHANGHAI
+10
+11
+12
+13
+14MCWT (minute)
+noATT
+noCP
+noMC
+MASTER
+(a) MCWT
+BEIJING SHANGHAI
+1.48
+1.50
+1.52
+1.54
+1.56MCP (CNY)
+noATT
+noCP
+noMC
+MASTER (b) MCP
+BEIJING SHANGHAI
+0.8
+1.1
+1.4
+1.7
+2.0
+TSF (CNY)
+×104
+noATT
+noCP
+noMC
+MASTER
+(c) TSF
+BEIJING SHANGHAI
+0.5
+1.0
+1.5
+2.0
+2.5CFR (%)
+noATT
+noCP
+noMC
+MASTER (d) CFR
+Figure 6: Ablation studies for MCWT, MCP, TSF and CFR on
+Beijing and Shanghai
+compared with two multi-agent baselines IDDPG and MADDPG on
+Beijing, and the improvements are(15.8%, 4.2%, 28.6%, 42.3%)
+and(13.4%, 3.6%, 22.4%, 46.4%) on Shanghai. All the above re-
+sults demonstrate the effectiveness of Master. Look into Master-
+ATT and MADDPG, two MARL algorithms with centralized training
+decentralized execution. We can observe the Master-ATT with
+centralized attentive critic have all-sided improvements comparing
+with MADDPG, especially in the MCWT and CFR. This is because
+the critic in MADDPG integrates full state and joint action suffering
+from the large state and action space problem, while our centralized
+attentive critic can effectively avoid this problem in our task.
+Looking further into the results, we observe centralized RL al-
+gorithms (i.e., CDQN and CPPO) consistently perform worse than
+multi-agent approaches (i.e., IDDPG, MADDPG, Master-ATT and
+Master), which validates our intuition that the centralized algo-
+rithms suffer from the high dimensional state and action space
+problem and hard to learn satisfying policies, while multi-agent
+approaches perform better because of their quantity-independent
+state action space in large-scale agents environment. We also ob-
+serve that Greedy-P-10 has the best performance in MCP among all
+compared algorithms. This is no surprise, because it always recom-
+mends the least expensive charging stations without considering
+other goals, which causes that the Greedy-P-10 performs badly in
+MCWT and CFR. It is worth mentioning thatMaster unexpectedly
+exceeds Greedy-P-10 in TSF on Beijing for the reason that Master
+has a much lower CFR comparing with Greedy-P-10, more users
+are benefited from our recommendation.
+4.3 Ablation Study
+In this section, we conduct ablation studies on Master to further
+verify the effectiveness of each component. We evaluate the per-
+formance of Master and it’s three variants for the four metrics on
+20 30 40 50 60 70 80 *
+k
+9.5
+10
+10.5
+11
+11.5
+12
+MCWT (minute)
+MCWT MCP
+1.4
+1.45
+1.5
+1.55
+1.6
+1.65
+MCP (CNY)
+(a) MCWT and MCP
+20 30 40 50 60 70 80 *
+k
+0.8
+1.1
+1.4
+1.7
+2.0
+2.3
+TSF (CNY)
+×104
+TSF CFR
+0.50
+0.75
+1.00
+1.25
+1.50
+1.75
+CFR (%)
+ (b) TSF and CFR
+Figure 7: Effect of top-𝑘 nearest charging stations for recom-
+mendation performance.
+Beijing and Shanghai. Specifically, the three variants are (1)noATT
+removes centralized attentive critic, learning agents independently;
+(2) noCP removes the future potential charging competition infor-
+mation from centralized attentive critic; (3) noMC removes multi-
+critic architecture, learning policies by a single centralized attentive
+critic with the average combined reward. The ablation results are
+reported in Figure 6. As can be seen, removing centralized attentive
+critic (noATT) or charging competition information (noCP) have
+a greater impact on MCWT. This is because MCWT is highly re-
+lated to the cooperation of agents and charging competition of EVs,
+whereas the removed modules exactly work on these two aspects.
+Removing multi-critic architecture (noMC) has a large performance
+degradation on MCP and TSF. This is becausenoMC suffers from the
+convergence problem and finally leads to performance variance on
+multiple objectives. All the above experimental results demonstrate
+the effectiveness of each component in Master.
+4.4 Effect of Recommendation Candidates
+In this section, we study the effect of the number of top-𝑘 active
+agents for recommendations on Beijing. We vary 𝑘 from 20 to
+the number of all the agents. The results are reported in Figure 7,
+where "∗" denotes all the agents are activated for recommendation
+decision. As can be seen, with relaxing the recommendation con-
+straint𝑘, the MCWT increases while the MCP and TSF decrease,
+further validating the divergence of the optimal solutions for dif-
+ferent objectives. This is possible because a more relaxed candidate
+number will expose more alternative economic but distant charg-
+ing stations for recommendations. Even so, we should notice that
+the performance under the most strict constraint (i.e.,𝑘 = 20) or
+without constraint ( i.e.,𝑘 =∗) are varying in a small range, i.e.,
+the (MCWT, MCP) are (9.56, 1.603) and (11.73, 1.437), respectively,
+are not extreme and still acceptable for the online recommendation.
+The above results demonstrate that our model are well-rounded
+with different candidate numbers. It also inspires us that we can
+explore to make diversified recommendations that are biased to
+different objectives to satisfy personalized preferences in the future.
+4.5 Convergence Analysis
+In this section, we study the effect of our multi-objective optimiza-
+tion method by comparing the convergence ofMaster between the
+static and our adaptive strategy. Note the Master with static aver-
+age updated weight is equivalent to Master-noMC (i.e., average
+--- PAGE 9 ---
+Intelligent Electric Vehicle Charging Recommendation
+Based on Multi-Agent Reinforcement Learning WWW ’21, April 19–23, 2021, Ljubljana, Slovenia
+0 20000 40000 60000 80000
+Training Steps
+0.0
+0.2
+0.4
+0.6
+0.8
+1.0Ratio
+CP gap
+CWT gap
+Static weight
+(a) Static updated weight
+0 20000 40000 60000 80000
+Training Steps
+0.0
+0.2
+0.4
+0.6
+0.8
+1.0Ratio
+CP gap
+CWT gap
+Adaptive weight (b) Adaptive updated weight
+Figure 8: Convergence curves by moving average for every
+500 successive training steps.
+two rewards as a single reward for training). More details can be
+found in proposition C.1 in the Appendix C. The gap ratios (Eq. (13))
+and dynamic weights (Eq. (14)) are reported in Figure 8. As can
+be seen in Figure 8(a), at the beginning of training, the gap ratio
+of the CP critic is decreasing faster than the CWT one. This is
+because the distribution of CP reward is more concentrated (as
+illustrated in Figure 4), it’s easier to accumulate rewards compar-
+ing with CWT when agents with poor policies. In such a case, the
+static method keeps invariant update weights and results in slow
+convergence for CWT. In contrast, as shown in Figure 8(b), the
+dynamic re-weighting method in Master assigns a higher weight
+to the CWT objective when it falls behind the optimization of CP,
+and adjust them to a synchronous convergence pace. As the train-
+ing step increase, the convergence of CWT overtakes the CP. This
+is because the distribution of CWT reward is more even, having
+larger room for improvement. And the optimization of CWT drags
+the CP objective to a sub-optimal point since the divergences be-
+tween two objectives. However, the static method is helpless for
+such asynchronous convergence, but Master with the dynamic
+gradient re-weighting strategy weakens such asynchronism, and
+finally adjust them to be synchronous (i.e., weight approaches 0.5)
+to learn well-rounded policies.
+4.6 Case Study
+In this section, we visualize the correlation among the attention
+weights and some input features of two centralized attentive crit-
+ics (i.e.,𝑄𝑐𝑤𝑡
+𝒃 and𝑄𝑐𝑝
+𝒃 ), to qualitatively analysis the effectiveness of
+Master. Two cases are depicted in Figure 9. We can observe these
+two critics pay more attention to the charging stations with high
+action values. This makes sense, since these charging stations are
+highly competitive bidding participants. The charging request will
+be recommended to the charging station with the highest action,
+then environment returns rewards depending on this recommended
+station. Furthermore, we observe the action is highly correlated
+with factors such as supply, future supply, future demand, ETA and
+CP. A charging station with low ETA, CP and sufficient available
+charging spots (supplies) always has a high action value. Conversely,
+the charging stations with few available charging spots but high
+future demands usually derive a low action value for avoiding fu-
+ture charging competitions. The above observations validate the
+effectiveness of our model to mediate the contradiction between
+the space-constrained charging capacity and spatiotemporally un-
+balanced charging demands.
+Supply
+Future Supply
+Future Demand
+Power
+ETA
+CP
+Action
+CWT Att Weight
+Top-50 nearest charging stations
+CP Att Weight
+(a) Case 1
+Top-50 nearest charging stations (b) Case 2
+Figure 9: Cases of the centralized attentive critics. For each
+factor (i.e., each row), the darker color means a greater value.
+And each col denotes a top-50 nearest charging station for
+the charging request.
+5 RELATED WORK
+Charging Station Recommendation. In recent years, EVs have
+become an emerging choice in the modern transportation system
+due to their low-carbon emission and energy efficiency. Some ef-
+forts [1, 8, 14, 35–39, 44] have been made for charging station recom-
+mendation for EVs. In particular, most studies [1, 8, 35, 38, 39] focus
+on recommending charging station locations for EV drivers with the
+goal of time. For example, Guo et al. [8] propose to make recommen-
+dations of charging stations to minimize the time of traveling and
+queuing with a game-theoretical approach. Wang et al. [39] devise
+a fairness-aware recommender system to reduce the idle time based
+on the fairness constraints. Cao et al . [1] introduce the charging
+reservation information into the vehicle-to-vehicle system to facili-
+tate the location recommendation. Different from charging location
+recommendation problem, another line of works [ 14, 36, 37, 44]
+investigate to handle more complicated scenarios, especially con-
+sidering commercial benefits. Yuan et al. [44] propose a charging
+strategy that allows an electric taxi to get partially charged to meet
+the dynamic passenger demand. In particular, with the help of
+deep reinforcement learning which has been widely adopted for
+solving sequential decision-making problems, Wang et al. [36] de-
+sign a multi-agent mean field hierarchical reinforcement learning
+framework by regarding each electric taxi as an individual agent to
+provide charging and relocation recommendations for electric taxi
+drivers, so as to maximize the cumulative rewards of the number
+of served orders. However, formulating each EV driver as an agent
+is not suitable for our problem, since most charging requests of a
+day in our task are ad-hoc and from non-repetitive drivers. Besides,
+the above works mainly focus on a single recommendation objec-
+tive, which can not handle multiple divergent recommendation
+objectives simultaneously.
+Multi-Agent Reinforcement Learning. Multi-agent Reinforce-
+ment Learning (MARL) is an emerging sub-field of reinforcement
+learning. Compared with traditional reinforcement learning, MARL
+expects the agents to learn to cooperate and compete with others.
+The simplest approach to realize a multi-agent system is learning
+agents independently [9, 33, 34]. However, the independent agents
+are not able to coordinate their actions, failing to achieve com-
+plicated cooperation[24, 26, 32]. A kind of natural approaches to
+achieve agents’ cooperation is to learn communication among mul-
+tiple agents [5, 12, 29, 32]. However, such approaches always lead
+--- PAGE 10 ---
+WWW ’21, April 19–23, 2021, Ljubljana, Slovenia Weijia Zhang 1†, Hao Liu2∗, Fan Wang3, Tong Xu1, Haoran Xin1, Dejing Dou2, Hui Xiong4∗
+to high communication overhead because of the large amount of
+information transfer. Alternatively, there are some works that em-
+ploy the centralized training decentralized execution architecture
+to achieve agents’ coordination and cooperation [6, 11, 24]. The ad-
+vantage of such methods is that the agents can make decentralized
+execution without involving any other agents’ information, which
+is lightweight and fault-tolerant in a large-scale agent system.
+Multi-Agent Transportation Systems. In the past years, a few
+studies have successfully applied MARL for several intelligent trans-
+portation tasks. For example, [40, 41] use MARL algorithm for co-
+operative traffic signal control. [13, 15, 20, 49] apply MARL into the
+large-scale ride-hailing system to maximize the long-term benefits.
+Besides, MARL also has been adopted for shared-bike repositioning
+[17], express delivery-service scheduling [18]. However, we argue
+that our problem is inherently different from the above applications
+as a recommendation task, and the above approaches cannot be
+directly adopted for our problem.
+6 CONCLUSION
+In this paper, we investigated the intelligent EV charging recom-
+mendation task with the long-term goals of simultaneously mini-
+mizing the overall CWT, average CP and the CFR. We formulated
+this problem as a multi-objective MARL task and proposed a spa-
+tiotemporal MARL framework, Master. Specifically, by regarding
+each charging station as an individual agent, we developed the
+multi-agent actor-critic framework with centralized attentive critic
+to stimulate the agents to learn coordinated and cooperative poli-
+cies. Besides, to enhance the recommendation effectiveness, we
+proposed a delayed access strategy to integrate the future charging
+competition information during model training. Moreover, we ex-
+tend the centralized attentive critic to multi-critics with a dynamic
+gradient re-weighting strategy to adaptively guide the optimiza-
+tion direction of multiple divergent recommendation objectives.
+Extensive experiments on two real-world datasets demonstrated
+the effectiveness of Master compared with nine baselines.
+ACKNOWLEDGMENTS
+This research is supported in part by grants from the National
+Natural Science Foundation of China (Grant No.91746301, 71531001,
+62072423).
+REFERENCES
+[1] Yue Cao, Tao Jiang, Omprakash Kaiwartya, Hongjian Sun, Huan Zhou, and Ran
+Wang. 2019. Toward pre-empted EV charging recommendation through V2V-
+based reservation system. IEEE Transactions on Systems, Man, and Cybernetics:
+Systems (2019).
+[2] Tianshu Chu, Jie Wang, Lara Codecà, and Zhaojian Li. 2019. Multi-agent deep
+reinforcement learning for large-scale traffic signal control. IEEE Transactions on
+Intelligent Transportation Systems 21, 3 (2019), 1086–1095.
+[3] Bowen Du, Yongxin Tong, Zimu Zhou, Qian Tao, and Wenjun Zhou. 2018.
+Demand-aware charger planning for electric vehicle sharing. In Proceedings
+of the 24th ACM SIGKDD International Conference on Knowledge Discovery and
+Data Mining. 1330–1338.
+[4] Wei Fan, Kunpeng Liu, Hao Liu, Pengyang Wang, Yong Ge, and Yanjie Fu. 2020.
+AutoFS: Automated Feature Selection via Diversity-aware Interactive Reinforce-
+ment Learning. In IEEE 20th International Conference on Data Mining .
+[5] Jakob Foerster, Ioannis Alexandros Assael, Nando De Freitas, and Shimon White-
+son. 2016. Learning to communicate with deep multi-agent reinforcement learn-
+ing. In Advances in neural information processing systems . 2137–2145.
+[6] Jakob N. Foerster, Gregory Farquhar, Triantafyllos Afouras, Nantas Nardelli,
+and Shimon Whiteson. 2018. Counterfactual Multi-Agent Policy Gradients. In
+Proceedings of the 32nd AAAI Conference on Artificial Intelligence . 2974–2982.
+[7] Qingyu Guo, Fuzhen Zhuang, Chuan Qin, Hengshu Zhu, Xing Xie, Hui Xiong,
+and Qing He. 2020. A survey on knowledge graph-based recommender systems.
+IEEE Transactions on Knowledge and Data Engineering (2020).
+[8] Tianci Guo, Pengcheng You, and Zaiyue Yang. 2017. Recommendation of geo-
+graphic distributed charging stations for electric vehicles: A game theoretical
+approach. In IEEE Power & Energy Society General Meeting . 1–5.
+[9] Jayesh K Gupta, Maxim Egorov, and Mykel Kochenderfer. 2017. Cooperative multi-
+agent control using deep reinforcement learning. In International Conference on
+Autonomous Agents and Multiagent Systems . 66–83.
+[10] Jindong Han, Hao Liu, Hengshu Zhu, Hui Xiong, and Dejing Dou. 2021. Joint
+Air Quality and Weather Prediction Based on Multi-Adversarial Spatiotemporal
+Networks. In Proceedings of the 35th AAAI Conference on Artificial Intelligence .
+[11] Shariq Iqbal and Fei Sha. 2019. Actor-attention-critic for multi-agent reinforce-
+ment learning. In International Conference on Machine Learning . 2961–2970.
+[12] Jiechuan Jiang and Zongqing Lu. 2018. Learning attentional communication for
+multi-agent cooperation. In Advances in neural information processing systems .
+7254–7264.
+[13] Jiarui Jin, Ming Zhou, Weinan Zhang, Minne Li, Zilong Guo, Zhiwei Qin, Yan
+Jiao, Xiaocheng Tang, Chenxi Wang, Jun Wang, et al. 2019. Coride: joint order
+dispatching and fleet management for multi-scale ride-hailing platforms. In Pro-
+ceedings of the 28th ACM International Conference on Information and Knowledge
+Management. 1983–1992.
+[14] Fanxin Kong, Qiao Xiang, Linghe Kong, and Xue Liu. 2016. On-line event-driven
+scheduling for electric vehicle charging via park-and-charge. In IEEE Real-Time
+Systems Symposium. 69–78.
+[15] Minne Li, Zhiwei Qin, Yan Jiao, Yaodong Yang, Jun Wang, Chenxi Wang, Guobin
+Wu, and Jieping Ye. 2019. Efficient ridesharing order dispatching with mean field
+multi-agent reinforcement learning. InThe World Wide Web Conference. 983–994.
+[16] Yanhua Li, Jun Luo, Chi-Yin Chow, Kam-Lam Chan, Ye Ding, and Fan Zhang. 2015.
+Growing the charging station network for electric vehicles with trajectory data
+analytics. In IEEE 31st International Conference on Data Engineering . 1376–1387.
+[17] Yexin Li, Yu Zheng, and Qiang Yang. 2018. Dynamic bike reposition: A spatio-
+temporal reinforcement learning approach. In Proceedings of the 24th ACM
+SIGKDD International Conference on Knowledge Discovery & Data Mining . 1724–
+1733.
+[18] Yexin Li, Yu Zheng, and Qiang Yang. 2019. Efficient and Effective Express via
+Contextual Cooperative Reinforcement Learning. In Proceedings of the 25th ACM
+SIGKDD International Conference on Knowledge Discovery & Data Mining . 510–
+519.
+[19] Timothy P Lillicrap, Jonathan J Hunt, Alexander Pritzel, Nicolas Heess, Tom Erez,
+Yuval Tassa, David Silver, and Daan Wierstra. 2015. Continuous control with
+deep reinforcement learning. arXiv preprint arXiv:1509.02971 (2015).
+[20] Kaixiang Lin, Renyu Zhao, Zhe Xu, and Jiayu Zhou. 2018. Efficient large-scale
+fleet management via multi-agent deep reinforcement learning. In Proceedings of
+the 24th ACM SIGKDD International Conference on Knowledge Discovery & Data
+Mining. 1774–1783.
+[21] Hao Liu, Jindong Han, Yanjie Fu, Jingbo Zhou, Xinjiang Lu, and Hui Xiong. 2020.
+Multi-modal transportation recommendation with unified route representation
+learning. Proceedings of the VLDB Endowment (2020), 342–350.
+[22] Hao Liu, Ting Li, Renjun Hu, Yanjie Fu, Jingjing Gu, and Hui Xiong. 2019. Joint
+Representation Learning for Multi-Modal Transportation Recommendation. In
+Proceedings of the 33rd AAAI Conference on Artificial Intelligence . 1036–1043.
+[23] Hao Liu, Yongxin Tong, Jindong Han, Panpan Zhang, Xinjiang Lu, and Hui Xiong.
+2020. Incorporating Multi-Source Urban Data for Personalized and Context-
+Aware Multi-Modal Transportation Recommendation. IEEE Transactions on
+Knowledge and Data Engineering (2020).
+[24] Ryan Lowe, Yi I Wu, Aviv Tamar, Jean Harb, OpenAI Pieter Abbeel, and Igor
+Mordatch. 2017. Multi-agent actor-critic for mixed cooperative-competitive
+environments. In Advances in neural information processing systems . 6379–6390.
+[25] Gary S Lynch. 2009. Single point of failure . Wiley Online Library.
+[26] Laetitia Matignon, Guillaume J Laurent, and Nadine Le Fort-Piat. 2012. Indepen-
+dent reinforcement learners in cooperative Markov games: a survey regarding
+coordination problems. Knowledge Engineering Review (2012), 1–31.
+[27] Volodymyr Mnih, Koray Kavukcuoglu, David Silver, Andrei A Rusu, Joel Veness,
+Marc G Bellemare, Alex Graves, Martin Riedmiller, Andreas K Fidjeland, Georg
+Ostrovski, et al. 2015. Human-level control through deep reinforcement learning.
+Nature (2015), 529–533.
+[28] Georgios Papoudakis, Filippos Christianos, Arrasy Rahman, and Stefano V Al-
+brecht. 2019. Dealing with non-stationarity in multi-agent deep reinforcement
+learning. arXiv preprint arXiv:1906.04737 (2019).
+[29] Peng Peng, Quan Yuan, Ying Wen, Yaodong Yang, Zhenkun Tang, Haitao Long,
+and Jun Wang. 2017. Multiagent bidirectionally-coordinated nets for learning to
+play starcraft combat games. arXiv preprint arXiv:1703.10069 (2017).
+[30] George F Savari, Vijayakumar Krishnasamy, Jagabar Sathik, Ziad M Ali, and
+Shady HE Abdel Aleem. 2020. Internet of Things based real-time electric vehicle
+load forecasting and charging station recommendation. ISA transactions (2020),
+431–447.
+--- PAGE 11 ---
+Intelligent Electric Vehicle Charging Recommendation
+Based on Multi-Agent Reinforcement Learning WWW ’21, April 19–23, 2021, Ljubljana, Slovenia
+[31] John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov.
+2017. Proximal policy optimization algorithms. arXiv preprint arXiv:1707.06347
+(2017).
+[32] Sainbayar Sukhbaatar, Arthur Szlam, and Rob Fergus. 2016. Learning multia-
+gent communication with backpropagation. In Advances in neural information
+processing systems. 2244–2252.
+[33] Ardi Tampuu, Tambet Matiisen, Dorian Kodelja, Ilya Kuzovkin, Kristjan Kor-
+jus, Juhan Aru, Jaan Aru, and Raul Vicente. 2017. Multiagent cooperation and
+competition with deep reinforcement learning. PloS one (2017).
+[34] Ming Tan. 1993. Multi-agent reinforcement learning: Independent vs. cooperative
+agents. In Proceedings of the 10th International Conference on Machine Learning .
+330–337.
+[35] Zhiyong Tian, Taeho Jung, Yi Wang, Fan Zhang, Lai Tu, Chengzhong Xu, Chen
+Tian, and Xiang-Yang Li. 2016. Real-time charging station recommendation
+system for electric-vehicle taxis. IEEE Transactions on Intelligent Transportation
+Systems (2016), 3098–3109.
+[36] Enshu Wang, Rong Ding, Zhaoxing Yang, Haiming Jin, Chenglin Miao, Lu Su, Fan
+Zhang, Chunming Qiao, and Xinbing Wang. 2020. Joint Charging and Relocation
+Recommendation for E-Taxi Drivers via Multi-Agent Mean Field Hierarchical
+Reinforcement Learning. IEEE Transactions on Mobile Computing (2020).
+[37] Guang Wang, Xiaoyang Xie, Fan Zhang, Yunhuai Liu, and Desheng Zhang. 2018.
+bCharge: Data-driven real-time charging scheduling for large-scale electric bus
+fleets. In IEEE Real-Time Systems Symposium. 45–55.
+[38] Guang Wang, Fan Zhang, and Desheng Zhang. 2019. tCharge-A fleet-oriented
+real-time charging scheduling system for electric taxi fleets. In Proceedings of the
+17th Conference on Embedded Networked Sensor Systems . 440–441.
+[39] Guang Wang, Yongfeng Zhang, Zhihan Fang, Shuai Wang, Fan Zhang, and
+Desheng Zhang. 2020. FairCharge: A data-driven fairness-aware charging rec-
+ommendation system for large-scale electric taxi fleets. Proceedings of the ACM
+on Interactive, Mobile, Wearable and Ubiquitous Technologies (2020), 1–25.
+[40] Yanan Wang, Tong Xu, Xin Niu, Chang Tan, Enhong Chen, and Hui Xiong. 2020.
+STMARL: A Spatio-Temporal Multi-Agent Reinforcement Learning Approach
+for Cooperative Traffic Light Control. IEEE Transactions on Mobile Computing
+(2020).
+[41] Hua Wei, Nan Xu, Huichu Zhang, Guanjie Zheng, Xinshi Zang, Chacha Chen,
+Weinan Zhang, Yanmin Zhu, Kai Xu, and Zhenhui Li. 2019. Colight: Learning
+network-level cooperation for traffic signal control. InProceedings of the 28th ACM
+International Conference on Information and Knowledge Management . 1913–1922.
+[42] Haoran Xin, Xinjiang Lu, Tong Xu, Hao Liu, Jingjing Gu, Dejing Dou, and Hui
+Xiong. 2021. Out-of-Town Recommendation with Travel Intention Modeling. In
+Proceedings of the 35th AAAI Conference on Artificial Intelligence .
+[43] Zaiyue Yang, Lihao Sun, Min Ke, Zhiguo Shi, and Jiming Chen. 2014. Opti-
+mal charging strategy for plug-in electric taxi with time-varying profits. IEEE
+Transactions on Smart Grid (2014), 2787–2797.
+[44] Yukun Yuan, Desheng Zhang, Fei Miao, Jimin Chen, Tian He, and Shan Lin. 2019.
+pˆ 2Charging: Proactive Partial Charging for Electric Taxi Systems. In IEEE 39th
+International Conference on Distributed Computing Systems . IEEE, 688–699.
+[45] Zixuan Yuan, Hao Liu, Yanchi Liu, Denghui Zhang, Fei Yi, Nengjun Zhu, and
+Hui Xiong. 2020. Spatio-temporal dual graph attention network for query-poi
+matching. In Proceedings of the 43rd International ACM SIGIR Conference on
+Research and Development in Information Retrieval . 629–638.
+[46] Weijia Zhang, Hao Liu, Yanchi Liu, Jingbo Zhou, and Hui Xiong. 2020. Semi-
+Supervised Hierarchical Recurrent Graph Neural Network for City-Wide Parking
+Availability Prediction. In Proceedings of the 34th AAAI Conference on Artificial
+Intelligence. 1186–1193.
+[47] Jun Zhao, Guang Qiu, Ziyu Guan, Wei Zhao, and Xiaofei He. 2018. Deep re-
+inforcement learning for sponsored search real-time bidding. In Proceedings of
+the 24th ACM SIGKDD International Conference on Knowledge Discovery & Data
+Mining. 1021–1030.
+[48] Yanchong Zheng, Ziyun Shao, Yumeng Zhang, and Linni Jian. 2020. A systematic
+methodology for mid-and-long term electric vehicle charging load forecasting:
+The case study of Shenzhen, China. Sustainable Cities and Society (2020), 102084.
+[49] Ming Zhou, Jiarui Jin, Weinan Zhang, Zhiwei Qin, Yan Jiao, Chenxi Wang, Guobin
+Wu, Yong Yu, and Jieping Ye. 2019. Multi-agent reinforcement learning for order-
+dispatching via order-vehicle distribution matching. In Proceedings of the 28th
+ACM International Conference on Information and Knowledge Management . 2645–
+2653.
+A SIMULATOR DESIGN
+We develop a simulator 1 based on historical real-time availabil-
+ity (supplies) records data, historical real-time charging prices data,
+and charging powers data of charging stations, along with historical
+electric vehicles (EVs) charging data, and road network data [21],
+to simulate how the system runs for a day. We take Baidu API2 to
+compute ETA [23] between the location of charging request and
+charging station. Besides, we train a MLP model to predict the fu-
+ture demands based on the historical charging requests data, and
+leverage the learned MLP model to predict the future demands in
+evaluation phase.
+Simulation step.Initially, our simulator loads basic supplies, charg-
+ing prices and charging powers data of charging stations and charg-
+ing requests by minutes of a day from the real-world dataset. For
+each minute𝑇 in simulator, there are three events to be disposed:
+• Electric vehicles’ departure and arrival: In this event, we
+dispose EVs’ departure and arrival at𝑇 . For EV leaving sta-
+tion, the charging stations will free corresponding number
+of charging spots. For an arrived EV, the vehicle successfully
+charges if there still have available spots in the charging
+station, and the environment will return a negative charging
+wait time (CWT) and negative charging price (CP) as the
+rewards if the arrived EV accepted our recommendation. For
+each successful charging request, the vehicle will block one
+charging spot in a duration which obeys a Gaussian distri-
+bution associated to the charging power of each charging
+station. If the charging station is full, this EV has to queue
+until there have an available charging spot, or fail to charge
+when the CWT exceeds a predefined threshold (45 minutes).
+The penal rewards 𝜖𝑐𝑤𝑡 and𝜖𝑐𝑝 of failed request are−60
+and−2.8, respectively. In the implementation, the number of
+available charging spots can be a negative number, indicating
+how many EVs are queuing at station for charging.
+• Charging requests recommendation: The policy will make
+recommendations for each charging request at𝑇 . The EV of
+the charging request will drive to the recommended charging
+station based on the real recommendation acceptance prob-
+ability, and otherwise will go to the ground truth charging
+station.
+• Transition collection: If there have charging requests at
+𝑇 , the transitions(𝑜𝑖
+𝑡′,𝑎𝑖
+𝑡′,𝑜𝑖
+𝑡,𝑅𝑡′:𝑡) for charging stations will
+be collected and stored into replay memory [27] for learning
+RL algorithms.
+B DATASET STATISTICAL ANALYSIS
+We take Beijing as an example for more statistical analysis. Fig-
+ure 10 shows the distribution of the quantities of charging requests
+in different time, and the distributions of ETA, charging powers,
+and CP. We can observe the charging requests quantity changes no-
+tably along with time in a day, which indicates unbalanced charging
+demands. Besides, we observe it is significantly different by com-
+paring the distributions of ETA with CP, where the latter is much
+more concentrated. This observation indicates the large differences
+between the two objectives.
+C PROPOSITION
+Proposition C.1. Define𝑟 1 (e.g.,𝑟𝑐𝑤𝑡 ) and𝑟 2 (e.g.,𝑟𝑐𝑝 ) as two
+different reward functions, then the following two policy gradients to
+1https://github.com/Vvrep/MASTER-electric_vehicle_charging_recommendation
+2http://lbsyun.baidu.com/index.php?title=webapi
+--- PAGE 12 ---
+WWW ’21, April 19–23, 2021, Ljubljana, Slovenia Weijia Zhang 1†, Hao Liu2∗, Fan Wang3, Tong Xu1, Haoran Xin1, Dejing Dou2, Hui Xiong4∗
+0 4 8 12 16 20 24
+Hour
+0.0000
+0.0025
+0.0050
+0.0075
+0.0100
+0.0125
+0.0150
+0.0175Probability Density
+(a) Charging requests
+10 20 30 40 50 60
+ETA (minute)
+0.000
+0.002
+0.004
+0.006
+0.008
+0.010
+0.012
+0.014
+0.016Probability Density (b) ETA
+20 40 60 80 100 120 140
+Charging power (kilowatt)
+0.0
+0.1
+0.2
+0.3
+0.4
+0.5
+0.6
+0.7Probability Density
+(c) Charging powers
+0.8 1.0 1.2 1.4 1.6 1.8 2.0 2.2
+CP (CNY)
+0.0
+0.1
+0.2
+0.3
+0.4Probability Density (d) CP
+Figure 10: Distributions of charging requests quantity, ETA,
+charging powers, and CP on Beijing.
+update the policy 𝒃 are equivalent:
+∇𝜃𝒃𝐽1(𝒃) = E𝑠𝑡∼𝐷
+
+∇𝜃𝒃 𝒃(𝑠|𝜃𝒃)|𝑠=𝑠𝑡∇𝑎𝑄𝒃(𝑠,𝑎)|𝑠=𝑠𝑡,𝑎=𝒃(𝑠𝑡)
+
+(16)
+∇𝜃𝒃𝐽2(𝒃) = E𝑠𝑡∼𝐷
+
+∇𝜃𝒃 𝒃(𝑠|𝜃𝒃)|𝑠=𝑠𝑡∇𝑎𝑄 1
+𝒃(𝑠,𝑎)|𝑠=𝑠𝑡,𝑎=𝒃(𝑠𝑡) (17)
++∇𝜃𝒃 𝒃(𝑠|𝜃𝒃)|𝑠=𝑠𝑡∇𝑎𝑄 2
+𝒃(𝑠,𝑎)|𝑠=𝑠𝑡,𝑎=𝒃(𝑠𝑡)
+
+= E𝑠𝑡∼𝐷
+h
+∇𝜃𝒃 𝒃(𝑠|𝜃𝒃)|𝑠=𝑠𝑡∇𝑎
+
+𝑄 1
+𝒃(𝑠,𝑎)+ 𝑄 2
+𝒃(𝑠,𝑎)
+
+|𝑠=𝑠𝑡,𝑎=𝒃(𝑠𝑡)
+i
+where𝑄𝒃(𝑠,𝑎) = E𝒃
+"∞∑︁
+𝑖=𝑡
+𝛾(𝑖−𝑡)
+
+𝑟 1(𝑠𝑖,𝑎𝑖)+ 𝑟 2(𝑠𝑖,𝑎𝑖)
+
+|𝑠 =𝑠𝑡,𝑎 =𝑎𝑡
+#
+and𝑄𝑘
+𝒃(𝑠,𝑎) = E𝒃
+"∞∑︁
+𝑖=𝑡
+𝛾(𝑖−𝑡)𝑟𝑘(𝑠𝑖,𝑎𝑖)|𝑠 =𝑠𝑡,𝑎 =𝑎𝑡
+#
+,𝑘 ={1, 2}.
