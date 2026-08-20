@@ -17,6 +17,7 @@ import torch
 import common
 from marl_spklu.rl.master_station_ppo_policy import (MasterStationPPOTrainer,
                                                       MasterStationPPOPolicy,
+                                                      MasterStationPPOPrefPolicy,
                                                       MasterStationPPOInferenceAgent)
 from marl_spklu.rl.forecaster import FormulaForecaster
 from marl_spklu.agents.greedy_agent import GreedyAgent
@@ -32,6 +33,10 @@ p.add_argument("--n-eval-seed", type=int, default=10)
 p.add_argument("--n-updates", type=int, default=300, help="jumlah chunk rollout (anggaran)")
 p.add_argument("--rollout-steps", type=int, default=96, help="langkah simulasi per chunk")
 p.add_argument("--k", type=int, default=3, help="langit-langit jumlah stasiun direkomendasikan")
+p.add_argument("--pref", action="store_true",
+              help="latih MasterStationPPOPrefPolicy (+modul preferensi PDQN) alih-alih "
+                   "MasterStationPPOPolicy polos. Nama checkpoint/hasil BEDA awalan "
+                   "(master_station_ppo_pref_*) -- tak menimpa lengan tanpa-P.")
 p.add_argument("--dataset", type=str, default="4x",
               help="'4x' (BAKU, regime dibekukan Tahap 1, sepadan dgn seluruh lengan lain) "
                    "| '1x' (DATASET_KANONIK, TAK sepadan) | path berkas .json eksplisit")
@@ -49,14 +54,18 @@ else:
     DATASET = args.dataset
     assert os.path.exists(DATASET), f"dataset tak ditemukan: {DATASET}"
 
+POLICY_CLS = MasterStationPPOPrefPolicy if args.pref else MasterStationPPOPolicy
+TAG_ARM = "master_station_ppo_pref" if args.pref else "master_station_ppo"
+
 print(f"[{elapsed()}] Dataset: {DATASET}", flush=True)
+print(f"[{elapsed()}] Lengan: {POLICY_CLS.__name__} (tag={TAG_ARM})", flush=True)
 print(f"[{elapsed()}] Anggaran: n_updates={args.n_updates} rollout_steps={args.rollout_steps} "
      f"k={args.k}", flush=True)
 
 
 def train_one(seed, tag):
     tr = MasterStationPPOTrainer(DATASET, rollout_steps=args.rollout_steps, seed=seed,
-                                 verbose=False, k=args.k)
+                                 verbose=False, k=args.k, policy_cls=POLICY_CLS)
     policy = tr.train(FormulaForecaster(), n_updates=args.n_updates)
     ckpt = os.path.join(common.OUTDIR, f"{tag}_seed{seed}.pt")
     torch.save(policy.state_dict(), ckpt)
@@ -65,7 +74,7 @@ def train_one(seed, tag):
 
 
 def load_policy(ckpt_path, n_spklu):
-    policy = MasterStationPPOPolicy(n_spklu)
+    policy = POLICY_CLS(n_spklu)
     policy.load_state_dict(torch.load(ckpt_path, map_location="cpu"))
     policy.eval()
     return policy
@@ -117,7 +126,7 @@ def pick_median(results, n_spklu, dataset_path, n_eval_seed, k):
 print(f"[{elapsed()}] === PELATIHAN MasterStationPPO ({args.n_train_seed} seed) ===",
      flush=True)
 results = []
-results_path = "master_station_ppo_training_results.json"
+results_path = f"{TAG_ARM}_training_results.json"
 existing = {}
 try:
     import json
@@ -134,7 +143,7 @@ for seed in range(args.n_train_seed):
         results.append(existing[seed])
         continue
     print(f"[{elapsed()}]   seed={seed} -- mulai training", flush=True)
-    row = train_one(seed, "master_station_ppo")
+    row = train_one(seed, TAG_ARM)
     print(f"[{elapsed()}]   seed={seed} -- SELESAI (chunk={row['n_grad_updates']})", flush=True)
     results.append(row)
     common.save_json(results, results_path)
@@ -170,6 +179,6 @@ common.save_json(dict(
     per_seed_means={str(k): float(np.mean(v)) for k, v in per_seed.items()},
     config=dict(n_train_seed=args.n_train_seed, n_eval_seed=args.n_eval_seed,
                n_updates=args.n_updates, rollout_steps=args.rollout_steps, k=args.k)),
-    "master_station_ppo_eval_results.json")
+    f"{TAG_ARM}_eval_results.json")
 
 print(f"[{elapsed()}] === SEMUA SELESAI (MasterStationPPO) ===", flush=True)

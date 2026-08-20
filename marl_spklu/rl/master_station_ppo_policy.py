@@ -57,6 +57,8 @@ from marl_spklu.rl.master_paper_obs import STATION_FEAT_DIM_MASTER, build_joint_
 from marl_spklu.rl.rollout import RLRolloutAgent, Transition, RewardCalculatorStub, _gini
 from marl_spklu.rl.rewards import RewardCalculator
 from marl_spklu.rl.ppo import PPOTrainer, _make_logger
+from marl_spklu.rl.pdqn_policy import PreferenceAttention, hist_feat_dim
+from marl_spklu.rl.p_ppo_policy import PREF_D_LSTM, PREF_D_ATTN
 
 
 class MasterStationPPOPolicy(_BiddingMixin, nn.Module):
@@ -116,6 +118,73 @@ class MasterStationPPOPolicy(_BiddingMixin, nn.Module):
         return bid_mean, value
 
 
+class MasterStationPPOPrefPolicy(MasterStationPPOPolicy):
+    """`MasterStationPPOPolicy` + modul ekstraksi preferensi PDQN (`pref_lstm` +
+    `PreferenceAttention` + `pref_gate`), sbg KONTEKS TAMBAHAN yang di-broadcast ke
+    seluruh stasiun saat encoding -- pola SAMA PERSIS `PPPOPolicy` (p_ppo_policy.py).
+
+    ⚠️ TEGANGAN ARSITEKTURAL yang harus dinyatakan terbuka. Observasi §3.1 MASTER
+    sengaja TIDAK memuat fitur pemohon -- `a^i_t = b^i(o^i_t)` (Pers. 11): bid stasiun
+    TIDAK bergantung pada siapa yang bertanya. Menambahkan modul preferensi berarti bid
+    kini bergantung pada riwayat (a_hat,a) PEMOHON YANG SEDANG MEMINTA -- ini melanggar
+    "stasiun buta terhadap pemohon" itu sendiri. Kelas ini TIDAK LAGI dapat diklaim
+    "setia observasi §3.1 murni MASTER" -- ia adalah hibrida sengaja: stasiun-sebagai-
+    agen (peran) + kesadaran-preferensi-pemohon (informasi tambahan), diuji utk menjawab
+    apakah preferensi (bukan sekadar informasi permintaan apa pun) yang menaikkan
+    penerimaan -- lihat `RENCANA_...` /diskusi 2026-08-20 (hipotesis P pada MASTER-bid).
+
+    `_record_pref`/`_build_pref_hist` (rollout.py, DIWARISI dari `RLRolloutAgent`)
+    beroperasi murni atas INDEKS STASIUN (rekomendasi vs pilihan) + `user_id` -- tak
+    bergantung apa pun pada observasi kaya/murni yang dilihat kebijakan, sehingga dapat
+    dipakai ulang APA ADANYA di sini tanpa modifikasi.
+    """
+
+    def __init__(self, n_spklu: int, hidden: int = 64, critic_hidden: int = 128,
+                n_critics: int = 1, bid_log_std_init: float = 0.0,
+                pref_d_lstm: int = PREF_D_LSTM, pref_d_attn: int = PREF_D_ATTN,
+                pref_feature_mode: bool = False, use_preference: bool = True):
+        super().__init__(n_spklu, hidden=hidden, critic_hidden=critic_hidden,
+                         n_critics=n_critics, bid_log_std_init=bid_log_std_init)
+        self.pref_feature_mode = bool(pref_feature_mode)
+        self.use_preference = bool(use_preference)
+        self.pref_d_attn = int(pref_d_attn)
+        self.pref_hist_feat_dim = hist_feat_dim(n_spklu)   # feature-mode tak didukung di sini
+        self.pref_lstm = nn.LSTM(self.pref_hist_feat_dim, pref_d_lstm, batch_first=True)
+        self.pref_attn = PreferenceAttention(STATION_FEAT_DIM_MASTER, pref_d_lstm, pref_d_attn)
+        # Gerbang nol-awal (Parisotto dkk. 2019/GTrXL, sama alasan dgn PPPOPolicy) --
+        # modul preferensi baru diinisialisasi acak, disuntik penuh langsung akan jadi
+        # derau besar bagi station_encoder yg sedianya belajar lancar tanpa itu.
+        self.pref_gate = nn.Parameter(torch.tensor(0.0))
+        # GANTI station_encoder: context_dim bertambah pref_d_attn (sebelumnya 0).
+        self.station_encoder = StationEncoder(STATION_FEAT_DIM_MASTER, pref_d_attn, hidden)
+
+    def _encode_pref(self, pref_hist):
+        if not self.use_preference:
+            return torch.zeros(pref_hist.shape[0], self.pref_lstm.hidden_size,
+                               device=pref_hist.device, dtype=pref_hist.dtype)
+        _, (h_n, _) = self.pref_lstm(pref_hist)
+        return h_n[-1]
+
+    def forward(self, obs, hist=None, critic_obs=None, pref_hist=None):
+        _, station_feats = self._split_station_block(obs, STATION_FEAT_DIM_MASTER, 0)
+
+        if pref_hist is not None and self.use_preference:
+            c_pref = self._encode_pref(pref_hist)
+            attended_pref, _ = self.pref_attn(station_feats, c_pref)
+            attended_pref = self.pref_gate * attended_pref
+        else:
+            attended_pref = torch.zeros(obs.shape[0], self.pref_d_attn, device=obs.device)
+
+        emb = self.station_encoder(station_feats, attended_pref)
+        bid_mean = self.disc_head(emb).squeeze(-1)
+
+        c_emb = self.critic_station_encoder(station_feats,
+                                            torch.zeros(obs.shape[0], 0, device=obs.device))
+        pooled = self.critic_pool(c_emb)
+        value = self.critic_head(pooled)
+        return bid_mean, value
+
+
 class MasterStationPPORolloutAgent(RLRolloutAgent):
     """Override HANYA `get_recommendation` -- observasi §3.1 murni via
     `build_joint_obs_master`. `on_decision`/`on_step_end`/`on_charge_complete` DIWARISI
@@ -144,9 +213,19 @@ class MasterStationPPORolloutAgent(RLRolloutAgent):
         dummy_hist = np.zeros((1, 1), dtype=np.float32)   # tak dipakai forward(), hanya
                                                            # supaya kontrak act() terpenuhi
 
-        act = self.policy.act(obs_flat, mask, dummy_hist, k=self.k,
-                              critic_obs_np=obs_flat, epsilon=self.epsilon,
-                              threshold=self.threshold)
+        # Modul preferensi (opsional): _use_pref/_build_pref_hist DIWARISI dari
+        # RLRolloutAgent.__init__, murni berbasis indeks stasiun + user_id -- reuse
+        # tanpa modifikasi (lihat docstring MasterStationPPOPrefPolicy).
+        if self._use_pref:
+            pref_hist = self._build_pref_hist(user)
+            act = self.policy.act(obs_flat, mask, dummy_hist, k=self.k,
+                                  critic_obs_np=obs_flat, epsilon=self.epsilon,
+                                  threshold=self.threshold, pref_hist_np=pref_hist)
+        else:
+            pref_hist = None
+            act = self.policy.act(obs_flat, mask, dummy_hist, k=self.k,
+                                  critic_obs_np=obs_flat, epsilon=self.epsilon,
+                                  threshold=self.threshold)
 
         chosen_indices = act["chosen_indices"]
         n_rec = act["n_rec"]
@@ -164,7 +243,8 @@ class MasterStationPPORolloutAgent(RLRolloutAgent):
         idx_arr[:n_rec] = chosen_indices
 
         tr = Transition(obs_flat, obs_flat, dummy_hist, mask, idx_arr, n_rec,
-                        act["logp"], act["value"], self.sim.current_step)
+                        act["logp"], act["value"], self.sim.current_step,
+                        pref_hist=pref_hist)
         tr.bids = act.get("bids")
         tr.disp_estwait = primary_disp
         tr.wait_default = float(self.sim.compute_virtual_wait(
@@ -214,12 +294,17 @@ class MasterStationPPOTrainer:
     Satu-satunya penyimpangan dari `TorchContinuingTrainer`: carry-forward trust lintas
     pass (lihat docstring modul) -- dipertahankan sengaja supaya sepadan dgn
     MasterDDPGTrainer, BUKAN dgn keluarga PPO lain.
+
+    `policy_cls` (baku `MasterStationPPOPolicy`): ganti ke `MasterStationPPOPrefPolicy`
+    utk menguji apakah modul preferensi membantu pada arsitektur stasiun-sebagai-agen
+    §3.1 murni. `policy_kw` diteruskan apa adanya ke konstruktor kelas itu.
     """
 
     def __init__(self, dataset_path, rollout_steps: int = 96, seed: int = 0,
                 verbose: bool = True, reward_calc=None, hidden: int = 64,
                 critic_hidden: int = 128, k: int = 3, n_critics: int = 1,
-                equity_calc=None, **ppo_kw):
+                equity_calc=None, policy_cls=MasterStationPPOPolicy,
+                policy_kw=None, **ppo_kw):
         self.dataset_path = dataset_path
         self.rollout_steps = int(rollout_steps)
         self.k = int(k)
@@ -231,9 +316,8 @@ class MasterStationPPOTrainer:
 
         sim0 = self._fresh_sim()
         self.N = len(sim0.spklus)
-        self.policy = MasterStationPPOPolicy(self.N, hidden=hidden,
-                                             critic_hidden=critic_hidden,
-                                             n_critics=n_critics)
+        self.policy = policy_cls(self.N, hidden=hidden, critic_hidden=critic_hidden,
+                                 n_critics=n_critics, **(policy_kw or {}))
         self.ppo = PPOTrainer(self.policy, avg_reward=True, **ppo_kw)
         self.history = []
         self._it_global = 0

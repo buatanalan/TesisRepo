@@ -3,7 +3,8 @@
 kenapa terpisah dari loop 19-lengan).
 
 Pemakaian (checkpoint HARUS sudah ada, hasil `_run_master_station_ppo_pipeline.py`):
-    python _uji_master_station_ppo_metrik.py 0,1,2 30d
+    python _uji_master_station_ppo_metrik.py 0,1,2 30d          # tanpa-P
+    python _uji_master_station_ppo_metrik.py 0,1,2 30d --pref   # +modul preferensi
 """
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -16,24 +17,31 @@ import _uji_konsolidasi as K
 sys.argv = _argv_asli
 
 from marl_spklu.rl.master_station_ppo_policy import (MasterStationPPOPolicy,
+                                                      MasterStationPPOPrefPolicy,
                                                       MasterStationPPOInferenceAgent)
 
-SEEDS = ([int(s) for s in sys.argv[1].replace(" ", "").split(",") if s]
-         if len(sys.argv) > 1 else [0, 1, 2])
-TAG = sys.argv[2] if len(sys.argv) > 2 else "30d"
+_argv_bersih = [a for a in _argv_asli if a != "--pref"]
+PREF = "--pref" in _argv_asli
+POLICY_CLS = MasterStationPPOPrefPolicy if PREF else MasterStationPPOPolicy
+TAG_ARM = "master_station_ppo_pref" if PREF else "master_station_ppo"
+LABEL_ARM = "MASTER-stasiun-PPO+P" if PREF else "MASTER-stasiun-PPO"
+
+SEEDS = ([int(s) for s in _argv_bersih[1].replace(" ", "").split(",") if s]
+         if len(_argv_bersih) > 1 else [0, 1, 2])
+TAG = _argv_bersih[2] if len(_argv_bersih) > 2 else "30d"
 K.DS = os.path.join(common.ROOT, K.HORIZON[TAG])
 K_REC = 3
 
 
 def muat_policy(seed):
-    ckpt = os.path.join(common.OUTDIR, f"master_station_ppo_seed{seed}.pt")
+    ckpt = os.path.join(common.OUTDIR, f"{TAG_ARM}_seed{seed}.pt")
     assert os.path.exists(ckpt), (
         f"checkpoint tak ditemukan: {ckpt}\n"
-        f"latih dulu lewat: python _run_master_station_ppo_pipeline.py --n-train-seed "
-        f"{seed+1} ...")
+        f"latih dulu lewat: python _run_master_station_ppo_pipeline.py "
+        f"{'--pref ' if PREF else ''}--n-train-seed {seed+1} ...")
     sim0 = common.fresh_sim(K.DS)
     n_spklu = len(sim0.spklus)
-    policy = MasterStationPPOPolicy(n_spklu)
+    policy = POLICY_CLS(n_spklu)
     policy.load_state_dict(torch.load(ckpt, map_location="cpu"))
     policy.eval()
     return policy
@@ -54,7 +62,7 @@ def main():
     harian = {}
     for mode in ("abs", "signed"):
         for beku in (False, True):
-            label = f"MASTER-stasiun-PPO|{mode}|{'beku' if beku else 'dinamis'}"
+            label = f"{LABEL_ARM}|{mode}|{'beku' if beku else 'dinamis'}"
             runs = []
             for sd in SEEDS:
                 policy = muat_policy(sd)
@@ -70,8 +78,9 @@ def main():
                  f"acc={agregat[label]['acc']:.3f}", flush=True)
 
     out = dict(horizon=TAG, seeds=SEEDS, per_seed=per_seed, agregat=agregat, harian=harian)
-    common.save_json(out, f"uji_master_station_ppo_metrik_{TAG}.json")
-    print(f"\nSAVED -> outputs/uji_master_station_ppo_metrik_{TAG}.json", flush=True)
+    nama = f"uji_{TAG_ARM}_metrik_{TAG}.json"
+    common.save_json(out, nama)
+    print(f"\nSAVED -> outputs/{nama}", flush=True)
 
 
 if __name__ == "__main__":
