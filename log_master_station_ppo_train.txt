@@ -1,0 +1,14 @@
+[0.0s] Dataset: /home/iskandar/Alan/TesisRepo/scenario_dataset_klaster12_4x.json
+[0.0s] Anggaran: n_updates=300 rollout_steps=96 k=3
+[0.0s] === PELATIHAN MasterStationPPO (3 seed) ===
+[0.0s]   seed=0 -- mulai training
+[56.2s]   seed=0 -- SELESAI (chunk=300)
+[56.2s]   seed=1 -- mulai training
+[116.8s]   seed=1 -- SELESAI (chunk=300)
+[116.8s]   seed=2 -- mulai training
+[176.2s]   seed=2 -- SELESAI (chunk=300)
+[176.2s] Pelatihan selesai (3 seed)
+[176.2s] === Evaluasi vs greedy_queue/greedy_util (10 seed) ===
+[324.5s] MasterStationPPO=0.1134  greedy_queue=0.0900  greedy_util=0.0926
+[324.5s] p_vs_gq=0.0020 d=+3.041  p_vs_gu=0.0020 d=+2.856  spread_antar_seed=0.0062
+[324.5s] === SEMUA SELESAI (MasterStationPPO) ===

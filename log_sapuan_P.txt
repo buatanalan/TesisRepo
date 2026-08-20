@@ -1,0 +1,28 @@
+horizon=30d (/home/iskandar/Alan/TesisRepo/scenario_dataset_klaster12_4x.json)
+seed: [0, 1, 2]
+sapuan trust (meniru p_check PDQN): [0.2, 0.35, 0.5, 0.65, 0.8]
+/home/iskandar/Alan/TesisRepo/Eksekusi_RL/_uji_konsolidasi.py:260: RuntimeWarning: Mean of empty slice
+  o[k] = float(np.nanmean(v)); o[k + "_med"] = float(np.nanmedian(v))
+/home/iskandar/Alan/TesisRepo/Eksekusi_RL/_uji_konsolidasi.py:260: RuntimeWarning: All-NaN slice encountered
+  o[k] = float(np.nanmean(v)); o[k + "_med"] = float(np.nanmedian(v))
+/home/iskandar/Alan/TesisRepo/.venv/lib/python3.14/site-packages/numpy/lib/_nanfunctions_impl.py:1997: RuntimeWarning: Degrees of freedom <= 0 for slice.
+  var = nanvar(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+  trust=0.20 [noP ] acc=0.596 wait= 106.3 gini=0.110
+  trust=0.20 [P   ] acc=0.599 wait= 112.4 gini=0.105
+  trust=0.35 [noP ] acc=0.668 wait=  71.0 gini=0.103
+  trust=0.35 [P   ] acc=0.675 wait=  69.4 gini=0.108
+  trust=0.50 [noP ] acc=0.747 wait=  56.6 gini=0.110
+  trust=0.50 [P   ] acc=0.755 wait=  55.4 gini=0.102
+  trust=0.65 [noP ] acc=0.826 wait=  49.8 gini=0.110
+  trust=0.65 [P   ] acc=0.824 wait=  49.1 gini=0.114
+  trust=0.80 [noP ] acc=0.900 wait=  46.3 gini=0.111
+  trust=0.80 [P   ] acc=0.902 wait=  45.7 gini=0.108
+
+  trust  acc_noP    acc_P   d_acc  wait_noP   wait_P  d_wait  gini_noP   gini_P  d_gini
+   0.20    0.596    0.599  +0.003     106.3    112.4    +6.2     0.110    0.105  -0.005
+   0.35    0.668    0.675  +0.008      71.0     69.4    -1.6     0.103    0.108  +0.005
+   0.50    0.747    0.755  +0.008      56.6     55.4    -1.2     0.110    0.102  -0.008
+   0.65    0.826    0.824  -0.002      49.8     49.1    -0.7     0.110    0.114  +0.004
+   0.80    0.900    0.902  +0.002      46.3     45.7    -0.6     0.111    0.108  -0.003
+
+SAVED -> outputs/uji_sapuan_kepatuhan_P_30d.json
