@@ -91,6 +91,55 @@ def build_joint_obs_master(sim, sids: list, time_now_min: float) -> np.ndarray:
     ]).astype(np.float32)
 
 
+# --------------------------------------------------------------------------------
+# VARIAN +EV (2026-08-20) -- observasi §3.1 DITAMBAH state permintaan/EV, meniru
+# 3 skalar pemohon yang terbukti jadi faktor pembeda menang/kalah minggu ini (SoC,
+# jarak/lokasi, kapasitas baterai -- lihat H-PPO/P-PPO `rollout.py::_build_obs`).
+#
+# INI PENYIMPANGAN SENGAJA dari §3.1 murni (Pers. 11: a^i_t = b^i(o^i_t), TANPA fitur
+# pemohon). Diminta eksplisit setelah bukti: kontras langsung MASTER-bid (obs kaya,
+# scalar_dim=6 pemohon) vs MasterStationPPOPolicy (obs §3.1 murni, scalar_dim=0) --
+# satu-satunya beda arsitektural besar keduanya -- berkorelasi dgn selisih acceptance
+# 0,15-0,17 yang bertahan lepas dari peran agen/bentuk aksi/tulang-punggung/modul P.
+#
+# TETAP DESENTRALISASI: tiap stasiun menghitung fiturnya SENDIRI dari (a) informasi
+# lokalnya (spt sebelumnya) + (b) JARAK dari lokasinya sendiri ke lokasi pemohon yang
+# di-broadcast (TIAP stasiun mengetahui posisinya sendiri -- menghitung jarak ke satu
+# titik yang sama tidak butuh melihat stasiun lain), dan (c) dua skalar milik pemohon
+# (SoC, kapasitas baterai) yang di-broadcast SAMA ke semua baris -- pola broadcast yg
+# SAMA dgn `StationEncoder` di seluruh lengan lain, bukan sesuatu yang baru.
+STATION_FEAT_DIM_MASTER_EV = STATION_FEAT_DIM_MASTER + 3   # = 10
+FEATURE_NAMES_MASTER_EV = FEATURE_NAMES_MASTER + (
+    "dist_to_pemohon_norm", "soc_pemohon_norm", "baterai_pemohon_norm",
+)
+_DIST_SCALE = 10.0   # konsisten dgn RLRolloutAgent.dist_scale (rollout.py)
+_BATTERY_SCALE = 80.0   # kWh, sama dgn RLRolloutAgent.battery_scale
+
+
+def build_station_obs_ev(spklu, sid_idx: int, n_spklu: int, time_now_min: float,
+                         sim, user_loc, soc_norm: float, battery_norm: float) -> np.ndarray:
+    """`build_station_obs` (§3.1 murni) + 3 fitur permintaan. `user_loc`/`soc_norm`/
+    `battery_norm` DI-BROADCAST -- stasiun menghitung jaraknya SENDIRI dari lokasinya
+    sendiri (sudah diketahui) ke `user_loc`, tak perlu tahu apa pun tentang stasiun lain."""
+    base = build_station_obs(spklu, sid_idx, n_spklu, time_now_min, sim)
+    dist_norm = math.dist(user_loc, spklu.location) / _DIST_SCALE
+    return np.concatenate([base, [dist_norm, soc_norm, battery_norm]]).astype(np.float32)
+
+
+def build_joint_obs_master_ev(sim, sids: list, time_now_min: float,
+                              user, soc: float) -> np.ndarray:
+    """(N, STATION_FEAT_DIM_MASTER_EV) -- `build_joint_obs_master` + state EV pemohon.
+    `soc`: persentase (0-100, konvensi simulator) -> dinormalisasi /100 di sini."""
+    n = len(sids)
+    soc_norm = float(soc) / 100.0
+    battery_norm = float(user.battery_capacity_kwh) / _BATTERY_SCALE
+    return np.stack([
+        build_station_obs_ev(sim.spklus[sid], i, n, time_now_min, sim,
+                             user.location, soc_norm, battery_norm)
+        for i, sid in enumerate(sids)
+    ]).astype(np.float32)
+
+
 def snapshot_slots_avail(sim) -> dict:
     """{sid: slots_avail_norm} SAAT INI utk SELURUH stasiun -- dipakai trainer
     (`master_ddpg_trainer.py::_SlotAvailLog`) membangun fitur kritik-saja `future_avail`

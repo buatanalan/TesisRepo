@@ -14,7 +14,8 @@ untuk definisi tiap metrik. `sys.argv` disamarkan sementara sebelum impor krn mo
 mem-parse argv di level modul (utk SEEDS/TAG/DS-nya sendiri) -- lihat blok impor.
 
 Pemakaian (checkpoint HARUS sudah ada, hasil `_run_master_ddpg_pipeline.py`):
-    python _uji_master_ddpg_metrik.py 0,1,2 30d
+    python _uji_master_ddpg_metrik.py 0,1,2 30d            # §3.1 murni
+    python _uji_master_ddpg_metrik.py 0,1,2 30d --ev-obs   # +state permintaan
 """
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -29,22 +30,28 @@ sys.argv = _argv_asli
 
 from marl_spklu.rl.master_ddpg_policy import MasterStationActor
 from marl_spklu.rl.master_ddpg_trainer import MasterDDPGInferenceAgent
-from marl_spklu.rl.master_paper_obs import STATION_FEAT_DIM_MASTER
+from marl_spklu.rl.master_paper_obs import STATION_FEAT_DIM_MASTER, STATION_FEAT_DIM_MASTER_EV
 
-SEEDS = ([int(s) for s in sys.argv[1].replace(" ", "").split(",") if s]
-         if len(sys.argv) > 1 else [0, 1, 2])
-TAG = sys.argv[2] if len(sys.argv) > 2 else "30d"
+_argv_bersih = [a for a in _argv_asli if a != "--ev-obs"]
+EV_OBS = "--ev-obs" in _argv_asli
+STATION_FEAT_DIM = STATION_FEAT_DIM_MASTER_EV if EV_OBS else STATION_FEAT_DIM_MASTER
+TAG_ARM = "master_ddpg_ev" if EV_OBS else "master_ddpg"
+LABEL_ARM = "MASTER-DDPG+EV" if EV_OBS else "MASTER-DDPG"
+
+SEEDS = ([int(s) for s in _argv_bersih[1].replace(" ", "").split(",") if s]
+         if len(_argv_bersih) > 1 else [0, 1, 2])
+TAG = _argv_bersih[2] if len(_argv_bersih) > 2 else "30d"
 K.DS = os.path.join(common.ROOT, K.HORIZON[TAG])   # ikut regime 4x, BUKAN DATASET_KANONIK
 K_REC = 3   # langit-langit rekomendasi -- samakan dgn --k pipeline pelatihan
 
 
 def muat_actor(seed):
-    ckpt = os.path.join(common.OUTDIR, f"master_ddpg_actor_seed{seed}.pt")
+    ckpt = os.path.join(common.OUTDIR, f"{TAG_ARM}_actor_seed{seed}.pt")
     assert os.path.exists(ckpt), (
         f"checkpoint tak ditemukan: {ckpt}\n"
-        f"latih dulu lewat: python _run_master_ddpg_pipeline.py --n-train-seed "
-        f"{seed+1} ...")
-    actor = MasterStationActor(STATION_FEAT_DIM_MASTER)
+        f"latih dulu lewat: python _run_master_ddpg_pipeline.py "
+        f"{'--ev-obs ' if EV_OBS else ''}--n-train-seed {seed+1} ...")
+    actor = MasterStationActor(STATION_FEAT_DIM)
     actor.load_state_dict(torch.load(ckpt, map_location="cpu"))
     actor.eval()
     return actor
@@ -53,7 +60,7 @@ def muat_actor(seed):
 def fac_dari_actor(actor):
     """fac(sim) -> agen terikat -- kontrak yang sama dipakai `K.satu_run`."""
     def fac(sim, _actor=actor):
-        agent = MasterDDPGInferenceAgent(_actor, k=K_REC)
+        agent = MasterDDPGInferenceAgent(_actor, k=K_REC, use_ev_obs=EV_OBS)
         agent.bind_to_sim(sim)
         return agent
     return fac
@@ -61,14 +68,14 @@ def fac_dari_actor(actor):
 
 def main():
     print(f"horizon={TAG} ({K.DS})", flush=True)
-    print(f"seed: {SEEDS}", flush=True)
+    print(f"seed: {SEEDS}  ev_obs={EV_OBS}", flush=True)
 
     per_seed = {}
     agregat = {}
     harian = {}
     for mode in ("abs", "signed"):
         for beku in (False, True):
-            label = f"MASTER-DDPG|{mode}|{'beku' if beku else 'dinamis'}"
+            label = f"{LABEL_ARM}|{mode}|{'beku' if beku else 'dinamis'}"
             runs = []
             for sd in SEEDS:
                 actor = muat_actor(sd)
@@ -84,8 +91,9 @@ def main():
                  f"acc={agregat[label]['acc']:.3f}", flush=True)
 
     out = dict(horizon=TAG, seeds=SEEDS, per_seed=per_seed, agregat=agregat, harian=harian)
-    common.save_json(out, f"uji_master_ddpg_metrik_{TAG}.json")
-    print(f"\nSAVED -> outputs/uji_master_ddpg_metrik_{TAG}.json", flush=True)
+    nama = f"uji_{TAG_ARM}_metrik_{TAG}.json"
+    common.save_json(out, nama)
+    print(f"\nSAVED -> outputs/{nama}", flush=True)
 
 
 if __name__ == "__main__":

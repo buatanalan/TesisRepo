@@ -21,7 +21,7 @@ import torch
 import common
 from marl_spklu.rl.master_ddpg_trainer import (MasterDDPGTrainer, MasterDDPGInferenceAgent)
 from marl_spklu.rl.master_ddpg_policy import MasterStationActor
-from marl_spklu.rl.master_paper_obs import STATION_FEAT_DIM_MASTER
+from marl_spklu.rl.master_paper_obs import STATION_FEAT_DIM_MASTER, STATION_FEAT_DIM_MASTER_EV
 from marl_spklu.agents.greedy_agent import GreedyAgent
 from scipy.stats import wilcoxon
 
@@ -36,6 +36,10 @@ p.add_argument("--n-updates", type=int, default=300, help="jumlah chunk rollout 
 p.add_argument("--rollout-steps", type=int, default=96, help="langkah simulasi per chunk")
 p.add_argument("--delay-minutes", type=float, default=15.0, help="d Delayed Access Strategy")
 p.add_argument("--k", type=int, default=3, help="langit-langit jumlah stasiun direkomendasikan")
+p.add_argument("--ev-obs", action="store_true",
+              help="tambahkan state permintaan (jarak, SoC, kapasitas baterai pemohon) "
+                   "ke observasi §3.1 -- PENYIMPANGAN SENGAJA dari MASTER murni, lihat "
+                   "master_paper_obs.py. Tag/checkpoint beda awalan (master_ddpg_ev_*).")
 p.add_argument("--dataset", type=str, default="4x",
               help="'4x' (BAKU, regime dibekukan Tahap 1, dipakai SELURUH lengan lain di "
                    "uji_konsolidasi_30d.json) | '1x' (DATASET_KANONIK, TIDAK sepadan "
@@ -59,7 +63,12 @@ else:
     DATASET = args.dataset
     assert os.path.exists(DATASET), f"dataset tak ditemukan: {DATASET}"
 
+STATION_FEAT_DIM = STATION_FEAT_DIM_MASTER_EV if args.ev_obs else STATION_FEAT_DIM_MASTER
+TAG_ARM = "master_ddpg_ev" if args.ev_obs else "master_ddpg"
+
 print(f"[{elapsed()}] Dataset: {DATASET}", flush=True)
+print(f"[{elapsed()}] Lengan: tag={TAG_ARM} ev_obs={args.ev_obs} (dim_stasiun={STATION_FEAT_DIM})",
+     flush=True)
 print(f"[{elapsed()}] Anggaran: n_updates={args.n_updates} rollout_steps={args.rollout_steps} "
      f"delay_minutes={args.delay_minutes} k={args.k}", flush=True)
 
@@ -67,7 +76,7 @@ print(f"[{elapsed()}] Anggaran: n_updates={args.n_updates} rollout_steps={args.r
 def train_one(seed, tag):
     tr = MasterDDPGTrainer(
         DATASET, rollout_steps=args.rollout_steps, seed=seed, verbose=False,
-        delay_minutes=args.delay_minutes)
+        delay_minutes=args.delay_minutes, use_ev_obs=args.ev_obs)
     actor, critic = tr.train(n_updates=args.n_updates)
     ckpt_actor = os.path.join(common.OUTDIR, f"{tag}_actor_seed{seed}.pt")
     ckpt_critic = os.path.join(common.OUTDIR, f"{tag}_critic_seed{seed}.pt")
@@ -79,7 +88,7 @@ def train_one(seed, tag):
 
 
 def load_actor(ckpt_path):
-    actor = MasterStationActor(STATION_FEAT_DIM_MASTER)
+    actor = MasterStationActor(STATION_FEAT_DIM)
     actor.load_state_dict(torch.load(ckpt_path, map_location="cpu"))
     actor.eval()
     return actor
@@ -91,7 +100,7 @@ def eval_actor_gini(ckpt_path, dataset_path, n_eval_seed, k):
     for s in range(n_eval_seed):
         sim = common.fresh_sim(dataset_path)
         random.seed(s); np.random.seed(s)
-        agent = MasterDDPGInferenceAgent(actor, k=k)
+        agent = MasterDDPGInferenceAgent(actor, k=k, use_ev_obs=args.ev_obs)
         agent.bind_to_sim(sim)
         sim.run(max_steps=sim.max_steps, agent=agent)
         served = np.array([sp.total_served for sp in sim.spklus.values()], float)
@@ -131,7 +140,7 @@ def pick_median(results, dataset_path, n_eval_seed, k):
 # ---------------------------------------------------------------------------
 print(f"[{elapsed()}] === PELATIHAN MasterDDPG ({args.n_train_seed} seed) ===", flush=True)
 results = []
-results_path = "master_ddpg_training_results.json"
+results_path = f"{TAG_ARM}_training_results.json"
 existing = {}
 try:
     import json
@@ -148,7 +157,7 @@ for seed in range(args.n_train_seed):
         results.append(existing[seed])
         continue
     print(f"[{elapsed()}]   seed={seed} -- mulai training", flush=True)
-    row = train_one(seed, "master_ddpg")
+    row = train_one(seed, TAG_ARM)
     print(f"[{elapsed()}]   seed={seed} -- SELESAI (grad_updates={row['n_grad_updates']} "
          f"buffer={row['buffer_size']})", flush=True)
     results.append(row)
@@ -184,6 +193,6 @@ common.save_json(dict(
     config=dict(n_train_seed=args.n_train_seed, n_eval_seed=args.n_eval_seed,
                n_updates=args.n_updates, rollout_steps=args.rollout_steps,
                delay_minutes=args.delay_minutes, k=args.k)),
-    "master_ddpg_eval_results.json")
+    f"{TAG_ARM}_eval_results.json")
 
 print(f"[{elapsed()}] === SEMUA SELESAI (MasterDDPG) ===", flush=True)

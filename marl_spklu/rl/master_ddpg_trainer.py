@@ -26,7 +26,9 @@ import torch
 import torch.nn as nn
 
 from marl_spklu.rl.rollout import RLRolloutAgent, STREAM_INDIVIDUAL, STREAM_GLOBAL, N_REWARD_STREAMS, _gini
-from marl_spklu.rl.master_paper_obs import build_joint_obs_master, snapshot_slots_avail, STATION_FEAT_DIM_MASTER
+from marl_spklu.rl.master_paper_obs import (build_joint_obs_master, build_joint_obs_master_ev,
+                                            snapshot_slots_avail, STATION_FEAT_DIM_MASTER,
+                                            STATION_FEAT_DIM_MASTER_EV)
 from marl_spklu.rl.master_ddpg_policy import MasterStationActor, MasterAttentiveCritic
 from marl_spklu.rl.rewards import RewardCalculator
 
@@ -98,12 +100,15 @@ class MasterDDPGRolloutAgent(RLRolloutAgent):
     `master_bidding_policy.py`."""
 
     def __init__(self, actor, sim, reward_calc, forecaster=None, noise_std: float = 8.0,
-                k: int = 3, equity_calc=None):
+                k: int = 3, equity_calc=None, use_ev_obs: bool = False):
         super().__init__(actor, sim, reward_calc, forecaster, k=k, equity_calc=equity_calc)
         self.actor = actor
         self.noise_std = float(noise_std)
         self.ou_theta = 0.15
         self._ou_state = np.zeros(self.N, dtype=np.float32)
+        # +EV (2026-08-20): observasi §3.1 ditambah state permintaan (SoC, jarak,
+        # baterai) -- lihat master_paper_obs.py utk alasan & batas penyimpangan.
+        self.use_ev_obs = bool(use_ev_obs)
 
     def _sample_noise(self):
         self._ou_state += (self.ou_theta * (0.0 - self._ou_state)
@@ -118,10 +123,13 @@ class MasterDDPGRolloutAgent(RLRolloutAgent):
 
         # default_idx/wait_hat: bookkeeping REWARD/CTDE saja (dipakai on_decision via
         # self._pending, lihat rollout.py) -- TIDAK bocor ke observasi aktor (dibangun
-        # terpisah di bawah, murni §3.1, tanpa user).
+        # terpisah di bawah, murni §3.1 [+EV opsional], tanpa identitas pemohon).
         _rich_obs_unused, default_idx, wait_hat = self._build_obs(user, soc, feasible_ids, time_now)
 
-        joint_obs = build_joint_obs_master(self.sim, self.sids, time_now)   # (N,7)
+        if self.use_ev_obs:
+            joint_obs = build_joint_obs_master_ev(self.sim, self.sids, time_now, user, soc)  # (N,10)
+        else:
+            joint_obs = build_joint_obs_master(self.sim, self.sids, time_now)   # (N,7)
         mask = self._feasible_mask(feasible_ids)
 
         obs_t = torch.as_tensor(joint_obs, dtype=torch.float32).unsqueeze(0)
@@ -189,12 +197,13 @@ class MasterDDPGInferenceAgent:
     menang; EstWait yang ditampilkan tetap forecaster jujur (sama batas
     `MasterDDPGRolloutAgent`)."""
 
-    def __init__(self, actor, forecaster=None, k: int = 3):
+    def __init__(self, actor, forecaster=None, k: int = 3, use_ev_obs: bool = False):
         self.actor = actor
         self.actor.eval()
         from marl_spklu.rl.forecaster import FormulaForecaster
         self.forecaster = forecaster or FormulaForecaster()
         self.k = int(k)
+        self.use_ev_obs = bool(use_ev_obs)
         self.sids = None
         self.sid_to_idx = None
         self.N = None
@@ -208,7 +217,12 @@ class MasterDDPGInferenceAgent:
     def get_recommendation(self, feasible_spklus: dict):
         assert self.sids is not None, "panggil bind_to_sim(sim) sebelum sim.run(agent=...)"
         time_now = self.sim.current_step * self.sim.dt_minutes
-        joint_obs = build_joint_obs_master(self.sim, self.sids, time_now)
+        if self.use_ev_obs:
+            user = self.sim._current_spawn_user
+            soc = self.sim._current_spawn_soc
+            joint_obs = build_joint_obs_master_ev(self.sim, self.sids, time_now, user, soc)
+        else:
+            joint_obs = build_joint_obs_master(self.sim, self.sids, time_now)
         mask = np.zeros(self.N, dtype=bool)
         for sid in feasible_spklus:
             if sid in self.sid_to_idx:
@@ -247,8 +261,15 @@ class MasterDDPGTrainer:
                 reward_calc=None, seed: int = 0, verbose: bool = True,
                 updates_per_chunk: int = 20, equity_calc=None,
                 delay_minutes: float = 15.0, n_critics: int = N_REWARD_STREAMS,
-                beta_mode: str = "gap_ratio", beta_sigma: float = 0.1):
+                beta_mode: str = "gap_ratio", beta_sigma: float = 0.1,
+                use_ev_obs: bool = False):
         self.dataset_path = dataset_path
+        # +EV (2026-08-20): lihat master_paper_obs.py -- penyimpangan sengaja dari §3.1
+        # murni, diminta eksplisit setelah bukti observasi-permintaan jadi faktor
+        # pembeda dominan menang/kalah thd greedy.
+        self.use_ev_obs = bool(use_ev_obs)
+        self._station_feat_dim = (STATION_FEAT_DIM_MASTER_EV if self.use_ev_obs
+                                  else STATION_FEAT_DIM_MASTER)
         self.equity_calc = equity_calc
         self.rollout_steps = int(rollout_steps)
         self.gamma = float(gamma)
@@ -277,8 +298,8 @@ class MasterDDPGTrainer:
         self._slot_log = _SlotAvailLog(maxlen=self.rollout_steps + self.delay_steps + 4)
 
         self.N = len(sim0.spklus)
-        self.actor = MasterStationActor(STATION_FEAT_DIM_MASTER)
-        self.actor_target = MasterStationActor(STATION_FEAT_DIM_MASTER)
+        self.actor = MasterStationActor(self._station_feat_dim)
+        self.actor_target = MasterStationActor(self._station_feat_dim)
         self.actor_target.load_state_dict(self.actor.state_dict())
         self.actor_target.eval()
 
@@ -289,8 +310,8 @@ class MasterDDPGTrainer:
         self._ret_best = np.full(self.n_critics, -np.inf, dtype=np.float64)
         self._last_beta = np.full(self.n_critics, 1.0 / self.n_critics, dtype=np.float64)
 
-        self.critic = MasterAttentiveCritic(STATION_FEAT_DIM_MASTER, n_critics=self.n_critics)
-        self.critic_target = MasterAttentiveCritic(STATION_FEAT_DIM_MASTER, n_critics=self.n_critics)
+        self.critic = MasterAttentiveCritic(self._station_feat_dim, n_critics=self.n_critics)
+        self.critic_target = MasterAttentiveCritic(self._station_feat_dim, n_critics=self.n_critics)
         self.critic_target.load_state_dict(self.critic.state_dict())
         self.critic_target.eval()
 
@@ -500,7 +521,7 @@ class MasterDDPGTrainer:
         self._total_chunks = int(n_updates)
         sim = self._fresh_sim()
         agent = MasterDDPGRolloutAgent(self.actor, sim, self.rc, noise_std=self._noise_std(),
-                                       equity_calc=self.equity_calc)
+                                       equity_calc=self.equity_calc, use_ev_obs=self.use_ev_obs)
         step = 0
         for _ in range(n_updates):
             it = self._it_global
