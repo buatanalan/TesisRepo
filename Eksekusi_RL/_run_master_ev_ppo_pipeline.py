@@ -35,7 +35,13 @@ p.add_argument("--pref", action="store_true",
 p.add_argument("--pref-feature-mode", action="store_true",
               help="riwayat preferensi sbg vektor fitur (bukan one-hot identitas) -- "
                    "hanya berlaku bila --pref diberikan")
-p.add_argument("--dataset", type=str, default="4x")
+p.add_argument("--dataset", type=str, default="4x",
+              help="'4x' (BAKU, 30 hari) | '1x' (DATASET_KANONIK, TAK sepadan) | path eksplisit "
+                   "(mis. scenario_dataset_klaster12_4x_90d.json -- WAJIB sertakan --horizon 90d)")
+p.add_argument("--horizon", type=str, default="30d",
+              help="penanda tag checkpoint/hasil -- WAJIB diubah ('90d') saat --dataset menunjuk "
+                   "dataset 90-hari, supaya tak menimpa diam-diam checkpoint 30-hari yg sudah ada "
+                   "(tag 'master_ev_ppo*' polos khusus utk horizon baku 30d)")
 args = p.parse_args()
 
 assert not (args.pref_feature_mode and not args.pref), "--pref-feature-mode butuh --pref"
@@ -51,9 +57,16 @@ elif args.dataset == "1x":
     print(f"[{elapsed()}] !! PERINGATAN: regime 1x -- hasil TAK SEPADAN.", flush=True)
 else:
     DATASET = args.dataset
+    if not os.path.isabs(DATASET) and not os.path.exists(DATASET):
+        DATASET = os.path.join(common.ROOT, DATASET)
     assert os.path.exists(DATASET), f"dataset tak ditemukan: {DATASET}"
+    assert args.horizon != "30d", (
+        "--dataset kustom diberikan tapi --horizon masih baku ('30d') -- kemungkinan besar "
+        "kekeliruan (checkpoint akan bertabrakan diam-diam dgn hasil 30d yg sudah ada). "
+        "Sertakan --horizon eksplisit, mis. --horizon 90d.")
 
-_suffix = "_pref_feat" if args.pref_feature_mode else ("_pref" if args.pref else "")
+_horizon_suffix = "" if args.horizon == "30d" else f"_{args.horizon}"
+_suffix = ("_pref_feat" if args.pref_feature_mode else ("_pref" if args.pref else "")) + _horizon_suffix
 TAG_ARM = "master_ev_ppo" + _suffix
 print(f"[{elapsed()}] Dataset: {DATASET}", flush=True)
 print(f"[{elapsed()}] Lengan: tag={TAG_ARM} (perspektif-EV, PPOTrainer standar, V(s) atensi tunggal, "
@@ -170,7 +183,8 @@ common.save_json(dict(
     config=dict(n_train_seed=args.n_train_seed, n_eval_seed=args.n_eval_seed,
                n_updates=args.n_updates, rollout_steps=args.rollout_steps, k=args.k,
                n_critics=args.n_critics, pref=args.pref,
-               pref_feature_mode=args.pref_feature_mode)),
+               pref_feature_mode=args.pref_feature_mode, horizon=args.horizon,
+               dataset=DATASET)),
     f"{TAG_ARM}_eval_results.json")
 
 print(f"[{elapsed()}] === SEMUA SELESAI (MasterEV-PPO) ===", flush=True)
