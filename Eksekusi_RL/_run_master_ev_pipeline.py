@@ -19,12 +19,24 @@ import common
 from marl_spklu.rl.master_ev_trainer import MasterEVTrainer, MasterEVInferenceAgent
 from marl_spklu.rl.master_ev_policy import MasterEVActor
 from marl_spklu.rl.master_paper_obs import STATION_FEAT_DIM_MASTER_EV
+from marl_spklu.rl.rewards import RewardCalculator
 from marl_spklu.agents.greedy_agent import GreedyAgent
 from scipy.stats import wilcoxon
 
 T0 = time.time()
 def elapsed():
     return f"{time.time()-T0:.1f}s"
+
+# Preset `seimbang4x` -- IDENTIK dgn yg dipakai H-PPO/P-PPO (`_tahap2_jalankan.py`),
+# kalibrasi Tahap 0.1 (dekomposisi varians rezim 4x): alpha_gini 5,2x lebih besar dari
+# default RewardCalculator(), alpha_wait nyaris nol (mengandalkan delta-Gini + Prox).
+# MasterEVTrainer SEBELUMNYA memakai RewardCalculator() default -- gap kalibrasi yg
+# belum pernah diuji di lengan MASTER manapun (lihat diskusi rekomendasi perbaikan).
+REWARD_PRESETS = {
+    "default": dict(),   # RewardCalculator() bawaan (alpha_wait=1.0, alpha_gini=0.5, alpha_flock=0.3)
+    "seimbang4x": dict(alpha_wait=0.0046, beta_prox=0.1, alpha_gini=2.6019,
+                       alpha_flock=0.0208, use_delta_gini=True),
+}
 
 p = argparse.ArgumentParser()
 p.add_argument("--n-train-seed", type=int, default=3)
@@ -33,6 +45,14 @@ p.add_argument("--n-updates", type=int, default=300, help="jumlah chunk rollout 
 p.add_argument("--rollout-steps", type=int, default=96, help="langkah simulasi per chunk")
 p.add_argument("--delay-minutes", type=float, default=15.0, help="d Delayed Access Strategy")
 p.add_argument("--k", type=int, default=3, help="langit-langit jumlah stasiun direkomendasikan")
+p.add_argument("--reward-preset", type=str, default="default", choices=list(REWARD_PRESETS),
+              help="'default' (RewardCalculator() lama -- BAKU, agar tag 'master_ev' polos "
+                   "TETAP menunjuk checkpoint historis, tak tertimpa diam-diam) | 'seimbang4x' "
+                   "(kalibrasi sama dgn H-PPO/P-PPO -- WAJIB dipilih EKSPLISIT, akan memakai "
+                   "tag folder terpisah 'master_ev_seimbang4x')")
+p.add_argument("--beta-mode", type=str, default="gap_ratio", choices=["gap_ratio", "fixed"],
+              help="Dynamic Gradient Re-weighting: 'gap_ratio' (MASTER asli) | 'fixed' "
+                   "(bobot seragam 1/K, kontrol ablasi)")
 p.add_argument("--dataset", type=str, default="4x",
               help="'4x' (BAKU, regime dibekukan Tahap 1) | '1x' (DATASET_KANONIK, TAK sepadan) "
                    "| path berkas .json eksplisit")
@@ -50,16 +70,30 @@ else:
     DATASET = args.dataset
     assert os.path.exists(DATASET), f"dataset tak ditemukan: {DATASET}"
 
-TAG_ARM = "master_ev"
+# Tag lengan menandai preset/DGR eksplisit -- kombinasi HISTORIS (preset default lama +
+# gap_ratio) TETAP `master_ev` polos (kompatibel checkpoint server yg SUDAH ADA, tak boleh
+# tertimpa diam-diam), kombinasi lain (termasuk `seimbang4x`) WAJIB dapat akhiran --
+# sama pola `ablasi_prox_{tag}` di `_uji_ablasi_prox_P.py`.
+_suffix = ""
+if args.reward_preset != "default":
+    _suffix += f"_{args.reward_preset}"
+if args.beta_mode != "gap_ratio":
+    _suffix += f"_{args.beta_mode}"
+TAG_ARM = "master_ev" + _suffix
+REWARD_KW = REWARD_PRESETS[args.reward_preset]
+
 print(f"[{elapsed()}] Dataset: {DATASET}", flush=True)
-print(f"[{elapsed()}] Lengan: tag={TAG_ARM} (perspektif-EV, kritik per-timestep)", flush=True)
+print(f"[{elapsed()}] Lengan: tag={TAG_ARM} (perspektif-EV, kritik per-timestep, "
+     f"preset={args.reward_preset}, beta_mode={args.beta_mode})", flush=True)
 print(f"[{elapsed()}] Anggaran: n_updates={args.n_updates} rollout_steps={args.rollout_steps} "
      f"delay_minutes={args.delay_minutes} k={args.k}", flush=True)
 
 
 def train_one(seed, tag):
+    rc = RewardCalculator(**REWARD_KW)
     tr = MasterEVTrainer(DATASET, rollout_steps=args.rollout_steps, seed=seed, verbose=False,
-                         delay_minutes=args.delay_minutes, k=args.k)
+                         delay_minutes=args.delay_minutes, k=args.k, reward_calc=rc,
+                         beta_mode=args.beta_mode)
     actor, critic = tr.train(n_updates=args.n_updates)
     ckpt_actor = os.path.join(common.OUTDIR, f"{tag}_actor_seed{seed}.pt")
     ckpt_critic = os.path.join(common.OUTDIR, f"{tag}_critic_seed{seed}.pt")
