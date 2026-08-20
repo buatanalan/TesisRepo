@@ -25,10 +25,17 @@ SEEDS = ([int(s) for s in sys.argv[1].replace(" ", "").split(",") if s]
         if len(sys.argv) > 1 else [0, 1, 2])
 TAG = sys.argv[2] if len(sys.argv) > 2 else "30d"
 TAG_ARM = sys.argv[3] if len(sys.argv) > 3 else "master_ev_ppo"
-LABEL_ARM = {"master_ev_ppo": "MASTER-EV-PPO", "master_ev_ppo_pref": "MASTER-EV-PPO+P",
-            "master_ev_ppo_pref_feat": "MASTER-EV-PPO+P(fitur)"}.get(TAG_ARM, f"MASTER-EV-PPO[{TAG_ARM}]")
-POLICY_CLS = MasterEVPPOPrefPolicy if "pref" in TAG_ARM else MasterEVPPOPolicy
-POLICY_KW = dict(pref_feature_mode=True) if TAG_ARM == "master_ev_ppo_pref_feat" else dict()
+# PERBAIKAN: pencocokan SUBSTRING (bukan `==` eksak) -- tag_arm bisa dapat akhiran
+# horizon (mis. "master_ev_ppo_pref_feat_90d"), pencocokan eksak lama membuat
+# pref_feature_mode salah terdeteksi False -> dim LSTM riwayat salah (12 bukan 10) ->
+# RuntimeError size-mismatch saat load_state_dict.
+_is_pref_feat = "pref_feat" in TAG_ARM
+_is_pref = "pref" in TAG_ARM
+LABEL_ARM = (f"MASTER-EV-PPO+P(fitur)[{TAG_ARM}]" if _is_pref_feat
+            else f"MASTER-EV-PPO+P[{TAG_ARM}]" if _is_pref
+            else f"MASTER-EV-PPO[{TAG_ARM}]")
+POLICY_CLS = MasterEVPPOPrefPolicy if _is_pref else MasterEVPPOPolicy
+POLICY_KW = dict(pref_feature_mode=True) if _is_pref_feat else dict()
 K.DS = os.path.join(common.ROOT, K.HORIZON[TAG])
 K_REC = 3
 
