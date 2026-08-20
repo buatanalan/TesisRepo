@@ -57,7 +57,8 @@ from marl_spklu.rl.master_paper_obs import STATION_FEAT_DIM_MASTER, build_joint_
 from marl_spklu.rl.rollout import RLRolloutAgent, Transition, RewardCalculatorStub, _gini
 from marl_spklu.rl.rewards import RewardCalculator
 from marl_spklu.rl.ppo import PPOTrainer, _make_logger
-from marl_spklu.rl.pdqn_policy import PreferenceAttention, hist_feat_dim
+from marl_spklu.rl.pdqn_policy import (PreferenceAttention, hist_feat_dim,
+                                       hist_feat_dim_feature, PREF_STATION_FEAT_DIM)
 from marl_spklu.rl.p_ppo_policy import PREF_D_LSTM, PREF_D_ATTN
 
 
@@ -137,6 +138,18 @@ class MasterStationPPOPrefPolicy(MasterStationPPOPolicy):
     beroperasi murni atas INDEKS STASIUN (rekomendasi vs pilihan) + `user_id` -- tak
     bergantung apa pun pada observasi kaya/murni yang dilihat kebijakan, sehingga dapat
     dipakai ulang APA ADANYA di sini tanpa modifikasi.
+
+    `pref_feature_mode` (2026-08-20, diminta eksplisit): saat True, tiap langkah riwayat
+    BUKAN one-hot identitas (a_hat,a) melainkan PASANGAN VEKTOR FITUR KAYA milik kedua
+    stasiun itu -- [jarak, est_wait, antrean, konektor, utilisasi] (PREF_STATION_FEAT_DIM
+    =5, `RLRolloutAgent._pref_station_feat`) DIHITUNG PADA SAAT REKOMENDASI TERJADI (nilai
+    `wait_hat` & keadaan stasiun SAAT keputusan itu diambil, BUKAN keadaan sekarang saat
+    riwayat dibaca ulang) -- sesuai permintaan: "fitur SPKLU a dan a_hat berdasarkan data
+    saat rekomendasi terjadi". Dim per-langkah jadi 2x5=10 (vs 2xN=12 pada mode identitas
+    default). Modul ini kini melihat DUA hal yang tak dilihat mode identitas: KARAKTERISTIK
+    fisik kedua stasiun saat itu, dan bisa MENGGENERALISASI lintas stasiun berkarakter
+    serupa (bukan menghafal indeks) -- lihat `_pref_station_feat` (rollout.py) utk definisi
+    lengkap tiap elemen.
     """
 
     def __init__(self, n_spklu: int, hidden: int = 64, critic_hidden: int = 128,
@@ -148,7 +161,8 @@ class MasterStationPPOPrefPolicy(MasterStationPPOPolicy):
         self.pref_feature_mode = bool(pref_feature_mode)
         self.use_preference = bool(use_preference)
         self.pref_d_attn = int(pref_d_attn)
-        self.pref_hist_feat_dim = hist_feat_dim(n_spklu)   # feature-mode tak didukung di sini
+        self.pref_hist_feat_dim = (hist_feat_dim_feature(PREF_STATION_FEAT_DIM)
+                                   if self.pref_feature_mode else hist_feat_dim(n_spklu))
         self.pref_lstm = nn.LSTM(self.pref_hist_feat_dim, pref_d_lstm, batch_first=True)
         self.pref_attn = PreferenceAttention(STATION_FEAT_DIM_MASTER, pref_d_lstm, pref_d_attn)
         # Gerbang nol-awal (Parisotto dkk. 2019/GTrXL, sama alasan dgn PPPOPolicy) --
@@ -260,12 +274,20 @@ class MasterStationPPORolloutAgent(RLRolloutAgent):
 class MasterStationPPOInferenceAgent:
     """Evaluasi bersih (tanpa akumulasi reward) -- pola SAMA dgn `InferenceAgent`
     (rollout.py), tetapi membungkus `MasterStationPPORolloutAgent` (bukan basis
-    `RLRolloutAgent`) supaya observasi §3.1 murni ikut dipakai saat evaluasi juga."""
+    `RLRolloutAgent`) supaya observasi §3.1 murni ikut dipakai saat evaluasi juga.
+
+    `pref_feature_mode` DIAMBIL OTOMATIS dari `policy.pref_feature_mode` (bila ada) --
+    TIDAK diketik ulang manual di titik panggil, supaya latih dan uji TAK PERNAH bisa
+    berbeda mode encoding riwayat preferensi (kelas bug yg sudah berulang kali muncul
+    di repo ini: `InferenceAgent` lama tanpa on_decision/on_charge_complete membuat
+    riwayat mati total saat evaluasi -- lihat rollout.py::InferenceAgent docstring)."""
 
     def __init__(self, policy, sim, forecaster=None, k: int = 3, epsilon: float = 0.0,
                 threshold: float = 0.20):
+        pref_feature_mode = bool(getattr(policy, "pref_feature_mode", False))
         self._roll = MasterStationPPORolloutAgent(
-            policy, sim, RewardCalculatorStub(), forecaster, k=k)
+            policy, sim, RewardCalculatorStub(), forecaster, k=k,
+            pref_feature_mode=pref_feature_mode)
         self._roll.epsilon = epsilon
         self._roll.threshold = threshold
 
@@ -356,8 +378,12 @@ class MasterStationPPOTrainer:
         chunk = self.rollout_steps
         sim = self._fresh_sim()
         self._reset_rc()
+        # pref_feature_mode DIAMBIL dari kebijakan, bukan diketik ulang -- lihat alasan
+        # sama di MasterStationPPOInferenceAgent.
+        pref_feature_mode = bool(getattr(self.policy, "pref_feature_mode", False))
         agent = MasterStationPPORolloutAgent(self.policy, sim, self.rc, forecaster,
-                                             k=self.k, equity_calc=self.equity_calc)
+                                             k=self.k, equity_calc=self.equity_calc,
+                                             pref_feature_mode=pref_feature_mode)
         step = 0
         for _ in range(n_updates):
             it = self._it_global

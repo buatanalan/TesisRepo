@@ -3,8 +3,10 @@
 kenapa terpisah dari loop 19-lengan).
 
 Pemakaian (checkpoint HARUS sudah ada, hasil `_run_master_station_ppo_pipeline.py`):
-    python _uji_master_station_ppo_metrik.py 0,1,2 30d          # tanpa-P
-    python _uji_master_station_ppo_metrik.py 0,1,2 30d --pref   # +modul preferensi
+    python _uji_master_station_ppo_metrik.py 0,1,2 30d                       # tanpa-P
+    python _uji_master_station_ppo_metrik.py 0,1,2 30d --pref                # +P (identitas)
+    python _uji_master_station_ppo_metrik.py 0,1,2 30d --pref --pref-feature-mode
+                                                                              # +P (fitur kaya)
 """
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -20,11 +22,23 @@ from marl_spklu.rl.master_station_ppo_policy import (MasterStationPPOPolicy,
                                                       MasterStationPPOPrefPolicy,
                                                       MasterStationPPOInferenceAgent)
 
-_argv_bersih = [a for a in _argv_asli if a != "--pref"]
+_FLAGS = {"--pref", "--pref-feature-mode"}
+_argv_bersih = [a for a in _argv_asli if a not in _FLAGS]
 PREF = "--pref" in _argv_asli
+PREF_FEAT = "--pref-feature-mode" in _argv_asli
+if PREF_FEAT and not PREF:
+    raise SystemExit("--pref-feature-mode hanya berlaku bersama --pref")
 POLICY_CLS = MasterStationPPOPrefPolicy if PREF else MasterStationPPOPolicy
-TAG_ARM = "master_station_ppo_pref" if PREF else "master_station_ppo"
-LABEL_ARM = "MASTER-stasiun-PPO+P" if PREF else "MASTER-stasiun-PPO"
+POLICY_KW = {"pref_feature_mode": True} if PREF_FEAT else {}
+if PREF_FEAT:
+    TAG_ARM = "master_station_ppo_pref_feat"
+    LABEL_ARM = "MASTER-stasiun-PPO+P(fitur)"
+elif PREF:
+    TAG_ARM = "master_station_ppo_pref"
+    LABEL_ARM = "MASTER-stasiun-PPO+P"
+else:
+    TAG_ARM = "master_station_ppo"
+    LABEL_ARM = "MASTER-stasiun-PPO"
 
 SEEDS = ([int(s) for s in _argv_bersih[1].replace(" ", "").split(",") if s]
          if len(_argv_bersih) > 1 else [0, 1, 2])
@@ -41,7 +55,7 @@ def muat_policy(seed):
         f"{'--pref ' if PREF else ''}--n-train-seed {seed+1} ...")
     sim0 = common.fresh_sim(K.DS)
     n_spklu = len(sim0.spklus)
-    policy = POLICY_CLS(n_spklu)
+    policy = POLICY_CLS(n_spklu, **POLICY_KW)
     policy.load_state_dict(torch.load(ckpt, map_location="cpu"))
     policy.eval()
     return policy

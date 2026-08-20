@@ -37,10 +37,18 @@ p.add_argument("--pref", action="store_true",
               help="latih MasterStationPPOPrefPolicy (+modul preferensi PDQN) alih-alih "
                    "MasterStationPPOPolicy polos. Nama checkpoint/hasil BEDA awalan "
                    "(master_station_ppo_pref_*) -- tak menimpa lengan tanpa-P.")
+p.add_argument("--pref-feature-mode", action="store_true",
+              help="HANYA berlaku bersama --pref. Riwayat (a_hat,a) dikodekan sbg "
+                   "PASANGAN VEKTOR FITUR KAYA [jarak,wait,antrean,konektor,utilisasi] "
+                   "milik kedua stasiun SAAT REKOMENDASI TERJADI (bukan one-hot "
+                   "identitas baku). Tag/checkpoint beda awalan lagi "
+                   "(master_station_ppo_pref_feat_*).")
 p.add_argument("--dataset", type=str, default="4x",
               help="'4x' (BAKU, regime dibekukan Tahap 1, sepadan dgn seluruh lengan lain) "
                    "| '1x' (DATASET_KANONIK, TAK sepadan) | path berkas .json eksplisit")
 args = p.parse_args()
+if args.pref_feature_mode and not args.pref:
+    raise SystemExit("--pref-feature-mode hanya berlaku bersama --pref")
 
 _DATASET_4X = os.path.join(common.ROOT, "scenario_dataset_klaster12_4x.json")
 if args.dataset == "4x":
@@ -55,17 +63,25 @@ else:
     assert os.path.exists(DATASET), f"dataset tak ditemukan: {DATASET}"
 
 POLICY_CLS = MasterStationPPOPrefPolicy if args.pref else MasterStationPPOPolicy
-TAG_ARM = "master_station_ppo_pref" if args.pref else "master_station_ppo"
+POLICY_KW = {"pref_feature_mode": True} if args.pref_feature_mode else {}
+if args.pref_feature_mode:
+    TAG_ARM = "master_station_ppo_pref_feat"
+elif args.pref:
+    TAG_ARM = "master_station_ppo_pref"
+else:
+    TAG_ARM = "master_station_ppo"
 
 print(f"[{elapsed()}] Dataset: {DATASET}", flush=True)
-print(f"[{elapsed()}] Lengan: {POLICY_CLS.__name__} (tag={TAG_ARM})", flush=True)
+print(f"[{elapsed()}] Lengan: {POLICY_CLS.__name__} (tag={TAG_ARM}, "
+     f"pref_feature_mode={args.pref_feature_mode})", flush=True)
 print(f"[{elapsed()}] Anggaran: n_updates={args.n_updates} rollout_steps={args.rollout_steps} "
      f"k={args.k}", flush=True)
 
 
 def train_one(seed, tag):
     tr = MasterStationPPOTrainer(DATASET, rollout_steps=args.rollout_steps, seed=seed,
-                                 verbose=False, k=args.k, policy_cls=POLICY_CLS)
+                                 verbose=False, k=args.k, policy_cls=POLICY_CLS,
+                                 policy_kw=POLICY_KW)
     policy = tr.train(FormulaForecaster(), n_updates=args.n_updates)
     ckpt = os.path.join(common.OUTDIR, f"{tag}_seed{seed}.pt")
     torch.save(policy.state_dict(), ckpt)
@@ -74,7 +90,7 @@ def train_one(seed, tag):
 
 
 def load_policy(ckpt_path, n_spklu):
-    policy = POLICY_CLS(n_spklu)
+    policy = POLICY_CLS(n_spklu, **POLICY_KW)
     policy.load_state_dict(torch.load(ckpt_path, map_location="cpu"))
     policy.eval()
     return policy
