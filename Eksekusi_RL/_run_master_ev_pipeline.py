@@ -36,6 +36,12 @@ p.add_argument("--k", type=int, default=3, help="langit-langit jumlah stasiun di
 p.add_argument("--dataset", type=str, default="4x",
               help="'4x' (BAKU, regime dibekukan Tahap 1) | '1x' (DATASET_KANONIK, TAK sepadan) "
                    "| path berkas .json eksplisit")
+p.add_argument("--forecaster", type=str, default="formula", choices=["formula", "vwf"],
+              help="'formula' (BAKU historis -- FormulaForecaster kasar, TAK PERNAH diuji "
+                   "dgn VWF sebelum ini) | 'vwf' (VirtualWaitForecaster -- basis SAMA dgn "
+                   "eta_norm yg dilihat aktor; menguji apakah kegagalan kritik-kolektif "
+                   "murni arsitektural atau tercampur celah forecaster, lihat diskusi "
+                   "'apakah ada pengaruh dari vwf'). >0 WAJIB tag terpisah, lihat di bawah.")
 args = p.parse_args()
 
 _DATASET_4X = os.path.join(common.ROOT, "scenario_dataset_klaster12_4x.json")
@@ -50,17 +56,24 @@ else:
     DATASET = args.dataset
     assert os.path.exists(DATASET), f"dataset tak ditemukan: {DATASET}"
 
-TAG_ARM = "master_ev"
+_fc_suffix = "" if args.forecaster == "formula" else f"_{args.forecaster}"
+TAG_ARM = "master_ev" + _fc_suffix
 print(f"[{elapsed()}] Dataset: {DATASET}", flush=True)
-print(f"[{elapsed()}] Lengan: tag={TAG_ARM} (perspektif-EV, kritik per-timestep)", flush=True)
+print(f"[{elapsed()}] Lengan: tag={TAG_ARM} (perspektif-EV, kritik per-timestep, "
+     f"forecaster={args.forecaster})", flush=True)
 print(f"[{elapsed()}] Anggaran: n_updates={args.n_updates} rollout_steps={args.rollout_steps} "
      f"delay_minutes={args.delay_minutes} k={args.k}", flush=True)
+
+
+def make_forecaster():
+    from marl_spklu.rl.forecaster import FormulaForecaster, VirtualWaitForecaster
+    return VirtualWaitForecaster() if args.forecaster == "vwf" else FormulaForecaster()
 
 
 def train_one(seed, tag):
     tr = MasterEVTrainer(DATASET, rollout_steps=args.rollout_steps, seed=seed, verbose=False,
                          delay_minutes=args.delay_minutes, k=args.k)
-    actor, critic = tr.train(n_updates=args.n_updates)
+    actor, critic = tr.train(n_updates=args.n_updates, forecaster=make_forecaster())
     ckpt_actor = os.path.join(common.OUTDIR, f"{tag}_actor_seed{seed}.pt")
     ckpt_critic = os.path.join(common.OUTDIR, f"{tag}_critic_seed{seed}.pt")
     torch.save(actor.state_dict(), ckpt_actor)
@@ -82,7 +95,7 @@ def eval_actor_gini(ckpt_path, dataset_path, n_eval_seed, k):
     for s in range(n_eval_seed):
         sim = common.fresh_sim(dataset_path)
         random.seed(s); np.random.seed(s)
-        agent = MasterEVInferenceAgent(actor, k=k)
+        agent = MasterEVInferenceAgent(actor, forecaster=make_forecaster(), k=k)
         agent.bind_to_sim(sim)
         sim.run(max_steps=sim.max_steps, agent=agent)
         served = np.array([sp.total_served for sp in sim.spklus.values()], float)

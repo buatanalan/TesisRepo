@@ -3,7 +3,9 @@ mirror `_uji_master_ddpg_metrik.py`, lihat docstring di sana utk alasan terpisah
 dari loop 19-lengan.
 
 Pemakaian (checkpoint HARUS sudah ada, hasil `_run_master_ev_pipeline.py`):
-    python _uji_master_ev_metrik.py 0,1,2 30d
+    python _uji_master_ev_metrik.py 0,1,2 30d [tag_arm]
+    tag_arm opsional -- default "master_ev" (forecaster kasar historis). Utk varian
+    "master_ev_vwf" (--forecaster vwf), berikan eksplisit sbg argumen ke-3.
 """
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -18,13 +20,15 @@ sys.argv = _argv_asli
 from marl_spklu.rl.master_ev_policy import MasterEVActor
 from marl_spklu.rl.master_ev_trainer import MasterEVInferenceAgent
 from marl_spklu.rl.master_paper_obs import STATION_FEAT_DIM_MASTER_EV
-
-TAG_ARM = "master_ev"
-LABEL_ARM = "MASTER-EV"
+from marl_spklu.rl.forecaster import FormulaForecaster
 
 SEEDS = ([int(s) for s in sys.argv[1].replace(" ", "").split(",") if s]
         if len(sys.argv) > 1 else [0, 1, 2])
 TAG = sys.argv[2] if len(sys.argv) > 2 else "30d"
+TAG_ARM = sys.argv[3] if len(sys.argv) > 3 else "master_ev"
+_is_vwf = "vwf" in TAG_ARM
+LABEL_ARM = f"MASTER-EV+vwf[{TAG_ARM}]" if _is_vwf else f"MASTER-EV[{TAG_ARM}]"
+FORECASTER_CLS = K.VW if _is_vwf else FormulaForecaster
 K.DS = os.path.join(common.ROOT, K.HORIZON[TAG])
 K_REC = 3
 
@@ -42,7 +46,7 @@ def muat_actor(seed):
 
 def fac_dari_actor(actor):
     def fac(sim, _actor=actor):
-        agent = MasterEVInferenceAgent(_actor, k=K_REC)
+        agent = MasterEVInferenceAgent(_actor, forecaster=FORECASTER_CLS(), k=K_REC)
         agent.bind_to_sim(sim)
         return agent
     return fac

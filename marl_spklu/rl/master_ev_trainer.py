@@ -418,10 +418,18 @@ class MasterEVTrainer:
         self._n_updates += 1
         return last
 
-    def train(self, n_updates: int):
+    def train(self, n_updates: int, forecaster=None):
+        """`forecaster` (2026-08-21, PERBAIKAN): SEBELUMNYA tak ada parameter ini sama
+        sekali -- `MasterEVRolloutAgent` selalu jatuh ke default `FormulaForecaster()`
+        kasar (RLRolloutAgent.__init__), TAK PERNAH diuji dgn `VirtualWaitForecaster`
+        (VWF) spt `MasterEVPPOTrainer`. Diberi eksplisit di sini supaya perbandingan
+        kritik-kolektif vs V(s)-tunggal bisa apple-to-apple pada basis forecaster yg
+        SAMA -- lihat diskusi "apakah ada pengaruh dari vwf" (celah confound yg belum
+        terisolasi sebelum ini)."""
         chunk = self.rollout_steps
         sim = self._fresh_sim()
-        agent = MasterEVRolloutAgent(self.actor, sim, self.rc, k=self.k, equity_calc=self.equity_calc)
+        agent = MasterEVRolloutAgent(self.actor, sim, self.rc, forecaster=forecaster,
+                                     k=self.k, equity_calc=self.equity_calc)
         step = 0
         for it in range(n_updates):
             boundary = False
