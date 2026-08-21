@@ -286,10 +286,20 @@ class MasterEVPPOPrefPolicy(MasterEVPPOPolicy):
                                                       self.hist_hidden + pref_d_attn, critic_hidden)
 
     def _encode_pref(self, pref_hist):
+        """PERBAIKAN (2026-08-21): pakai `pack_padded_sequence` -- `pref_lstm` MELEWATI
+        langkah padding-nol sepenuhnya (bukan memprosesnya sbg input nol yg tetap
+        mengubah cell-state), menghilangkan dilusi-padding TANPA harus memperpendek
+        jendela `pref_hist_k` (lihat `MasterEVPPORolloutAgent._build_pref_hist` --
+        padding kini di BELAKANG, syarat API ini). Panjang riwayat SUNGGUHAN tiap
+        baris dihitung dari baris bukan-nol (aman: fitur stasiun asli hampir tak pernah
+        PERSIS nol di semua dimensi sekaligus -- jarak/wait/antrean/konektor/utilisasi)."""
         if not self.use_preference:
             return torch.zeros(pref_hist.shape[0], self.pref_lstm.hidden_size,
                                device=pref_hist.device, dtype=pref_hist.dtype)
-        _, (h_n, _) = self.pref_lstm(pref_hist)
+        lengths = (pref_hist.abs().sum(dim=-1) > 0).sum(dim=1).clamp(min=1).cpu()
+        packed = nn.utils.rnn.pack_padded_sequence(pref_hist, lengths, batch_first=True,
+                                                    enforce_sorted=False)
+        _, (h_n, _) = self.pref_lstm(packed)
         return h_n[-1]
 
     def forward(self, obs, hist=None, critic_obs=None, pref_hist=None):
@@ -381,23 +391,25 @@ class MasterEVPPORolloutAgent(RLRolloutAgent):
         self.pref_hist_k = int(pref_hist_k) if pref_hist_k is not None else PDQN_HIST_K
 
     def _build_pref_hist(self, user):
-        """Override `RLRolloutAgent._build_pref_hist` -- logika IDENTIK, HANYA panjang
-        jendela (`self.pref_hist_k`, bisa < `PDQN_HIST_K`) yang beda. Deque penyimpanan
-        (`self._pref_hist`, diisi `_record_pref`, DIWARISI TANPA PERUBAHAN) tetap
-        ber-`maxlen=PDQN_HIST_K` -- di sini hanya AMBIL lebih sedikit dari ekornya."""
+        """Override `RLRolloutAgent._build_pref_hist` -- BEDA PENTING (2026-08-21):
+        padding-nol di sini ditaruh DI BELAKANG (bukan di depan spt versi asli) --
+        RIGHT-padding, syarat `nn.utils.rnn.pack_padded_sequence` (dipakai `_encode_pref`
+        supaya `pref_lstm` MELEWATI langkah padding sepenuhnya, bukan memprosesnya sbg
+        nol -- lihat diskusi "penyebabnya karena pooling?"/dilusi-padding). Panjang
+        jendela `self.pref_hist_k` (bisa < `PDQN_HIST_K`) tetap berlaku. Deque
+        penyimpanan (`self._pref_hist`, `_record_pref`) DIWARISI TANPA PERUBAHAN."""
         k = self.pref_hist_k
         arr = np.zeros((k, self._pref_hist_feat_dim), dtype=np.float32)
         h = self._pref_hist.get(user.user_id)
         if h:
             recent = list(h)[-k:]
-            offset = k - len(recent)
             for t, pair in enumerate(recent):
                 if self.pref_feature_mode:
-                    arr[offset + t] = pair
+                    arr[t] = pair
                 else:
                     a_hat_idx, a_idx = pair
-                    arr[offset + t, a_hat_idx] = 1.0
-                    arr[offset + t, self.N + a_idx] = 1.0
+                    arr[t, a_hat_idx] = 1.0
+                    arr[t, self.N + a_idx] = 1.0
         return arr
 
     def on_decision(self, user, chosen_spklu_id, recs, feasible_spklus):
