@@ -45,12 +45,26 @@ import torch.nn as nn
 
 from marl_spklu.rl.policy import StationEncoder, AttentionPooling, NEG_INF, HIST_FEAT_DIM, HIST_HIDDEN
 from marl_spklu.rl.master_paper_obs import STATION_FEAT_DIM_MASTER_EV, build_joint_obs_master_ev
-from marl_spklu.rl.rollout import RLRolloutAgent, Transition, RewardCalculatorStub, _gini
+from marl_spklu.rl.rollout import (RLRolloutAgent, Transition, RewardCalculatorStub, _gini,
+                                   STREAM_INDIVIDUAL, STREAM_GLOBAL)
 from marl_spklu.rl.rewards import RewardCalculator
 from marl_spklu.rl.ppo import PPOTrainer, _make_logger
 from marl_spklu.rl.pdqn_policy import (PreferenceAttention, hist_feat_dim,
                                        hist_feat_dim_feature, PREF_STATION_FEAT_DIM)
 from marl_spklu.rl.p_ppo_policy import PREF_D_LSTM, PREF_D_ATTN
+
+# --- Aliran reward 3-arah, KHUSUS keluarga MasterEVPPO (n_critics=3) ---------------
+# TIDAK mengubah `rollout.py::STREAM_INDIVIDUAL/STREAM_GLOBAL/N_REWARD_STREAMS` yang
+# dipakai BERSAMA oleh hampir semua lengan lain (H-PPO/P-PPO/MASTER-bid/dst) -- itu
+# akan mengubah bentuk kritik SEMUA lengan itu sekaligus & merusak checkpoint yang
+# sudah ada. Sebagai gantinya: 3 aliran LOKAL, hanya aktif bila `policy.n_critics==3`
+# (lihat `MasterEVPPORolloutAgent._split_prox`), memisahkan Prox dari perbaikan-wait
+# (SEBELUMNYA tergabung satu kolom di STREAM_INDIVIDUAL -- diagnosis "kenapa wait
+# anjlok saat +P+K2" menunjuk ke sini: begitu P membuat Prox lebih mudah dioptimalkan,
+# kontribusinya mendominasi kolom gabungan, wait ikut terseret tanpa disadari terpisah).
+STREAM_WAIT = 0     # perbaikan-wait SAJA (dulu tergabung STREAM_INDIVIDUAL)
+STREAM_PROX = 1     # Prox SAJA (dulu tergabung STREAM_INDIVIDUAL)
+STREAM_GLOBAL3 = 2  # Gini + anti-herding (identik STREAM_GLOBAL, indeks beda krn 3 aliran)
 
 
 class MasterEVPPOPolicy(nn.Module):
@@ -286,10 +300,129 @@ class MasterEVPPOPrefPolicy(MasterEVPPOPolicy):
         return logits, value
 
 
+class MasterEV3Transition:
+    """Duplikat `rollout.py::Transition`, HANYA beda `reward_streams` berukuran 3
+    (bukan `N_REWARD_STREAMS`=2 bersama) -- lihat catatan `STREAM_WAIT/PROX/GLOBAL3`
+    di atas kenapa ini TERISOLASI di modul ini, bukan mengubah `Transition` bersama."""
+    __slots__ = ("obs", "critic_obs", "hist", "mask", "chosen_indices", "n_rec",
+                 "logp", "value", "step", "reward_streams", "done",
+                 "complied", "disp_estwait", "wait_default", "resolved", "flock_penalty",
+                 "pref_hist", "bids", "trust_before")
+
+    def __init__(self, obs, critic_obs, hist, mask, chosen_indices, n_rec, logp, value, step,
+                pref_hist=None):
+        self.obs = obs; self.critic_obs = critic_obs; self.hist = hist; self.mask = mask
+        self.chosen_indices = chosen_indices; self.n_rec = n_rec
+        self.logp = logp
+        self.value = np.atleast_1d(np.asarray(value, dtype=np.float64))
+        self.step = step
+        self.reward_streams = np.zeros(3, dtype=np.float64)
+        self.done = False
+        self.flock_penalty = 0.0
+        self.pref_hist = pref_hist
+        self.bids = None
+        self.resolved = False
+        self.complied = False; self.disp_estwait = 0.0; self.wait_default = 0.0
+        self.trust_before = 0.5
+
+    @property
+    def reward(self) -> float:
+        return float(self.reward_streams.sum())
+
+    def reward_vec(self, n_critics: int) -> np.ndarray:
+        if n_critics == 1:
+            return np.array([self.reward_streams.sum()], dtype=np.float64)
+        if n_critics != 3:
+            raise ValueError(f"n_critics={n_critics} != 3 (MasterEV3Transition)")
+        return self.reward_streams
+
+    def add_reward(self, value: float, stream: int = STREAM_WAIT) -> None:
+        self.reward_streams[stream] += float(value)
+
+
 class MasterEVPPORolloutAgent(RLRolloutAgent):
-    """Override HANYA `get_recommendation` -- observasi §3.1+state-EV via
+    """Override `get_recommendation` -- observasi §3.1+state-EV via
     `build_joint_obs_master_ev`. `on_decision`/`on_step_end`/`on_charge_complete`
-    DIWARISI APA ADANYA (resep reward 2-aliran SAMA PERSIS lengan PPO lain)."""
+    JUGA DIOVERRIDE (2026-08-21) -- HANYA utk memilih indeks aliran reward yang benar
+    (2 aliran BAKU vs 3 aliran Prox-terpisah); logika perhitungan reward itu sendiri
+    IDENTIK PERSIS `RLRolloutAgent` (disalin, bukan ditulis ulang dari nol).
+
+    `_split_prox` (dideteksi OTOMATIS dari `policy.n_critics==3`, TAK PERNAH diketik
+    manual di titik panggil -- sama pola `pref_feature_mode` auto-derive di kelas lain
+    supaya latih & uji tak pernah bisa berbeda mode): True -> Prox & perbaikan-wait
+    dipisah ke `STREAM_PROX`/`STREAM_WAIT` (kritik 3-kepala WAJIB, `MasterEV3Transition`
+    dipakai). False -> perilaku LAMA (2 aliran, `Transition` biasa, TAK BERUBAH)."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._split_prox = (int(getattr(self.policy, "n_critics", 1)) == 3)
+
+    def on_decision(self, user, chosen_spklu_id, recs, feasible_spklus):
+        if not self._split_prox:
+            return super().on_decision(user, chosen_spklu_id, recs, feasible_spklus)
+        if self._pending is None:
+            return
+        tr, _, primary_idx, wait_hat, default_idx, recent_rec_count = self._pending
+        complied = chosen_spklu_id in set(recs)
+        tr.complied = bool(complied)
+        tr.trust_before = float(user.trust)
+        feat_rec = self._station_feat(self.sids[primary_idx], wait_hat)
+        feat_chosen = self._station_feat(chosen_spklu_id, wait_hat)
+        prox_value = self.rc.prox(feat_rec, feat_chosen)
+        tr.add_reward(self.rc.decision_reward(prox_value), STREAM_PROX)
+        flock_term = self.rc.flock_reward_rolling(recent_rec_count)
+        tr.add_reward(flock_term, STREAM_GLOBAL3)
+        tr.flock_penalty = self.rc.flocking_penalty_rolling(recent_rec_count)
+        if self.equity_calc is not None:
+            chosen_idx_eq = self.sid_to_idx.get(chosen_spklu_id)
+            if chosen_idx_eq is not None:
+                utils = np.array([s.get_utilization() for s in self.sim.spklus.values()])
+                feasible_idx = np.nonzero(tr.mask)[0]
+                tr.add_reward(self.equity_calc.decision_reward_equity(
+                    utils, feasible_idx, primary_idx, default_idx, chosen_idx_eq,
+                    recent_rec_count=recent_rec_count), STREAM_GLOBAL3)
+        if self._use_pref:
+            chosen_idx = self.sid_to_idx.get(chosen_spklu_id)
+            if chosen_idx is not None:
+                self._record_pref(user, primary_idx, chosen_idx, wait_hat)
+        user.interaction_history.append((
+            1.0 if complied else 0.0,
+            tr.disp_estwait / self.wait_scale,
+            tr.wait_default / self.wait_scale,
+            0.0,
+        ))
+        if len(user.interaction_history) > 30:
+            user.interaction_history.pop(0)
+        self._pending = None
+
+    def on_step_end(self, sim, step):
+        if not self._split_prox:
+            return super().on_step_end(sim, step)
+        transitions_this_step = [tr for tr in self.transitions if tr.step == step]
+        if not transitions_this_step:
+            return
+        utils = np.array([s.get_utilization() for s in self.sim.spklus.values()])
+        gini_term = self.rc.gini_reward(utils)
+        for tr in transitions_this_step:
+            tr.add_reward(gini_term, STREAM_GLOBAL3)
+
+    def on_charge_complete(self, user):
+        if not self._split_prox:
+            return super().on_charge_complete(user)
+        tr = self._user_trip_tr.pop(user.user_id, None)
+        if tr is not None:
+            if tr.complied:
+                tr.add_reward(
+                    self.rc.wait_reward(tr.wait_default, user.wait_time, tr.disp_estwait),
+                    STREAM_WAIT)
+                if self.rc.alpha_trust != 0.0:
+                    delta_trust = float(user.trust) - tr.trust_before
+                    tr.add_reward(self.rc.trust_shaping_reward(delta_trust), STREAM_WAIT)
+            tr.resolved = True
+            if tr.complied and user.interaction_history:
+                complied_v, disp_v, wdef_v, _ = user.interaction_history[-1]
+                realized_gap_norm = (user.wait_time - tr.disp_estwait) / self.wait_scale
+                user.interaction_history[-1] = (complied_v, disp_v, wdef_v, realized_gap_norm)
 
     def get_recommendation(self, feasible_spklus: dict):
         user = self.sim._current_spawn_user
@@ -334,9 +467,10 @@ class MasterEVPPORolloutAgent(RLRolloutAgent):
         idx_arr = np.zeros(self.k, dtype=np.int64)
         idx_arr[:n_rec] = chosen_indices
 
-        tr = Transition(obs_flat, obs_flat, hist, mask, idx_arr, n_rec,
-                        act["logp"], act["value"], self.sim.current_step,
-                        pref_hist=pref_hist)
+        TransitionCls = MasterEV3Transition if self._split_prox else Transition
+        tr = TransitionCls(obs_flat, obs_flat, hist, mask, idx_arr, n_rec,
+                           act["logp"], act["value"], self.sim.current_step,
+                           pref_hist=pref_hist)
         tr.disp_estwait = primary_disp
         tr.wait_default = float(self.sim.compute_virtual_wait(
             user, self.sim.spklus[self.sids[default_idx]], time_now)
