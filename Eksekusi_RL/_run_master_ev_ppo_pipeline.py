@@ -72,6 +72,15 @@ p.add_argument("--alpha-accept", type=float, default=0.0,
                    "BAKU MATI=0.0). SIMETRIS (+patuh/-tolak, SEGERA -- beda dari wait_reward "
                    "yg hanya-positif & tertunda). Diagnosis riwayat training membuktikan "
                    "acceptance terkikis 0,68->0,39 tanpa suku ini. >0 WAJIB tag terpisah.")
+p.add_argument("--reward-preset", type=str, default="raw", choices=["raw", "seimbang4x"],
+              help="'raw' (BAKU -- konstruktor RewardCalculator() MENTAH, alpha_wait=1.0 "
+                   "alpha_gini=0.5 use_delta_gini=False -- TAK PERNAH dikalibrasi utk rezim "
+                   "4x, dipertahankan hanya demi kompatibilitas mundur checkpoint lama) | "
+                   "'seimbang4x' (RewardCalculator.seimbang4x() -- preset TERKALIBRASI utk "
+                   "rezim 4x, alpha_wait=0.0046 alpha_gini=2.6019 alpha_flock=0.0208 "
+                   "use_delta_gini=True. Diagnosis 2026-08-21: 'raw' membuat gini level "
+                   "ABSOLUT nyaris-konstan tiap keputusan -- shg praktis tak jadi sinyal "
+                   "belajar; 'seimbang4x' memakai DELTA-gini spt didesain).")
 p.add_argument("--forecaster", type=str, default="formula", choices=["formula", "vwf"],
               help="'formula' (BAKU, FormulaForecaster -- kasar, rata2 tetap per konektor) "
                    "| 'vwf' (VirtualWaitForecaster -- basis DISAMAKAN dgn eta_norm yg dilihat "
@@ -112,6 +121,7 @@ _horizon_suffix = "" if args.horizon == "30d" else f"_{args.horizon}"
 _trust_suffix = "" if args.alpha_trust == 0.0 else f"_trust{args.alpha_trust:g}"
 _accept_suffix = "" if args.alpha_accept == 0.0 else f"_acc{args.alpha_accept:g}"
 _fc_suffix = "" if args.forecaster == "formula" else f"_{args.forecaster}"
+_rw_suffix = "" if args.reward_preset == "raw" else f"_{args.reward_preset}"
 _critics_suffix = "" if args.n_critics == 1 else f"_K{args.n_critics}"
 _beta_suffix = "_gap" if args.beta_mode == "gap_ratio" else ""
 _sigma_suffix = ("" if args.beta_sigma == 0.1 else f"_sig{args.beta_sigma:g}")
@@ -119,7 +129,7 @@ _hist_suffix = "_nohist" if args.no_hist else ""
 _prefk_suffix = "" if args.pref_hist_k is None else f"_prefk{args.pref_hist_k}"
 _suffix = (("_pref_feat" if args.pref_feature_mode else ("_pref" if args.pref else ""))
           + _hist_suffix + _prefk_suffix + _trust_suffix + _accept_suffix + _fc_suffix
-          + _critics_suffix + _beta_suffix + _sigma_suffix + _horizon_suffix)
+          + _rw_suffix + _critics_suffix + _beta_suffix + _sigma_suffix + _horizon_suffix)
 TAG_ARM = "master_ev_ppo" + _suffix
 print(f"[{elapsed()}] Dataset: {DATASET}", flush=True)
 print(f"[{elapsed()}] Lengan: tag={TAG_ARM} (perspektif-EV, PPOTrainer standar, V(s) atensi tunggal, "
@@ -134,8 +144,15 @@ def make_forecaster():
     return VirtualWaitForecaster() if args.forecaster == "vwf" else FormulaForecaster()
 
 
+def make_reward_calc():
+    if args.reward_preset == "seimbang4x":
+        return RewardCalculator.seimbang4x(alpha_trust=args.alpha_trust,
+                                           alpha_accept=args.alpha_accept)
+    return RewardCalculator(alpha_trust=args.alpha_trust, alpha_accept=args.alpha_accept)
+
+
 def train_one(seed, tag):
-    rc = RewardCalculator(alpha_trust=args.alpha_trust, alpha_accept=args.alpha_accept)
+    rc = make_reward_calc()
     tr = MasterEVPPOTrainer(DATASET, rollout_steps=args.rollout_steps, seed=seed, verbose=False,
                             reward_calc=rc, k=args.k, n_critics=args.n_critics,
                             policy_cls=POLICY_CLS, policy_kw=POLICY_KW,
@@ -247,7 +264,7 @@ common.save_json(dict(
                pref_feature_mode=args.pref_feature_mode, horizon=args.horizon,
                alpha_trust=args.alpha_trust, alpha_accept=args.alpha_accept,
                forecaster=args.forecaster, beta_mode=args.beta_mode,
-               beta_sigma=args.beta_sigma, dataset=DATASET)),
+               beta_sigma=args.beta_sigma, reward_preset=args.reward_preset, dataset=DATASET)),
     f"{TAG_ARM}_eval_results.json")
 
 print(f"[{elapsed()}] === SEMUA SELESAI (MasterEV-PPO) ===", flush=True)

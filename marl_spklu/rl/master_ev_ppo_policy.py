@@ -421,12 +421,16 @@ class MasterEVPPORolloutAgent(RLRolloutAgent):
         complied = chosen_spklu_id in set(recs)
         tr.complied = bool(complied)
         tr.trust_before = float(user.trust)
-        # Suku shaping acceptance (opsional, BAKU MATI) -- masuk STREAM_WAIT (bukan
-        # STREAM_PROX/GLOBAL3), sama "kantong konsekuensi-individual" spt wait_reward,
-        # tapi SIMETRIS & SEGERA (tak digerbang tr.complied spt wait_reward -- lihat
-        # RewardCalculator.acceptance_reward).
+        # Suku shaping acceptance (opsional, BAKU MATI) -- masuk STREAM_GLOBAL3 (BUKAN
+        # STREAM_WAIT lagi, lihat diagnosis 2026-08-21: acceptance_reward ber-magnitudo
+        # +-1 SEGERA tiap keputusan menumpuk di stream yg sama dgn wait_reward yg kecil &
+        # delayed, membuat r_bar STREAM_WAIT meledak 10-30x drpd PROX & beberapa x drpd
+        # GLOBAL -- diduga penyebab dominan wait/gini liar di eval K3+P+accept 90d).
+        # GLOBAL3 dipilih krn acceptance scr konseptual lebih dekat "penilaian
+        # populasi/sistem" (simetris, memengaruhi keputusan agen scr keseluruhan) drpd
+        # wait individual murni.
         if self.rc.alpha_accept != 0.0:
-            tr.add_reward(self.rc.acceptance_reward(complied), STREAM_WAIT)
+            tr.add_reward(self.rc.acceptance_reward(complied), STREAM_GLOBAL3)
         feat_rec = self._station_feat(self.sids[primary_idx], wait_hat)
         feat_chosen = self._station_feat(chosen_spklu_id, wait_hat)
         prox_value = self.rc.prox(feat_rec, feat_chosen)
