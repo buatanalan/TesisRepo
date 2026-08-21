@@ -36,6 +36,14 @@ p.add_argument("--beta-mode", type=str, default="fixed", choices=["fixed", "gap_
                    "sesungguhnya -- bobot menyesuaikan diri thd aliran yg paling tertinggal). "
                    "SEMUA eksperimen K2/K3 sebelum ini diam-diam memakai 'fixed' -- DGR "
                    "TAK PERNAH aktif walau n_critics>1 (lihat diagnosis beta terpaku 1/K).")
+p.add_argument("--beta-sigma", type=float, default=0.1,
+              help="suhu softmax utk beta_mode='gap_ratio' (PPOTrainer.beta_sigma, BAKU "
+                   "0.1 -- juga default PPOTrainer sendiri). BAKU 0.1 TERLALU TAJAM: gap "
+                   "diclip [0,10] tapi z=gap/sigma bisa smp 100 -> beta kolaps nyaris "
+                   "one-hot antar-chunk (diamati smoke-test & diagnosis kolaps seed 0 K3 "
+                   "90d acc1 -- entropi kebijakan runtuh permanen stlh lonjakan grad_norm "
+                   "beriringan dgn swing beta ekstrem). Naikkan (mis. 1.0-2.0) utk "
+                   "melunakkan transisi bobot antar-stream.")
 p.add_argument("--pref", action="store_true",
               help="tambahkan modul preferensi PDQN (MasterEVPPOPrefPolicy) -- pengujian "
                    "ULANG hipotesis 'P gagal krn identitas-ambigu di perspektif stasiun', "
@@ -106,11 +114,12 @@ _accept_suffix = "" if args.alpha_accept == 0.0 else f"_acc{args.alpha_accept:g}
 _fc_suffix = "" if args.forecaster == "formula" else f"_{args.forecaster}"
 _critics_suffix = "" if args.n_critics == 1 else f"_K{args.n_critics}"
 _beta_suffix = "_gap" if args.beta_mode == "gap_ratio" else ""
+_sigma_suffix = ("" if args.beta_sigma == 0.1 else f"_sig{args.beta_sigma:g}")
 _hist_suffix = "_nohist" if args.no_hist else ""
 _prefk_suffix = "" if args.pref_hist_k is None else f"_prefk{args.pref_hist_k}"
 _suffix = (("_pref_feat" if args.pref_feature_mode else ("_pref" if args.pref else ""))
           + _hist_suffix + _prefk_suffix + _trust_suffix + _accept_suffix + _fc_suffix
-          + _critics_suffix + _beta_suffix + _horizon_suffix)
+          + _critics_suffix + _beta_suffix + _sigma_suffix + _horizon_suffix)
 TAG_ARM = "master_ev_ppo" + _suffix
 print(f"[{elapsed()}] Dataset: {DATASET}", flush=True)
 print(f"[{elapsed()}] Lengan: tag={TAG_ARM} (perspektif-EV, PPOTrainer standar, V(s) atensi tunggal, "
@@ -130,7 +139,8 @@ def train_one(seed, tag):
     tr = MasterEVPPOTrainer(DATASET, rollout_steps=args.rollout_steps, seed=seed, verbose=False,
                             reward_calc=rc, k=args.k, n_critics=args.n_critics,
                             policy_cls=POLICY_CLS, policy_kw=POLICY_KW,
-                            pref_hist_k=args.pref_hist_k, beta_mode=args.beta_mode)
+                            pref_hist_k=args.pref_hist_k, beta_mode=args.beta_mode,
+                            beta_sigma=args.beta_sigma)
     policy = tr.train(make_forecaster(), n_updates=args.n_updates)
     ckpt = os.path.join(common.OUTDIR, f"{tag}_actor_seed{seed}.pt")
     torch.save(policy.state_dict(), ckpt)
@@ -236,7 +246,8 @@ common.save_json(dict(
                n_critics=args.n_critics, pref=args.pref,
                pref_feature_mode=args.pref_feature_mode, horizon=args.horizon,
                alpha_trust=args.alpha_trust, alpha_accept=args.alpha_accept,
-               forecaster=args.forecaster, beta_mode=args.beta_mode, dataset=DATASET)),
+               forecaster=args.forecaster, beta_mode=args.beta_mode,
+               beta_sigma=args.beta_sigma, dataset=DATASET)),
     f"{TAG_ARM}_eval_results.json")
 
 print(f"[{elapsed()}] === SEMUA SELESAI (MasterEV-PPO) ===", flush=True)
