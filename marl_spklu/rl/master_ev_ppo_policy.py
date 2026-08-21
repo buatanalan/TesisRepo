@@ -250,6 +250,13 @@ class MasterEVPPOPrefPolicy(MasterEVPPOPolicy):
         # eksplisit) -- pola SAMA `PPPOPolicy` (H-PPO+P).
         self.station_encoder = StationEncoder(STATION_FEAT_DIM_MASTER_EV,
                                               self.hist_hidden + pref_d_attn, hidden)
+        # PERBAIKAN (2026-08-21): kritik SEBELUMNYA hanya diberi `c_t`, buta terhadap
+        # `attended_pref` -- V(s) tak bisa "menjelaskan" bagian nilai yg didorong modul P,
+        # membuat estimasi advantage utk aksi yg dipengaruhi P jadi bias/kurang akurat.
+        # `attended_pref` BUKAN privileged (aktor sendiri sudah melihatnya) -- aman
+        # diteruskan ke kritik, sama prinsip CTDE penuh `HPPOPolicy`.
+        self.critic_station_encoder = StationEncoder(STATION_FEAT_DIM_MASTER_EV,
+                                                      self.hist_hidden + pref_d_attn, critic_hidden)
 
     def _encode_pref(self, pref_hist):
         if not self.use_preference:
@@ -273,7 +280,7 @@ class MasterEVPPOPrefPolicy(MasterEVPPOPolicy):
         emb = self.station_encoder(station_feats, context)
         logits = self.disc_head(emb).squeeze(-1)
 
-        c_emb = self.critic_station_encoder(station_feats, c_t)
+        c_emb = self.critic_station_encoder(station_feats, context)
         pooled = self.critic_pool(c_emb)
         value = self.critic_head(pooled)
         return logits, value
