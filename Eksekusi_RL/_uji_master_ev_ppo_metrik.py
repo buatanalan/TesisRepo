@@ -47,6 +47,11 @@ N_CRITICS = int(_m_critics.group(1)) if _m_critics else 1
 # krn selama training kontribusinya dinolkan) diam-diam ikut mencemari forward() --
 # TIDAK memicu RuntimeError spt mismatch dim, jadi harus benar sejak awal.
 _is_nohist = "nohist" in TAG_ARM
+# `prefk<N>`: panjang jendela riwayat P -- TAK mengubah bentuk jaringan (LSTM terima
+# urutan berapa pun) shg mismatch TAK memicu RuntimeError, harus benar sejak awal
+# (sama kelas risiko `nohist`). None (tak ada akhiran) -> baku PDQN_HIST_K=10.
+_m_prefk = re.search(r"_prefk(\d+)(?:_|$)", TAG_ARM)
+PREF_HIST_K = int(_m_prefk.group(1)) if _m_prefk else None
 LABEL_ARM = (f"MASTER-EV-PPO+P(fitur)[{TAG_ARM}]" if _is_pref_feat
             else f"MASTER-EV-PPO+P[{TAG_ARM}]" if _is_pref
             else f"MASTER-EV-PPO[{TAG_ARM}]")
@@ -73,7 +78,8 @@ def muat_policy(seed, n_spklu):
 
 def fac_dari_policy(policy):
     def fac(sim, _pol=policy):
-        return MasterEVPPOInferenceAgent(_pol, sim, FORECASTER_CLS(), k=K_REC)
+        return MasterEVPPOInferenceAgent(_pol, sim, FORECASTER_CLS(), k=K_REC,
+                                         pref_hist_k=PREF_HIST_K)
     return fac
 
 

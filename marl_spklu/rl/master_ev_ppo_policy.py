@@ -50,7 +50,8 @@ from marl_spklu.rl.rollout import (RLRolloutAgent, Transition, RewardCalculatorS
 from marl_spklu.rl.rewards import RewardCalculator
 from marl_spklu.rl.ppo import PPOTrainer, _make_logger
 from marl_spklu.rl.pdqn_policy import (PreferenceAttention, hist_feat_dim,
-                                       hist_feat_dim_feature, PREF_STATION_FEAT_DIM)
+                                       hist_feat_dim_feature, PREF_STATION_FEAT_DIM,
+                                       PDQN_HIST_K)
 from marl_spklu.rl.p_ppo_policy import PREF_D_LSTM, PREF_D_ATTN
 
 # --- Aliran reward 3-arah, KHUSUS keluarga MasterEVPPO (n_critics=3) ---------------
@@ -363,11 +364,41 @@ class MasterEVPPORolloutAgent(RLRolloutAgent):
     manual di titik panggil -- sama pola `pref_feature_mode` auto-derive di kelas lain
     supaya latih & uji tak pernah bisa berbeda mode): True -> Prox & perbaikan-wait
     dipisah ke `STREAM_PROX`/`STREAM_WAIT` (kritik 3-kepala WAJIB, `MasterEV3Transition`
-    dipakai). False -> perilaku LAMA (2 aliran, `Transition` biasa, TAK BERUBAH)."""
+    dipakai). False -> perilaku LAMA (2 aliran, `Transition` biasa, TAK BERUBAH).
 
-    def __init__(self, *args, **kwargs):
+    `pref_hist_k` (2026-08-21, ABLASI): panjang jendela riwayat P yang DIAMBIL saat
+    membangun `pref_hist` -- TERISOLASI PENUH dari `PDQN_HIST_K`=10 bersama (dipakai
+    PDQN diskrit sesuai spesifikasi §3.4 paper & lengan +P lain apa adanya, TAK
+    disentuh). Baku tetap 10 (perilaku lama persis). Dugaan yg diuji: bagi pengguna
+    dgn riwayat pendek (median interaksi rendah di domain ini), jendela 10 didominasi
+    padding-nol (~80% utk pengguna 2 interaksi) -- 2x lebih parah dari `hist_lstm`
+    (HIST_K=5, ~40% padding utk kasus sama) -- berpotensi mengencerkan sinyal `pref_lstm`
+    lebih jauh drpd `hist_lstm`."""
+
+    def __init__(self, *args, pref_hist_k: int = None, **kwargs):
         super().__init__(*args, **kwargs)
         self._split_prox = (int(getattr(self.policy, "n_critics", 1)) == 3)
+        self.pref_hist_k = int(pref_hist_k) if pref_hist_k is not None else PDQN_HIST_K
+
+    def _build_pref_hist(self, user):
+        """Override `RLRolloutAgent._build_pref_hist` -- logika IDENTIK, HANYA panjang
+        jendela (`self.pref_hist_k`, bisa < `PDQN_HIST_K`) yang beda. Deque penyimpanan
+        (`self._pref_hist`, diisi `_record_pref`, DIWARISI TANPA PERUBAHAN) tetap
+        ber-`maxlen=PDQN_HIST_K` -- di sini hanya AMBIL lebih sedikit dari ekornya."""
+        k = self.pref_hist_k
+        arr = np.zeros((k, self._pref_hist_feat_dim), dtype=np.float32)
+        h = self._pref_hist.get(user.user_id)
+        if h:
+            recent = list(h)[-k:]
+            offset = k - len(recent)
+            for t, pair in enumerate(recent):
+                if self.pref_feature_mode:
+                    arr[offset + t] = pair
+                else:
+                    a_hat_idx, a_idx = pair
+                    arr[offset + t, a_hat_idx] = 1.0
+                    arr[offset + t, self.N + a_idx] = 1.0
+        return arr
 
     def on_decision(self, user, chosen_spklu_id, recs, feasible_spklus):
         if not self._split_prox:
@@ -497,13 +528,20 @@ class MasterEVPPORolloutAgent(RLRolloutAgent):
 class MasterEVPPOInferenceAgent:
     """Evaluasi bersih -- pola sama `MasterStationPPOInferenceAgent`. `pref_feature_mode`
     DIAMBIL OTOMATIS dari `policy.pref_feature_mode` (bila ada) -- latih & uji tak pernah
-    bisa berbeda mode encoding riwayat (kelas bug berulang, lihat docstring kelas itu)."""
+    bisa berbeda mode encoding riwayat (kelas bug berulang, lihat docstring kelas itu).
+
+    `pref_hist_k`: BEDA dari `pref_feature_mode` -- TAK BISA diambil otomatis dari
+    `policy` (bukan bagian bentuk jaringan, murni hyperparameter sisi rollout-agent,
+    LSTM menerima panjang urutan berapa pun) -- WAJIB diteruskan MANUAL sesuai nilai
+    saat latih, kalau tidak evaluasi TETAP JALAN (tak crash) tapi diam-diam SALAH
+    (jendela riwayat tak cocok checkpoint)."""
 
     def __init__(self, policy, sim, forecaster=None, k: int = 3, epsilon: float = 0.0,
-                threshold: float = 0.20):
+                threshold: float = 0.20, pref_hist_k: int = None):
         pref_feature_mode = bool(getattr(policy, "pref_feature_mode", False))
         self._roll = MasterEVPPORolloutAgent(policy, sim, RewardCalculatorStub(), forecaster, k=k,
-                                             pref_feature_mode=pref_feature_mode)
+                                             pref_feature_mode=pref_feature_mode,
+                                             pref_hist_k=pref_hist_k)
         self._roll.epsilon = epsilon
         self._roll.threshold = threshold
 
@@ -530,11 +568,13 @@ class MasterEVPPOTrainer:
     def __init__(self, dataset_path, rollout_steps: int = 96, seed: int = 0,
                 verbose: bool = True, reward_calc=None, hidden: int = 64,
                 critic_hidden: int = 128, k: int = 3, n_critics: int = 1,
-                equity_calc=None, policy_cls=MasterEVPPOPolicy, policy_kw=None, **ppo_kw):
+                equity_calc=None, policy_cls=MasterEVPPOPolicy, policy_kw=None,
+                pref_hist_k: int = None, **ppo_kw):
         self.dataset_path = dataset_path
         self.rollout_steps = int(rollout_steps)
         self.k = int(k)
         self.equity_calc = equity_calc
+        self.pref_hist_k = pref_hist_k
         self.rc = reward_calc or RewardCalculator()
         self.verbose = verbose
         self.seed = seed
@@ -583,7 +623,8 @@ class MasterEVPPOTrainer:
         pref_feature_mode = bool(getattr(self.policy, "pref_feature_mode", False))
         agent = MasterEVPPORolloutAgent(self.policy, sim, self.rc, forecaster, k=self.k,
                                         equity_calc=self.equity_calc,
-                                        pref_feature_mode=pref_feature_mode)
+                                        pref_feature_mode=pref_feature_mode,
+                                        pref_hist_k=self.pref_hist_k)
         step = 0
         for _ in range(n_updates):
             it = self._it_global

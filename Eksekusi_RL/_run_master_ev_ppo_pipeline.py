@@ -58,6 +58,11 @@ p.add_argument("--forecaster", type=str, default="formula", choices=["formula", 
                    "aktor, sim.compute_virtual_wait; diagnosis event-trust menemukan celah "
                    "besar antara keduanya sbg penyebab dominan erosi trust RL). >0 WAJIB tag "
                    "terpisah, lihat di bawah.")
+p.add_argument("--pref-hist-k", type=int, default=None,
+              help="ABLASI: panjang jendela riwayat P (baku None=PDQN_HIST_K=10, sama "
+                   "dgn lengan +P lain & PDQN diskrit). Diperkecil (mis. 5, disamakan "
+                   "hist_lstm) utk uji dugaan jendela 10 terlalu didominasi padding-nol "
+                   "bagi pengguna beriwayat pendek. TERISOLASI dari PDQN_HIST_K bersama.")
 args = p.parse_args()
 
 assert not (args.pref_feature_mode and not args.pref), "--pref-feature-mode butuh --pref"
@@ -88,8 +93,10 @@ _trust_suffix = "" if args.alpha_trust == 0.0 else f"_trust{args.alpha_trust:g}"
 _fc_suffix = "" if args.forecaster == "formula" else f"_{args.forecaster}"
 _critics_suffix = "" if args.n_critics == 1 else f"_K{args.n_critics}"
 _hist_suffix = "_nohist" if args.no_hist else ""
+_prefk_suffix = "" if args.pref_hist_k is None else f"_prefk{args.pref_hist_k}"
 _suffix = (("_pref_feat" if args.pref_feature_mode else ("_pref" if args.pref else ""))
-          + _hist_suffix + _trust_suffix + _fc_suffix + _critics_suffix + _horizon_suffix)
+          + _hist_suffix + _prefk_suffix + _trust_suffix + _fc_suffix + _critics_suffix
+          + _horizon_suffix)
 TAG_ARM = "master_ev_ppo" + _suffix
 print(f"[{elapsed()}] Dataset: {DATASET}", flush=True)
 print(f"[{elapsed()}] Lengan: tag={TAG_ARM} (perspektif-EV, PPOTrainer standar, V(s) atensi tunggal, "
@@ -108,7 +115,8 @@ def train_one(seed, tag):
     rc = RewardCalculator(alpha_trust=args.alpha_trust)
     tr = MasterEVPPOTrainer(DATASET, rollout_steps=args.rollout_steps, seed=seed, verbose=False,
                             reward_calc=rc, k=args.k, n_critics=args.n_critics,
-                            policy_cls=POLICY_CLS, policy_kw=POLICY_KW)
+                            policy_cls=POLICY_CLS, policy_kw=POLICY_KW,
+                            pref_hist_k=args.pref_hist_k)
     policy = tr.train(make_forecaster(), n_updates=args.n_updates)
     ckpt = os.path.join(common.OUTDIR, f"{tag}_actor_seed{seed}.pt")
     torch.save(policy.state_dict(), ckpt)
@@ -129,7 +137,8 @@ def eval_policy_gini(ckpt_path, dataset_path, n_eval_seed, k):
     for s in range(n_eval_seed):
         sim = common.fresh_sim(dataset_path)
         random.seed(s); np.random.seed(s)
-        agent = MasterEVPPOInferenceAgent(pol, sim, make_forecaster(), k=k)
+        agent = MasterEVPPOInferenceAgent(pol, sim, make_forecaster(), k=k,
+                                          pref_hist_k=args.pref_hist_k)
         sim.run(max_steps=sim.max_steps, agent=agent)
         served = np.array([sp.total_served for sp in sim.spklus.values()], float)
         ginis.append(common.gini(served))
