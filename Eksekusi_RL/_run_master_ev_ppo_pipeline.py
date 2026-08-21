@@ -79,8 +79,9 @@ else:
 _horizon_suffix = "" if args.horizon == "30d" else f"_{args.horizon}"
 _trust_suffix = "" if args.alpha_trust == 0.0 else f"_trust{args.alpha_trust:g}"
 _fc_suffix = "" if args.forecaster == "formula" else f"_{args.forecaster}"
+_critics_suffix = "" if args.n_critics == 1 else f"_K{args.n_critics}"
 _suffix = (("_pref_feat" if args.pref_feature_mode else ("_pref" if args.pref else ""))
-          + _trust_suffix + _fc_suffix + _horizon_suffix)
+          + _trust_suffix + _fc_suffix + _critics_suffix + _horizon_suffix)
 TAG_ARM = "master_ev_ppo" + _suffix
 print(f"[{elapsed()}] Dataset: {DATASET}", flush=True)
 print(f"[{elapsed()}] Lengan: tag={TAG_ARM} (perspektif-EV, PPOTrainer standar, V(s) atensi tunggal, "

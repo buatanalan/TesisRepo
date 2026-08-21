@@ -7,7 +7,7 @@ Pemakaian:
     `--pref-feature-mode` di `_run_master_ev_ppo_pipeline.py`), berikan eksplisit:
     "master_ev_ppo_pref" atau "master_ev_ppo_pref_feat".
 """
-import sys, os
+import sys, os, re
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import torch, common
@@ -36,11 +36,18 @@ _is_pref = "pref" in TAG_ARM
 # terpisah, supaya identik persis dgn yg dipakai evaluasi H-PPO/P-PPO/MASTER (konvensi
 # Tahap 2: "Prediktor EstWait SERAGAM lintas semua metode -- syarat perbandingan setara").
 _is_vwf = "vwf" in TAG_ARM
+# `n_critics`: HARUS SAMA dgn --n-critics saat melatih -- dim keluaran critic_head
+# bergantung ini, mismatch -> RuntimeError size saat load_state_dict (sama kelas bug
+# pref_feature_mode sebelumnya). Dideteksi dari akhiran "_K<n>" (lihat _run_master_ev_
+# ppo_pipeline.py -- BAKU n_critics=1 tak dapat akhiran).
+_m_critics = re.search(r"_K(\d+)(?:_|$)", TAG_ARM)
+N_CRITICS = int(_m_critics.group(1)) if _m_critics else 1
 LABEL_ARM = (f"MASTER-EV-PPO+P(fitur)[{TAG_ARM}]" if _is_pref_feat
             else f"MASTER-EV-PPO+P[{TAG_ARM}]" if _is_pref
             else f"MASTER-EV-PPO[{TAG_ARM}]")
 POLICY_CLS = MasterEVPPOPrefPolicy if _is_pref else MasterEVPPOPolicy
 POLICY_KW = dict(pref_feature_mode=True) if _is_pref_feat else dict()
+POLICY_KW["n_critics"] = N_CRITICS
 FORECASTER_CLS = K.VW if _is_vwf else FormulaForecaster
 K.DS = os.path.join(common.ROOT, K.HORIZON[TAG])
 K_REC = 3
