@@ -5,7 +5,7 @@
 # pernah aktif ...". Jalankan dari root repo di server:
 #   nohup bash Eksekusi_RL/retrain_dgr_all.sh > Eksekusi_RL/outputs/retrain_dgr_all.log 2>&1 &
 set -e
-PY=.venv/Scripts/python.exe
+PY=.venv/bin/python
 PIPE=Eksekusi_RL/_run_master_ev_ppo_pipeline.py
 DS90=scenario_dataset_klaster12_4x_90d.json
 
