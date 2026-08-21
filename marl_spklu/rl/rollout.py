@@ -437,6 +437,11 @@ class RLRolloutAgent:
         complied = chosen_spklu_id in set(recs)
         tr.complied = bool(complied)
         tr.trust_before = float(user.trust)   # snapshot SEBELUM sesi ini bisa mengubahnya
+        # Suku shaping acceptance (opsional, BAKU MATI -- rc.alpha_accept=0.0 tak
+        # mengubah reward sama sekali). SIMETRIS (+patuh/-tolak), beda dari Prox/wait
+        # yg tak pernah menghukum penolakan -- lihat RewardCalculator.acceptance_reward.
+        if self.rc.alpha_accept != 0.0:
+            tr.add_reward(self.rc.acceptance_reward(complied), STREAM_INDIVIDUAL)
         # Suku Prox (segera): kedekatan fitur fisik SPKLU rekomendasi PRIMER vs SPKLU
         # terpilih. Terdefinisi baik saat diterima maupun ditolak (tidak dikalikan
         # indikator kepatuhan).
@@ -595,6 +600,10 @@ class RewardCalculatorStub:
     alpha_gini = 0.0
     alpha_flock = 0.0
     alpha_trust = 0.0
+    alpha_accept = 0.0
+
+    def acceptance_reward(self, complied):
+        return 0.0
 
     def prox(self, feat_rec, feat_chosen):
         return 0.0

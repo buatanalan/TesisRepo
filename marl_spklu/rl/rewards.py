@@ -108,7 +108,7 @@ class RewardCalculator:
                  alpha_gini: float = 0.5,
                  alpha_flock: float = 0.3, prox_lambda: float = 0.1,
                  wait_scale: float = 60.0, use_delta_gini: bool = False,
-                 alpha_trust: float = 0.0):
+                 alpha_trust: float = 0.0, alpha_accept: float = 0.0):
         self.alpha_wait = float(alpha_wait)
         self.beta_prox = float(beta_prox)
         self.alpha_gini = float(alpha_gini)
@@ -124,6 +124,17 @@ class RewardCalculator:
         # struktural atas "trust tak pernah jadi target reward" (diskusi analisis
         # kegagalan RL meningkatkan trust/acceptance).
         self.alpha_trust = float(alpha_trust)
+        # Suku SHAPING acceptance eksplisit (BAKU MATI, alpha_accept=0.0). TEMUAN
+        # yg mendasarinya: `wait_reward` HANYA aktif bila `tr.complied` -- tapi TAK
+        # ADA hukuman bila `complied=False` (kontribusi cuma nol, bukan negatif), dan
+        # `decision_reward`(Prox) dihitung SAMA baik patuh atau tidak. Artinya
+        # acceptance BUKAN sasaran reward sama sekali sebelumnya -- riwayat pelatihan
+        # (diagnosis "apakah trust/acceptance dipelajari") membuktikan acceptance
+        # TERKIKIS (0,68->0,39 sepanjang 300 chunk) tanpa apa pun menahannya. Suku
+        # ini SIMETRIS (+utk patuh, -utk tolak, lihat `acceptance_reward`) -- beda
+        # dari `wait_reward` yg hanya-positif, supaya ada gradien EKSPLISIT menahan
+        # erosi acceptance, bukan cuma "tak dihukum tak dihargai juga"."""
+        self.alpha_accept = float(alpha_accept)
         # Delta-gini (bukan level absolut) -- lihat catatan kelas. `_prev_gini` disimpan
         # per-instance (state internal), direset otomatis di keputusan pertama tiap episode
         # (None -> delta pertama = 0, tak ada sinyal palsu di awal).
@@ -237,6 +248,15 @@ class RewardCalculator:
         `wait_reward` (kedua suku individual delayed digerbang identik: hanya trip PATUH,
         sesuai `User.update_trust` sendiri hanya berjalan bila `last_rec_complied`)."""
         return self.alpha_trust * float(delta_trust)
+
+    def acceptance_reward(self, complied: bool) -> float:
+        """`alpha_accept * (+1 patuh / -1 tolak)` -- BAKU MATI (alpha_accept=0.0).
+        SIMETRIS (beda dari `wait_reward`/`decision_reward` yg tak pernah menghukum
+        penolakan) -- gradien EKSPLISIT menahan erosi acceptance, bukan cuma tak
+        menghukum/menghargai. Dipanggil SEGERA di on_decision (tak perlu menunggu
+        sesi selesai, beda dari wait_reward yg delayed -- kepatuhan sudah diketahui
+        SAAT itu juga)."""
+        return self.alpha_accept * (1.0 if complied else -1.0)
 
     # ---- Penalti herding / flocking -- DEPRECATED (per-langkah/same-step). Aktif hanya
     # 10,1% transisi krn 75% langkah cuma punya 1 keputusan -- herding di sistem ini

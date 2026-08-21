@@ -52,6 +52,11 @@ p.add_argument("--alpha-trust", type=float, default=0.0,
               help="bobot suku shaping trust eksplisit (RewardCalculator.alpha_trust, "
                    "BAKU MATI=0.0 -- reward += alpha_trust*(trust_baru-trust_lama) tiap "
                    "sesi PATUH selesai). >0 WAJIB tag terpisah, lihat di bawah.")
+p.add_argument("--alpha-accept", type=float, default=0.0,
+              help="bobot suku shaping acceptance eksplisit (RewardCalculator.alpha_accept, "
+                   "BAKU MATI=0.0). SIMETRIS (+patuh/-tolak, SEGERA -- beda dari wait_reward "
+                   "yg hanya-positif & tertunda). Diagnosis riwayat training membuktikan "
+                   "acceptance terkikis 0,68->0,39 tanpa suku ini. >0 WAJIB tag terpisah.")
 p.add_argument("--forecaster", type=str, default="formula", choices=["formula", "vwf"],
               help="'formula' (BAKU, FormulaForecaster -- kasar, rata2 tetap per konektor) "
                    "| 'vwf' (VirtualWaitForecaster -- basis DISAMAKAN dgn eta_norm yg dilihat "
@@ -90,13 +95,14 @@ else:
 
 _horizon_suffix = "" if args.horizon == "30d" else f"_{args.horizon}"
 _trust_suffix = "" if args.alpha_trust == 0.0 else f"_trust{args.alpha_trust:g}"
+_accept_suffix = "" if args.alpha_accept == 0.0 else f"_acc{args.alpha_accept:g}"
 _fc_suffix = "" if args.forecaster == "formula" else f"_{args.forecaster}"
 _critics_suffix = "" if args.n_critics == 1 else f"_K{args.n_critics}"
 _hist_suffix = "_nohist" if args.no_hist else ""
 _prefk_suffix = "" if args.pref_hist_k is None else f"_prefk{args.pref_hist_k}"
 _suffix = (("_pref_feat" if args.pref_feature_mode else ("_pref" if args.pref else ""))
-          + _hist_suffix + _prefk_suffix + _trust_suffix + _fc_suffix + _critics_suffix
-          + _horizon_suffix)
+          + _hist_suffix + _prefk_suffix + _trust_suffix + _accept_suffix + _fc_suffix
+          + _critics_suffix + _horizon_suffix)
 TAG_ARM = "master_ev_ppo" + _suffix
 print(f"[{elapsed()}] Dataset: {DATASET}", flush=True)
 print(f"[{elapsed()}] Lengan: tag={TAG_ARM} (perspektif-EV, PPOTrainer standar, V(s) atensi tunggal, "
@@ -112,7 +118,7 @@ def make_forecaster():
 
 
 def train_one(seed, tag):
-    rc = RewardCalculator(alpha_trust=args.alpha_trust)
+    rc = RewardCalculator(alpha_trust=args.alpha_trust, alpha_accept=args.alpha_accept)
     tr = MasterEVPPOTrainer(DATASET, rollout_steps=args.rollout_steps, seed=seed, verbose=False,
                             reward_calc=rc, k=args.k, n_critics=args.n_critics,
                             policy_cls=POLICY_CLS, policy_kw=POLICY_KW,
@@ -221,7 +227,8 @@ common.save_json(dict(
                n_updates=args.n_updates, rollout_steps=args.rollout_steps, k=args.k,
                n_critics=args.n_critics, pref=args.pref,
                pref_feature_mode=args.pref_feature_mode, horizon=args.horizon,
-               alpha_trust=args.alpha_trust, forecaster=args.forecaster, dataset=DATASET)),
+               alpha_trust=args.alpha_trust, alpha_accept=args.alpha_accept,
+               forecaster=args.forecaster, dataset=DATASET)),
     f"{TAG_ARM}_eval_results.json")
 
 print(f"[{elapsed()}] === SEMUA SELESAI (MasterEV-PPO) ===", flush=True)

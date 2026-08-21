@@ -421,6 +421,12 @@ class MasterEVPPORolloutAgent(RLRolloutAgent):
         complied = chosen_spklu_id in set(recs)
         tr.complied = bool(complied)
         tr.trust_before = float(user.trust)
+        # Suku shaping acceptance (opsional, BAKU MATI) -- masuk STREAM_WAIT (bukan
+        # STREAM_PROX/GLOBAL3), sama "kantong konsekuensi-individual" spt wait_reward,
+        # tapi SIMETRIS & SEGERA (tak digerbang tr.complied spt wait_reward -- lihat
+        # RewardCalculator.acceptance_reward).
+        if self.rc.alpha_accept != 0.0:
+            tr.add_reward(self.rc.acceptance_reward(complied), STREAM_WAIT)
         feat_rec = self._station_feat(self.sids[primary_idx], wait_hat)
         feat_chosen = self._station_feat(chosen_spklu_id, wait_hat)
         prox_value = self.rc.prox(feat_rec, feat_chosen)
