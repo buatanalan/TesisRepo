@@ -42,12 +42,19 @@ _is_vwf = "vwf" in TAG_ARM
 # ppo_pipeline.py -- BAKU n_critics=1 tak dapat akhiran).
 _m_critics = re.search(r"_K(\d+)(?:_|$)", TAG_ARM)
 N_CRITICS = int(_m_critics.group(1)) if _m_critics else 1
+# `nohist`: TAK mengubah bentuk jaringan (hist_lstm tetap ada, cuma gerbang runtime) --
+# tapi WAJIB cocok dgn saat latih, kalau tidak c_t acak (bobot hist_lstm tak terlatih,
+# krn selama training kontribusinya dinolkan) diam-diam ikut mencemari forward() --
+# TIDAK memicu RuntimeError spt mismatch dim, jadi harus benar sejak awal.
+_is_nohist = "nohist" in TAG_ARM
 LABEL_ARM = (f"MASTER-EV-PPO+P(fitur)[{TAG_ARM}]" if _is_pref_feat
             else f"MASTER-EV-PPO+P[{TAG_ARM}]" if _is_pref
             else f"MASTER-EV-PPO[{TAG_ARM}]")
 POLICY_CLS = MasterEVPPOPrefPolicy if _is_pref else MasterEVPPOPolicy
 POLICY_KW = dict(pref_feature_mode=True) if _is_pref_feat else dict()
 POLICY_KW["n_critics"] = N_CRITICS
+if _is_nohist:
+    POLICY_KW["use_hist"] = False
 FORECASTER_CLS = K.VW if _is_vwf else FormulaForecaster
 K.DS = os.path.join(common.ROOT, K.HORIZON[TAG])
 K_REC = 3

@@ -85,12 +85,20 @@ class MasterEVPPOPolicy(nn.Module):
     dipelajari, bukan lagi noise laten murni."""
 
     def __init__(self, n_spklu: int, hidden: int = 64, critic_hidden: int = 128,
-                n_critics: int = 1, hist_hidden: int = HIST_HIDDEN):
+                n_critics: int = 1, hist_hidden: int = HIST_HIDDEN, use_hist: bool = True):
         super().__init__()
         self.n_spklu = int(n_spklu)
         self.n_critics = int(n_critics)
         self.scalar_dim = 0   # state EV sudah masuk tiap baris kandidat, tak perlu blok skalar
         self.hist_hidden = int(hist_hidden)
+        # `use_hist=False` (2026-08-21, ABLASI): matikan kontribusi c_t (`hist_lstm`)
+        # TANPA mengubah bentuk jaringan (module tetap ada, dim tak berubah, checkpoint
+        # tetap kompatibel) -- utk mengisolasi dugaan bahwa `hist_lstm` & `pref_lstm`
+        # (MasterEVPPOPrefPolicy) saling mengganggu krn menggali sinyal riwayat yg
+        # tumpang tindih. Satu-satunya hasil P yg pernah POSITIF di seluruh sesi
+        # terjadi SEBELUM hist_lstm ada -- belum pernah diuji ulang P TANPA hist_lstm
+        # setelah keduanya digabung. Pola sama `use_preference=False` (ablasi P).
+        self.use_hist = bool(use_hist)
 
         self.hist_lstm = nn.LSTM(HIST_FEAT_DIM, self.hist_hidden, batch_first=True)
 
@@ -107,7 +115,9 @@ class MasterEVPPOPolicy(nn.Module):
 
     def _encode_hist(self, hist):
         """hist: (B,K,HIST_FEAT_DIM) -> c_t: (B,hist_hidden). IDENTIK
-        `HPPOPolicy._encode_hist`."""
+        `HPPOPolicy._encode_hist`, TAMBAH gerbang ablasi `use_hist` (lihat __init__)."""
+        if not self.use_hist:
+            return torch.zeros(hist.shape[0], self.hist_hidden, device=hist.device, dtype=hist.dtype)
         _, (h_n, _) = self.hist_lstm(hist)
         return h_n[-1]
 
@@ -246,8 +256,10 @@ class MasterEVPPOPrefPolicy(MasterEVPPOPolicy):
 
     def __init__(self, n_spklu: int, hidden: int = 64, critic_hidden: int = 128,
                 n_critics: int = 1, pref_d_lstm: int = PREF_D_LSTM, pref_d_attn: int = PREF_D_ATTN,
-                pref_feature_mode: bool = False, use_preference: bool = True):
-        super().__init__(n_spklu, hidden=hidden, critic_hidden=critic_hidden, n_critics=n_critics)
+                pref_feature_mode: bool = False, use_preference: bool = True,
+                use_hist: bool = True):
+        super().__init__(n_spklu, hidden=hidden, critic_hidden=critic_hidden, n_critics=n_critics,
+                         use_hist=use_hist)
         self.pref_feature_mode = bool(pref_feature_mode)
         self.use_preference = bool(use_preference)
         self.pref_d_attn = int(pref_d_attn)

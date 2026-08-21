@@ -36,6 +36,11 @@ p.add_argument("--pref", action="store_true",
 p.add_argument("--pref-feature-mode", action="store_true",
               help="riwayat preferensi sbg vektor fitur (bukan one-hot identitas) -- "
                    "hanya berlaku bila --pref diberikan")
+p.add_argument("--no-hist", action="store_true",
+              help="ABLASI: matikan kontribusi hist_lstm (c_t) -- utk isolasi dugaan "
+                   "hist_lstm & pref_lstm saling mengganggu (satu-satunya hasil P yg "
+                   "pernah positif terjadi SEBELUM hist_lstm ada). Hanya bermakna dgn "
+                   "--pref; tanpa --pref cuma menghapus proxy-trust tanpa gantinya.")
 p.add_argument("--dataset", type=str, default="4x",
               help="'4x' (BAKU, 30 hari) | '1x' (DATASET_KANONIK, TAK sepadan) | path eksplisit "
                    "(mis. scenario_dataset_klaster12_4x_90d.json -- WAJIB sertakan --horizon 90d)")
@@ -58,6 +63,8 @@ args = p.parse_args()
 assert not (args.pref_feature_mode and not args.pref), "--pref-feature-mode butuh --pref"
 POLICY_CLS = MasterEVPPOPrefPolicy if args.pref else MasterEVPPOPolicy
 POLICY_KW = dict(pref_feature_mode=args.pref_feature_mode) if args.pref else dict()
+if args.no_hist:
+    POLICY_KW["use_hist"] = False
 
 _DATASET_4X = os.path.join(common.ROOT, "scenario_dataset_klaster12_4x.json")
 if args.dataset == "4x":
@@ -80,8 +87,9 @@ _horizon_suffix = "" if args.horizon == "30d" else f"_{args.horizon}"
 _trust_suffix = "" if args.alpha_trust == 0.0 else f"_trust{args.alpha_trust:g}"
 _fc_suffix = "" if args.forecaster == "formula" else f"_{args.forecaster}"
 _critics_suffix = "" if args.n_critics == 1 else f"_K{args.n_critics}"
+_hist_suffix = "_nohist" if args.no_hist else ""
 _suffix = (("_pref_feat" if args.pref_feature_mode else ("_pref" if args.pref else ""))
-          + _trust_suffix + _fc_suffix + _critics_suffix + _horizon_suffix)
+          + _hist_suffix + _trust_suffix + _fc_suffix + _critics_suffix + _horizon_suffix)
 TAG_ARM = "master_ev_ppo" + _suffix
 print(f"[{elapsed()}] Dataset: {DATASET}", flush=True)
 print(f"[{elapsed()}] Lengan: tag={TAG_ARM} (perspektif-EV, PPOTrainer standar, V(s) atensi tunggal, "
