@@ -43,7 +43,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from marl_spklu.rl.policy import StationEncoder, AttentionPooling, NEG_INF
+from marl_spklu.rl.policy import StationEncoder, AttentionPooling, NEG_INF, HIST_FEAT_DIM, HIST_HIDDEN
 from marl_spklu.rl.master_paper_obs import STATION_FEAT_DIM_MASTER_EV, build_joint_obs_master_ev
 from marl_spklu.rl.rollout import RLRolloutAgent, Transition, RewardCalculatorStub, _gini
 from marl_spklu.rl.rewards import RewardCalculator
@@ -54,28 +54,48 @@ from marl_spklu.rl.p_ppo_policy import PREF_D_LSTM, PREF_D_ATTN
 
 
 class MasterEVPPOPolicy(nn.Module):
-    """Aktor per-PERMINTAAN (`station_encoder`+`disc_head`, TANPA konteks tambahan --
-    state EV SUDAH di-broadcast ke tiap baris kandidat via `build_joint_obs_master_ev`,
-    beda dgn `HPPOPolicy` yg butuh blok skalar+LSTM riwayat terpisah) + kritik V(s)
-    "buta-aksi" ber-atensi (`AttentionPooling`, sama kelas dipakai `MasterStationPPOPolicy`
-    -- bukan implementasi baru, supaya beda hasil tak bisa dijelaskan beda encoder)."""
+    """Aktor per-PERMINTAAN (`station_encoder`+`disc_head`) + kritik V(s) "buta-aksi"
+    ber-atensi (`AttentionPooling`, sama kelas dipakai `MasterStationPPOPolicy`).
+
+    `hist_lstm` (2026-08-21, PERBAIKAN): encoder riwayat interaksi (`HPPOPolicy.
+    hist_lstm`, IDENTIK -- disalin apa adanya) yang SEBELUMNYA TAK ADA di kelas ini
+    ("hist diabaikan"). Ini kekurangan nyata, bukan desain sengaja: `alpha_trust`
+    (RewardCalculator, lihat rewards.py) memberi reward atas perubahan `user.trust`,
+    tapi `user.trust` sendiri TAK PERNAH masuk observasi manapun (sesuai §3.1 MASTER
+    -- desentralisasi, agen buta thd atribut pemohon) -- membuat reward itu BERISIK bagi
+    agen yg tak punya cara membedakan "pengguna trust tinggi" dari "pengguna trust
+    rendah" pada fitur stasiun yg identik. `hist_lstm` memberi PROXY trust yg TERAMATI
+    (riwayat patuh/estwait/wait_default/realized_gap K langkah terakhir -> c_t, belief
+    state ala POMDP Kaelbling dkk. 1998 -- BUKAN akses langsung ke `trust` mentah,
+    tetap konsisten §3.1) -- prasyarat supaya `alpha_trust` punya dasar yg bisa
+    dipelajari, bukan lagi noise laten murni."""
 
     def __init__(self, n_spklu: int, hidden: int = 64, critic_hidden: int = 128,
-                n_critics: int = 1):
+                n_critics: int = 1, hist_hidden: int = HIST_HIDDEN):
         super().__init__()
         self.n_spklu = int(n_spklu)
         self.n_critics = int(n_critics)
         self.scalar_dim = 0   # state EV sudah masuk tiap baris kandidat, tak perlu blok skalar
+        self.hist_hidden = int(hist_hidden)
 
-        self.station_encoder = StationEncoder(STATION_FEAT_DIM_MASTER_EV, 0, hidden)
+        self.hist_lstm = nn.LSTM(HIST_FEAT_DIM, self.hist_hidden, batch_first=True)
+
+        self.station_encoder = StationEncoder(STATION_FEAT_DIM_MASTER_EV, self.hist_hidden, hidden)
         self.disc_head = nn.Linear(hidden, 1)
 
-        self.critic_station_encoder = StationEncoder(STATION_FEAT_DIM_MASTER_EV, 0, critic_hidden)
+        self.critic_station_encoder = StationEncoder(STATION_FEAT_DIM_MASTER_EV, self.hist_hidden,
+                                                      critic_hidden)
         self.critic_pool = AttentionPooling(critic_hidden)
         self.critic_head = nn.Sequential(
             nn.Linear(critic_hidden, critic_hidden), nn.ReLU(),
             nn.Linear(critic_hidden, self.n_critics),
         )
+
+    def _encode_hist(self, hist):
+        """hist: (B,K,HIST_FEAT_DIM) -> c_t: (B,hist_hidden). IDENTIK
+        `HPPOPolicy._encode_hist`."""
+        _, (h_n, _) = self.hist_lstm(hist)
+        return h_n[-1]
 
     def _split_station_block(self, flat, feat_dim, scalar_dim):
         """flat: (B, feat_dim*N) FEATURE-MAJOR -- lihat `MasterEVPPORolloutAgent` utk
@@ -87,16 +107,18 @@ class MasterEVPPOPolicy(nn.Module):
         return scalars, station_feats
 
     def forward(self, obs, hist=None, critic_obs=None):
-        """`hist` diabaikan (tak ada modul riwayat di sini). `critic_obs` diabaikan bila
-        None -- kritik memakai `obs` YANG SAMA dgn aktor (V(s) sederhana, bukan CTDE
-        penuh -- sesuai penyempitan cakupan yg dinyatakan di docstring modul)."""
+        """`hist`: (B,K,HIST_FEAT_DIM) WAJIB (lihat `MasterEVPPORolloutAgent.
+        get_recommendation` -- riwayat SUNGGUHAN via `_build_hist`, bukan lagi dummy).
+        `critic_obs` diabaikan bila None -- kritik memakai `obs` YANG SAMA dgn aktor
+        (V(s) sederhana, bukan CTDE penuh), TAPI TETAP melihat `c_t` (bukan privileged,
+        sudah terlihat aktor juga -- sama pola `HPPOPolicy`)."""
+        c_t = self._encode_hist(hist)
         _, station_feats = self._split_station_block(obs, STATION_FEAT_DIM_MASTER_EV, 0)
-        zero_ctx = torch.zeros(obs.shape[0], 0, device=obs.device, dtype=obs.dtype)
 
-        emb = self.station_encoder(station_feats, zero_ctx)
+        emb = self.station_encoder(station_feats, c_t)
         logits = self.disc_head(emb).squeeze(-1)             # (B,N)
 
-        c_emb = self.critic_station_encoder(station_feats, zero_ctx)
+        c_emb = self.critic_station_encoder(station_feats, c_t)
         pooled = self.critic_pool(c_emb)
         value = self.critic_head(pooled)                     # (B,n_critics)
         return logits, value
@@ -223,7 +245,11 @@ class MasterEVPPOPrefPolicy(MasterEVPPOPolicy):
         # disuntik penuh langsung akan jadi derau besar bagi station_encoder yg sedianya
         # belajar lancar tanpa itu (sama alasan seluruh kelas +P lain di repo ini).
         self.pref_gate = nn.Parameter(torch.tensor(0.0))
-        self.station_encoder = StationEncoder(STATION_FEAT_DIM_MASTER_EV, pref_d_attn, hidden)
+        # GANTI station_encoder: context_dim = hist_hidden (c_t, riwayat compliance --
+        # SUDAH ADA di kelas dasar sejak perbaikan 2026-08-21) + pref_d_attn (preferensi
+        # eksplisit) -- pola SAMA `PPPOPolicy` (H-PPO+P).
+        self.station_encoder = StationEncoder(STATION_FEAT_DIM_MASTER_EV,
+                                              self.hist_hidden + pref_d_attn, hidden)
 
     def _encode_pref(self, pref_hist):
         if not self.use_preference:
@@ -233,6 +259,7 @@ class MasterEVPPOPrefPolicy(MasterEVPPOPolicy):
         return h_n[-1]
 
     def forward(self, obs, hist=None, critic_obs=None, pref_hist=None):
+        c_t = self._encode_hist(hist)
         _, station_feats = self._split_station_block(obs, STATION_FEAT_DIM_MASTER_EV, 0)
 
         if pref_hist is not None and self.use_preference:
@@ -242,11 +269,11 @@ class MasterEVPPOPrefPolicy(MasterEVPPOPolicy):
         else:
             attended_pref = torch.zeros(obs.shape[0], self.pref_d_attn, device=obs.device)
 
-        emb = self.station_encoder(station_feats, attended_pref)
+        context = torch.cat([c_t, attended_pref], dim=-1)
+        emb = self.station_encoder(station_feats, context)
         logits = self.disc_head(emb).squeeze(-1)
 
-        c_emb = self.critic_station_encoder(station_feats,
-                                            torch.zeros(obs.shape[0], 0, device=obs.device))
+        c_emb = self.critic_station_encoder(station_feats, c_t)
         pooled = self.critic_pool(c_emb)
         value = self.critic_head(pooled)
         return logits, value
@@ -268,18 +295,21 @@ class MasterEVPPORolloutAgent(RLRolloutAgent):
         joint_obs = build_joint_obs_master_ev(self.sim, self.sids, time_now, user, soc)   # (N,10)
         obs_flat = joint_obs.T.reshape(-1).astype(np.float32)   # feature-major, konvensi _split_station_block
         mask = self._feasible_mask(feasible_ids)
-        dummy_hist = np.zeros((1, 1), dtype=np.float32)
+        # Riwayat interaksi SUNGGUHAN (2026-08-21, PERBAIKAN -- SEBELUMNYA dummy nol,
+        # lihat docstring `MasterEVPPOPolicy.hist_lstm`) -- `_build_hist` DIWARISI dari
+        # RLRolloutAgent, sama persis dipakai HPPOPolicy/P-PPO.
+        hist = self._build_hist(user)
 
         # Modul preferensi (opsional): _use_pref/_build_pref_hist DIWARISI dari
         # RLRolloutAgent.__init__ -- pola sama `MasterStationPPORolloutAgent`.
         if self._use_pref:
             pref_hist = self._build_pref_hist(user)
-            act = self.policy.act(obs_flat, mask, dummy_hist, k=self.k, critic_obs_np=obs_flat,
+            act = self.policy.act(obs_flat, mask, hist, k=self.k, critic_obs_np=obs_flat,
                                   epsilon=self.epsilon, threshold=self.threshold,
                                   pref_hist_np=pref_hist)
         else:
             pref_hist = None
-            act = self.policy.act(obs_flat, mask, dummy_hist, k=self.k, critic_obs_np=obs_flat,
+            act = self.policy.act(obs_flat, mask, hist, k=self.k, critic_obs_np=obs_flat,
                                   epsilon=self.epsilon, threshold=self.threshold)
 
         chosen_indices = act["chosen_indices"]
@@ -297,7 +327,7 @@ class MasterEVPPORolloutAgent(RLRolloutAgent):
         idx_arr = np.zeros(self.k, dtype=np.int64)
         idx_arr[:n_rec] = chosen_indices
 
-        tr = Transition(obs_flat, obs_flat, dummy_hist, mask, idx_arr, n_rec,
+        tr = Transition(obs_flat, obs_flat, hist, mask, idx_arr, n_rec,
                         act["logp"], act["value"], self.sim.current_step,
                         pref_hist=pref_hist)
         tr.disp_estwait = primary_disp
