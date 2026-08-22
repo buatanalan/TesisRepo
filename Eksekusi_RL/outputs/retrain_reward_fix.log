@@ -1,0 +1,65 @@
+=== 1. K3 base 30d ===
+[0.0s] Dataset: /home/iskandar/Alan/TesisRepo/scenario_dataset_klaster12_4x.json
+[0.0s] Lengan: tag=master_ev_ppo_vwf_seimbang4x_K3_gap_sig1 (perspektif-EV, PPOTrainer standar, V(s) atensi tunggal, pref=False pref_feature_mode=False alpha_trust=0.0 forecaster=vwf)
+[0.0s] Anggaran: n_updates=300 rollout_steps=96 k=3 n_critics=3
+[0.0s] === PELATIHAN MasterEV-PPO (3 seed) ===
+[0.0s]   seed=0 -- mulai training
+[100.2s]   seed=0 -- SELESAI
+[100.2s]   seed=1 -- mulai training
+[205.2s]   seed=1 -- SELESAI
+[205.2s]   seed=2 -- mulai training
+[304.4s]   seed=2 -- SELESAI
+[304.4s] Pelatihan selesai (3 seed)
+[304.4s] === Evaluasi vs greedy_queue/greedy_util (10 seed) ===
+[608.5s] MasterEV-PPO=0.0685  greedy_queue=0.0900  greedy_util=0.0926
+[608.5s] p_vs_gq=0.0020 d=-2.790  p_vs_gu=0.0020 d=-3.302  spread_antar_seed=0.0136
+[608.5s] === SEMUA SELESAI (MasterEV-PPO) ===
+=== 2. K3 base 90d ===
+[0.0s] Dataset: scenario_dataset_klaster12_4x_90d.json
+[0.0s] Lengan: tag=master_ev_ppo_vwf_seimbang4x_K3_gap_sig1_90d (perspektif-EV, PPOTrainer standar, V(s) atensi tunggal, pref=False pref_feature_mode=False alpha_trust=0.0 forecaster=vwf)
+[0.0s] Anggaran: n_updates=300 rollout_steps=96 k=3 n_critics=3
+[0.0s] === PELATIHAN MasterEV-PPO (3 seed) ===
+[0.0s]   seed=0 -- mulai training
+[98.4s]   seed=0 -- SELESAI
+[98.4s]   seed=1 -- mulai training
+[206.4s]   seed=1 -- SELESAI
+[206.4s]   seed=2 -- mulai training
+[306.5s]   seed=2 -- SELESAI
+[306.6s] Pelatihan selesai (3 seed)
+[306.6s] === Evaluasi vs greedy_queue/greedy_util (10 seed) ===
+[1184.4s] MasterEV-PPO=0.0616  greedy_queue=0.0894  greedy_util=0.0976
+[1184.4s] p_vs_gq=0.0020 d=-9.144  p_vs_gu=0.0020 d=-9.374  spread_antar_seed=0.0149
+[1184.4s] === SEMUA SELESAI (MasterEV-PPO) ===
+=== 3. P+nohist+acc1 K3 30d ===
+[0.0s] Dataset: /home/iskandar/Alan/TesisRepo/scenario_dataset_klaster12_4x.json
+[0.0s] Lengan: tag=master_ev_ppo_pref_feat_nohist_acc1_vwf_seimbang4x_K3_gap_sig1 (perspektif-EV, PPOTrainer standar, V(s) atensi tunggal, pref=True pref_feature_mode=True alpha_trust=0.0 forecaster=vwf)
+[0.0s] Anggaran: n_updates=300 rollout_steps=96 k=3 n_critics=3
+[0.0s] === PELATIHAN MasterEV-PPO (3 seed) ===
+[0.0s]   seed=0 -- mulai training
+[111.7s]   seed=0 -- SELESAI
+[111.7s]   seed=1 -- mulai training
+[218.1s]   seed=1 -- SELESAI
+[218.1s]   seed=2 -- mulai training
+[320.8s]   seed=2 -- SELESAI
+[320.8s] Pelatihan selesai (3 seed)
+[320.8s] === Evaluasi vs greedy_queue/greedy_util (10 seed) ===
+[569.9s] MasterEV-PPO=0.1245  greedy_queue=0.0900  greedy_util=0.0926
+[569.9s] p_vs_gq=0.0098 d=+1.771  p_vs_gu=0.0195 d=+1.651  spread_antar_seed=0.0402
+[569.9s] === SEMUA SELESAI (MasterEV-PPO) ===
+=== 4. P+nohist+acc1 K3 90d ===
+[0.0s] Dataset: scenario_dataset_klaster12_4x_90d.json
+[0.0s] Lengan: tag=master_ev_ppo_pref_feat_nohist_acc1_vwf_seimbang4x_K3_gap_sig1_90d (perspektif-EV, PPOTrainer standar, V(s) atensi tunggal, pref=True pref_feature_mode=True alpha_trust=0.0 forecaster=vwf)
+[0.0s] Anggaran: n_updates=300 rollout_steps=96 k=3 n_critics=3
+[0.0s] === PELATIHAN MasterEV-PPO (3 seed) ===
+[0.0s]   seed=0 -- mulai training
+[103.5s]   seed=0 -- SELESAI
+[103.5s]   seed=1 -- mulai training
+[208.6s]   seed=1 -- SELESAI
+[208.7s]   seed=2 -- mulai training
+[311.8s]   seed=2 -- SELESAI
+[311.8s] Pelatihan selesai (3 seed)
+[311.8s] === Evaluasi vs greedy_queue/greedy_util (10 seed) ===
+[1090.4s] MasterEV-PPO=0.1132  greedy_queue=0.0894  greedy_util=0.0976
+[1090.4s] p_vs_gq=0.0020 d=+6.495  p_vs_gu=0.0020 d=+3.590  spread_antar_seed=0.0680
+[1090.4s] === SEMUA SELESAI (MasterEV-PPO) ===
+=== SEMUA RETRAIN REWARD-FIX SELESAI ===
