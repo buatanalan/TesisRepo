@@ -338,6 +338,15 @@ class RewardCalculator:
             signal = gini_u
         return -self.alpha_gini * signal
 
+    def gini_reward_terminal(self, gini_level: float) -> float:
+        """`-alpha_gini * gini_level` -- Opsi 1 (2026-08-22, APROKSIMASI per-chunk,
+        lihat `MasterEVPPOTrainer.__init__`/`train()`): level ABSOLUT (bukan delta --
+        beda dari `gini_reward` biasa) krn sinyal ini SEKALI per chunk (bukan
+        disiarkan tiap langkah), jadi tak mewarisi masalah "nyaris-konstan" yg
+        memotivasi delta-gini utk mode dense. Dipanggil sekali di transisi TERAKHIR
+        tiap chunk (bukan on_decision/on_step_end spt suku lain)."""
+        return -self.alpha_gini * float(gini_level)
+
     def reset_episode_state(self) -> None:
         """Bersihkan state lintas-keputusan saat SIMULASI diganti (batas horizon).
 

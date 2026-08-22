@@ -610,6 +610,9 @@ class RewardCalculatorStub:
                             overshoot_scale=10.0):
         return 0.0
 
+    def gini_reward_terminal(self, gini_level):
+        return 0.0
+
     def prox(self, feat_rec, feat_chosen):
         return 0.0
 

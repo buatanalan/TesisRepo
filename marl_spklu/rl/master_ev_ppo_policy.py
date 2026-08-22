@@ -413,7 +413,7 @@ class MasterEVPPORolloutAgent(RLRolloutAgent):
     (HIST_K=5, ~40% padding utk kasus sama) -- berpotensi mengencerkan sinyal `pref_lstm`
     lebih jauh drpd `hist_lstm`."""
 
-    def __init__(self, *args, pref_hist_k: int = None, **kwargs):
+    def __init__(self, *args, pref_hist_k: int = None, gini_mode: str = "dense", **kwargs):
         super().__init__(*args, **kwargs)
         _nc = int(getattr(self.policy, "n_critics", 1))
         self._split_prox = (_nc in (3, 4))
@@ -421,6 +421,11 @@ class MasterEVPPORolloutAgent(RLRolloutAgent):
         # `RewardCalculator.local_equity_reward` -- lihat MasterEV4Transition.
         self._split_equity = (_nc == 4)
         self.pref_hist_k = int(pref_hist_k) if pref_hist_k is not None else PDQN_HIST_K
+        # Opsi 1 (2026-08-22): "dense" (BAKU, perilaku LAMA -- gini_reward per-langkah
+        # di on_step_end) | "terminal" (suku Gini per-langkah DIMATIKAN di sini,
+        # `MasterEVPPOTrainer.train()` yg menyuntikkan sekali per chunk -- lihat
+        # catatan APROKSIMASI di trainer).
+        self.gini_mode = str(gini_mode)
 
     def _build_pref_hist(self, user):
         """Override `RLRolloutAgent._build_pref_hist` -- BEDA PENTING (2026-08-21):
@@ -504,6 +509,8 @@ class MasterEVPPORolloutAgent(RLRolloutAgent):
     def on_step_end(self, sim, step):
         if not self._split_prox:
             return super().on_step_end(sim, step)
+        if self.gini_mode == "terminal":
+            return  # Opsi 1: suku Gini disuntikkan trainer sekali per chunk, bukan di sini.
         transitions_this_step = [tr for tr in self.transitions if tr.step == step]
         if not transitions_this_step:
             return
@@ -633,7 +640,8 @@ class MasterEVPPOTrainer:
                 verbose: bool = True, reward_calc=None, hidden: int = 64,
                 critic_hidden: int = 128, k: int = 3, n_critics: int = 1,
                 equity_calc=None, policy_cls=MasterEVPPOPolicy, policy_kw=None,
-                pref_hist_k: int = None, **ppo_kw):
+                pref_hist_k: int = None, gini_mode: str = "dense",
+                cmdp_epsilon: float = None, cmdp_lr_dual: float = 0.0, **ppo_kw):
         self.dataset_path = dataset_path
         self.rollout_steps = int(rollout_steps)
         self.k = int(k)
@@ -642,6 +650,35 @@ class MasterEVPPOTrainer:
         self.rc = reward_calc or RewardCalculator()
         self.verbose = verbose
         self.seed = seed
+        # --- Opsi 1 (2026-08-22): reward Gini TERMINAL, APROKSIMASI ---------------
+        # Proposal asli "R_t=0 semua langkah, R_T=-Gini HANYA di t=T" butuh episode
+        # penuh (30-90 hari, ribuan langkah) tersimpan utuh sblm satu update GAE --
+        # BERTENTANGAN LANGSUNG dgn training chunked (rollout_steps=96, update PPO
+        # tiap chunk, transisi lama DIBUANG stlh update -- alasan formulasi
+        # continuing/avg-reward dipilih sejak awal, BUKAN bisa diubah tanpa trainer
+        # baru total). Kompromi yg diimplementasikan: tiap CHUNK (96 langkah)
+        # diperlakukan sbg pseudo-episode utk suku Gini SAJA -- 0 reward Gini di
+        # langkah 1-95, HANYA transisi TERAKHIR chunk dpt `gini_reward_terminal`
+        # (level absolut, BUKAN delta -- sinyal presisi sekali per chunk, bukan
+        # disiarkan). 32x lebih jarang dari mode "dense" (per-langkah), TAPI TETAP
+        # bukan literal "sekali per 30-90 hari" spt proposal asli -- didokumentasikan
+        # eksplisit sbg APROKSIMASI, bukan implementasi murni.
+        assert gini_mode in ("dense", "terminal"), f"gini_mode={gini_mode!r} tak dikenal"
+        self.gini_mode = str(gini_mode)
+        # --- Opsi 3 (2026-08-22): CMDP via Lagrangian dual ascent SEDERHANA --------
+        # max E[R_utilitas] s.t. Gini <= epsilon, diselesaikan primal-dual: `alpha_gini`
+        # (bobot suku Gini, `RewardCalculator`) DIPERLAKUKAN SBG PENGALI LAGRANGE
+        # `lambda`, diperbarui tiap chunk via dual ascent `lambda += lr*(gini_terukur -
+        # epsilon)`, clip >=0 (KKT: lambda tak boleh negatif). TAK butuh cost-critic
+        # terpisah -- mendaur-ulang mekanisme `gini_reward`/`gini_reward_terminal` yg
+        # SUDAH ADA (baik "dense" maupun "terminal" bisa dipasangkan dgn CMDP; dual
+        # update independen dari cara suku Gini disalurkan ke agen). `cmdp_lr_dual=0.0`
+        # (BAKU) -> MATI, `alpha_gini` tetap statis spt biasa (preset/default).
+        self.cmdp_epsilon = cmdp_epsilon
+        self.cmdp_lr_dual = float(cmdp_lr_dual)
+        if self.cmdp_lr_dual > 0.0:
+            assert cmdp_epsilon is not None, "cmdp_lr_dual>0 butuh cmdp_epsilon eksplisit"
+            self.rc.alpha_gini = 0.0  # lambda mulai dari 0 (KKT), BUKAN preset statis
         torch.manual_seed(seed); np.random.seed(seed); random.seed(seed)
 
         sim0 = self._fresh_sim()
@@ -688,7 +725,8 @@ class MasterEVPPOTrainer:
         agent = MasterEVPPORolloutAgent(self.policy, sim, self.rc, forecaster, k=self.k,
                                         equity_calc=self.equity_calc,
                                         pref_feature_mode=pref_feature_mode,
-                                        pref_hist_k=self.pref_hist_k)
+                                        pref_hist_k=self.pref_hist_k,
+                                        gini_mode=self.gini_mode)
         step = 0
         for _ in range(n_updates):
             it = self._it_global
@@ -704,14 +742,27 @@ class MasterEVPPOTrainer:
             self._it_global += 1
             if resolved:
                 resolved[-1].done = boundary
+                served = np.array([s.total_served for s in sim.spklus.values()], float)
+                gini_chunk = _gini(served)
+                # Opsi 1 (APROKSIMASI, lihat catatan __init__): suku Gini HANYA di
+                # transisi TERAKHIR chunk ini, bukan disiarkan tiap langkah.
+                if self.gini_mode == "terminal" and hasattr(resolved[-1], "add_reward"):
+                    resolved[-1].add_reward(self.rc.gini_reward_terminal(gini_chunk),
+                                            STREAM_GLOBAL3)
+                # Opsi 3: dual ascent -- `alpha_gini` diperlakukan sbg lambda Lagrange,
+                # diperbarui SETELAH reward chunk ini disalurkan (lag primal-dual std).
+                if self.cmdp_lr_dual > 0.0:
+                    self.rc.alpha_gini = max(0.0, self.rc.alpha_gini
+                                             + self.cmdp_lr_dual * (gini_chunk - self.cmdp_epsilon))
                 stats = self.ppo.update(resolved)
                 rewards = np.array([t.reward for t in resolved])
-                served = np.array([s.total_served for s in sim.spklus.values()], float)
                 trusts = np.array([u.trust for u in sim.users], float)
                 info = {"mean_reward": float(rewards.mean()),
                        "acceptance_rate": float(np.mean([t.complied for t in resolved])),
-                       "gini_served": _gini(served), "n_tr": len(resolved),
+                       "gini_served": gini_chunk, "n_tr": len(resolved),
                        "n_pending": len(pending), "trust_mean": float(trusts.mean())}
+                if self.cmdp_lr_dual > 0.0:
+                    info["lambda_gini"] = float(self.rc.alpha_gini)
                 rec = {"iter": it, **info, **stats}
                 self.history.append(rec)
                 if self.verbose:

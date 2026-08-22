@@ -81,6 +81,25 @@ p.add_argument("--alpha-equity", type=float, default=0.0,
                    "STREAM_EQUITY terpisah dari GLOBAL3 -- diagnosis 2026-08-21 acceptance "
                    "vs gini 'tarik-menarik' saat berbagi 1 head kritik). >0 WAJIB tag "
                    "terpisah, lihat Diagnosis_Gini_sbg_Reward 2026-08-22.")
+p.add_argument("--gini-mode", type=str, default="dense", choices=["dense", "terminal"],
+              help="'dense' (BAKU -- gini_reward per-langkah/delta, perilaku LAMA) | "
+                   "'terminal' (Opsi 1, APROKSIMASI per-chunk -- lihat catatan "
+                   "MasterEVPPOTrainer.__init__: proposal asli 'reward 0 sepanjang "
+                   "episode, hanya -Gini di t=T' butuh episode PENUH 30-90 hari "
+                   "tersimpan utuh, bertentangan dgn training chunked rollout_steps=96 "
+                   "-- di sini 'episode' didekati per-CHUNK, level absolut, HANYA "
+                   "transisi terakhir chunk. BUKAN implementasi murni proposal asli).")
+p.add_argument("--cmdp-epsilon", type=float, default=None,
+              help="Opsi 3 (CMDP): target ambang Gini (constraint Gini<=epsilon). WAJIB "
+                   "diberikan bila --cmdp-lr-dual>0. Referensi: gini K3 base sudah "
+                   "capai 0,046-0,072 -- epsilon di sekitar situ (mis. 0,06-0,08) masuk "
+                   "akal sbg target awal.")
+p.add_argument("--cmdp-lr-dual", type=float, default=0.0,
+              help="Opsi 3 (CMDP): laju dual ascent utk `alpha_gini` sbg pengali "
+                   "Lagrange (BAKU MATI=0.0 -- alpha_gini statis spt biasa/preset). "
+                   ">0 -> alpha_gini MULAI DARI 0 (KKT), diperbarui tiap chunk "
+                   "`alpha_gini += lr*(gini_terukur-epsilon)`, clip >=0. >0 WAJIB "
+                   "tag terpisah & --cmdp-epsilon eksplisit.")
 p.add_argument("--reward-preset", type=str, default="raw", choices=["raw", "seimbang4x"],
               help="'raw' (BAKU -- konstruktor RewardCalculator() MENTAH, alpha_wait=1.0 "
                    "alpha_gini=0.5 use_delta_gini=False -- TAK PERNAH dikalibrasi utk rezim "
@@ -137,8 +156,11 @@ _beta_suffix = "_gap" if args.beta_mode == "gap_ratio" else ""
 _sigma_suffix = ("" if args.beta_sigma == 0.1 else f"_sig{args.beta_sigma:g}")
 _hist_suffix = "_nohist" if args.no_hist else ""
 _prefk_suffix = "" if args.pref_hist_k is None else f"_prefk{args.pref_hist_k}"
+_gini_mode_suffix = "" if args.gini_mode == "dense" else f"_{args.gini_mode}"
+_cmdp_suffix = "" if args.cmdp_lr_dual == 0.0 else f"_cmdpE{args.cmdp_epsilon:g}lr{args.cmdp_lr_dual:g}"
 _suffix = (("_pref_feat" if args.pref_feature_mode else ("_pref" if args.pref else ""))
           + _hist_suffix + _prefk_suffix + _trust_suffix + _accept_suffix + _equity_suffix
+          + _gini_mode_suffix + _cmdp_suffix
           + _fc_suffix + _rw_suffix + _critics_suffix + _beta_suffix + _sigma_suffix
           + _horizon_suffix)
 TAG_ARM = "master_ev_ppo" + _suffix
@@ -170,7 +192,8 @@ def train_one(seed, tag):
                             reward_calc=rc, k=args.k, n_critics=args.n_critics,
                             policy_cls=POLICY_CLS, policy_kw=POLICY_KW,
                             pref_hist_k=args.pref_hist_k, beta_mode=args.beta_mode,
-                            beta_sigma=args.beta_sigma)
+                            beta_sigma=args.beta_sigma, gini_mode=args.gini_mode,
+                            cmdp_epsilon=args.cmdp_epsilon, cmdp_lr_dual=args.cmdp_lr_dual)
     policy = tr.train(make_forecaster(), n_updates=args.n_updates)
     ckpt = os.path.join(common.OUTDIR, f"{tag}_actor_seed{seed}.pt")
     torch.save(policy.state_dict(), ckpt)
@@ -278,7 +301,9 @@ common.save_json(dict(
                alpha_trust=args.alpha_trust, alpha_accept=args.alpha_accept,
                alpha_equity=args.alpha_equity,
                forecaster=args.forecaster, beta_mode=args.beta_mode,
-               beta_sigma=args.beta_sigma, reward_preset=args.reward_preset, dataset=DATASET)),
+               beta_sigma=args.beta_sigma, reward_preset=args.reward_preset,
+               gini_mode=args.gini_mode, cmdp_epsilon=args.cmdp_epsilon,
+               cmdp_lr_dual=args.cmdp_lr_dual, dataset=DATASET)),
     f"{TAG_ARM}_eval_results.json")
 
 print(f"[{elapsed()}] === SEMUA SELESAI (MasterEV-PPO) ===", flush=True)
