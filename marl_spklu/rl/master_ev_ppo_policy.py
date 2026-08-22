@@ -477,7 +477,8 @@ class MasterEVPPORolloutAgent(RLRolloutAgent):
             if chosen_idx_eq2 is not None:
                 utils_eq = np.array([s.get_utilization() for s in self.sim.spklus.values()])
                 tr.add_reward(self.rc.local_equity_reward(
-                    utils_eq[chosen_idx_eq2], utils_eq.mean()), STREAM_EQUITY)
+                    utils_eq[chosen_idx_eq2], utils_eq.mean(),
+                    recent_rec_count=recent_rec_count), STREAM_EQUITY)
         if self.equity_calc is not None:
             chosen_idx_eq = self.sid_to_idx.get(chosen_spklu_id)
             if chosen_idx_eq is not None:

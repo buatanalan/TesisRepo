@@ -266,15 +266,31 @@ class RewardCalculator:
         sesuai `User.update_trust` sendiri hanya berjalan bila `last_rec_complied`)."""
         return self.alpha_trust * float(delta_trust)
 
-    def local_equity_reward(self, chosen_util: float, mean_util: float) -> float:
-        """`alpha_equity * (mean_util - chosen_util)` -- BAKU MATI (alpha_equity=0.0).
-        Positif bila stasiun yg DIPILIH keputusan ini lebih SEPI dari rata2 populasi
-        saat itu (mendorong menjauh dr yg ramai), negatif bila lebih ramai. Individual
-        & Markovian sungguhan (hanya fungsi state SAAT keputusan diambil) -- BEDA dari
-        `gini_reward` yg butuh state lintas-langkah (`_prev_gini`) & statistik SELURUH
-        populasi stasiun. Dipanggil SEGERA di on_decision, sama pola `decision_reward`
-        (Prox)."""
-        return self.alpha_equity * (float(mean_util) - float(chosen_util))
+    def local_equity_reward(self, chosen_util: float, mean_util: float,
+                            recent_rec_count: float = 0.0, overshoot_scale: float = 10.0) -> float:
+        """`alpha_equity * [(mean_util - chosen_util) - recent_rec_count/overshoot_scale]`
+        -- BAKU MATI (alpha_equity=0.0). Suku PERTAMA positif bila stasiun yg DIPILIH
+        lebih SEPI dari rata2 populasi SAAT ITU (mendorong menjauh dr yg ramai).
+
+        Suku KEDUA (anti-overshoot, DITAMBAHKAN 2026-08-22): diagnosis retrain K4+equity
+        90d menunjukkan herding NAIK 2x lipat dari K3 base (0,24-0,30 vs 0,11-0,12) --
+        mendekati pola kegagalan GreedyAgent(mode='utilization') (0,41-0,42). Sebab:
+        "kejar stasiun tersepi SAAT INI" murni snapshot sesaat, TANPA memori thd
+        rekomendasi yg BARU SAJA diberikan ke pengguna lain -- persis kelemahan
+        struktural Greedy (stateless antar-keputusan berdekatan waktu), yg justru jadi
+        alasan `flock_reward_rolling`/anti-herding jendela-bergulir ada sejak Tahap 0.1.
+        `recent_rec_count` (sama sinyal `sim.recent_recs`, dipakai `flock_reward_rolling`
+        & `EquityRewardCalculator.decision_reward_equity`) meredam godaan itu: stasiun yg
+        tampak sepi TAPI baru saja ramai direkomendasikan tak lagi otomatis menarik.
+
+        Individual & Markovian sungguhan (hanya fungsi state SAAT keputusan diambil,
+        termasuk `recent_rec_count` yg jendela-bergulirnya sendiri per-definisi juga
+        lokal-temporal, bukan lintas-episode) -- BEDA dari `gini_reward` yg butuh state
+        lintas-langkah (`_prev_gini`) & statistik SELURUH populasi stasiun. Dipanggil
+        SEGERA di on_decision, sama pola `decision_reward` (Prox)."""
+        r_local = float(mean_util) - float(chosen_util)
+        r_overshoot = float(recent_rec_count) / float(overshoot_scale)
+        return self.alpha_equity * (r_local - r_overshoot)
 
     def acceptance_reward(self, complied: bool) -> float:
         """`alpha_accept * (+1 patuh / -1 tolak)` -- BAKU MATI (alpha_accept=0.0).

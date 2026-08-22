@@ -606,7 +606,8 @@ class RewardCalculatorStub:
     def acceptance_reward(self, complied):
         return 0.0
 
-    def local_equity_reward(self, chosen_util, mean_util):
+    def local_equity_reward(self, chosen_util, mean_util, recent_rec_count=0.0,
+                            overshoot_scale=10.0):
         return 0.0
 
     def prox(self, feat_rec, feat_chosen):
