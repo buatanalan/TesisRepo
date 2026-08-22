@@ -108,7 +108,8 @@ class RewardCalculator:
                  alpha_gini: float = 0.5,
                  alpha_flock: float = 0.3, prox_lambda: float = 0.1,
                  wait_scale: float = 60.0, use_delta_gini: bool = False,
-                 alpha_trust: float = 0.0, alpha_accept: float = 0.0):
+                 alpha_trust: float = 0.0, alpha_accept: float = 0.0,
+                 alpha_equity: float = 0.0):
         self.alpha_wait = float(alpha_wait)
         self.beta_prox = float(beta_prox)
         self.alpha_gini = float(alpha_gini)
@@ -135,6 +136,22 @@ class RewardCalculator:
         # dari `wait_reward` yg hanya-positif, supaya ada gradien EKSPLISIT menahan
         # erosi acceptance, bukan cuma "tak dihukum tak dihargai juga"."""
         self.alpha_accept = float(alpha_accept)
+        # Suku SHAPING pemerataan LOKAL eksplisit (BAKU MATI, alpha_equity=0.0).
+        # Alternatif thd suku Gini global (gini_reward, level/delta) yg terbukti
+        # bermasalah sbg sinyal RL (Diagnosis_Gini_sbg_Reward 2026-08-22): Gini adalah
+        # statistik POPULASI (bukan fungsi transisi lokal (s,a,s')) -- satu keputusan
+        # cuma menggeser gini SECARA MARGINAL, dientjilkan lebih jauh oleh konkurensi
+        # (~1,32 keputusan/langkah) -- credit assignment lemah, terlepas dr level/delta.
+        # `local_equity_reward` sebaliknya HANYA bergantung pada stasiun yg DIPILIH
+        # keputusan INI vs rata2 utilisasi saat itu -- Markovian sungguhan (fungsi state
+        # SAAT INI, tanpa state lintas-langkah `_prev_gini`), teratribusi langsung ke
+        # aksi agen (spt Prox), mendorong varians utilisasi mengecil scr implisit (~
+        # korelasi searah dgn penurunan Gini tanpa mewarisi non-linearitas/non-smoothness
+        # kurva Lorenz-nya). Referensi: Siddique dkk. ICML2020, Zimmer dkk. ICML2021
+        # (fungsi kesejahteraan non-linear spt Gini butuh perlakuan non-Markovian
+        # eksplisit bila dioptimalkan scr ketat; proksi lokal ini KOMPROMI, bukan
+        # pengganti persis).
+        self.alpha_equity = float(alpha_equity)
         # Delta-gini (bukan level absolut) -- lihat catatan kelas. `_prev_gini` disimpan
         # per-instance (state internal), direset otomatis di keputusan pertama tiap episode
         # (None -> delta pertama = 0, tak ada sinyal palsu di awal).
@@ -248,6 +265,16 @@ class RewardCalculator:
         `wait_reward` (kedua suku individual delayed digerbang identik: hanya trip PATUH,
         sesuai `User.update_trust` sendiri hanya berjalan bila `last_rec_complied`)."""
         return self.alpha_trust * float(delta_trust)
+
+    def local_equity_reward(self, chosen_util: float, mean_util: float) -> float:
+        """`alpha_equity * (mean_util - chosen_util)` -- BAKU MATI (alpha_equity=0.0).
+        Positif bila stasiun yg DIPILIH keputusan ini lebih SEPI dari rata2 populasi
+        saat itu (mendorong menjauh dr yg ramai), negatif bila lebih ramai. Individual
+        & Markovian sungguhan (hanya fungsi state SAAT keputusan diambil) -- BEDA dari
+        `gini_reward` yg butuh state lintas-langkah (`_prev_gini`) & statistik SELURUH
+        populasi stasiun. Dipanggil SEGERA di on_decision, sama pola `decision_reward`
+        (Prox)."""
+        return self.alpha_equity * (float(mean_util) - float(chosen_util))
 
     def acceptance_reward(self, complied: bool) -> float:
         """`alpha_accept * (+1 patuh / -1 tolak)` -- BAKU MATI (alpha_accept=0.0).

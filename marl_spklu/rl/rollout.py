@@ -601,8 +601,12 @@ class RewardCalculatorStub:
     alpha_flock = 0.0
     alpha_trust = 0.0
     alpha_accept = 0.0
+    alpha_equity = 0.0
 
     def acceptance_reward(self, complied):
+        return 0.0
+
+    def local_equity_reward(self, chosen_util, mean_util):
         return 0.0
 
     def prox(self, feat_rec, feat_chosen):

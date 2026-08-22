@@ -72,6 +72,15 @@ p.add_argument("--alpha-accept", type=float, default=0.0,
                    "BAKU MATI=0.0). SIMETRIS (+patuh/-tolak, SEGERA -- beda dari wait_reward "
                    "yg hanya-positif & tertunda). Diagnosis riwayat training membuktikan "
                    "acceptance terkikis 0,68->0,39 tanpa suku ini. >0 WAJIB tag terpisah.")
+p.add_argument("--alpha-equity", type=float, default=0.0,
+              help="bobot suku pemerataan LOKAL eksplisit (RewardCalculator."
+                   "local_equity_reward, BAKU MATI=0.0) -- ALTERNATIF thd Gini global "
+                   "(alpha_gini): Markovian sungguhan, individual, teratribusi ke stasiun "
+                   "yg DIPILIH keputusan ini vs rata2 populasi saat itu (bukan statistik "
+                   "SELURUH populasi lintas-langkah spt Gini). WAJIB --n-critics 4 (aliran "
+                   "STREAM_EQUITY terpisah dari GLOBAL3 -- diagnosis 2026-08-21 acceptance "
+                   "vs gini 'tarik-menarik' saat berbagi 1 head kritik). >0 WAJIB tag "
+                   "terpisah, lihat Diagnosis_Gini_sbg_Reward 2026-08-22.")
 p.add_argument("--reward-preset", type=str, default="raw", choices=["raw", "seimbang4x"],
               help="'raw' (BAKU -- konstruktor RewardCalculator() MENTAH, alpha_wait=1.0 "
                    "alpha_gini=0.5 use_delta_gini=False -- TAK PERNAH dikalibrasi utk rezim "
@@ -120,6 +129,7 @@ else:
 _horizon_suffix = "" if args.horizon == "30d" else f"_{args.horizon}"
 _trust_suffix = "" if args.alpha_trust == 0.0 else f"_trust{args.alpha_trust:g}"
 _accept_suffix = "" if args.alpha_accept == 0.0 else f"_acc{args.alpha_accept:g}"
+_equity_suffix = "" if args.alpha_equity == 0.0 else f"_eq{args.alpha_equity:g}"
 _fc_suffix = "" if args.forecaster == "formula" else f"_{args.forecaster}"
 _rw_suffix = "" if args.reward_preset == "raw" else f"_{args.reward_preset}"
 _critics_suffix = "" if args.n_critics == 1 else f"_K{args.n_critics}"
@@ -128,8 +138,9 @@ _sigma_suffix = ("" if args.beta_sigma == 0.1 else f"_sig{args.beta_sigma:g}")
 _hist_suffix = "_nohist" if args.no_hist else ""
 _prefk_suffix = "" if args.pref_hist_k is None else f"_prefk{args.pref_hist_k}"
 _suffix = (("_pref_feat" if args.pref_feature_mode else ("_pref" if args.pref else ""))
-          + _hist_suffix + _prefk_suffix + _trust_suffix + _accept_suffix + _fc_suffix
-          + _rw_suffix + _critics_suffix + _beta_suffix + _sigma_suffix + _horizon_suffix)
+          + _hist_suffix + _prefk_suffix + _trust_suffix + _accept_suffix + _equity_suffix
+          + _fc_suffix + _rw_suffix + _critics_suffix + _beta_suffix + _sigma_suffix
+          + _horizon_suffix)
 TAG_ARM = "master_ev_ppo" + _suffix
 print(f"[{elapsed()}] Dataset: {DATASET}", flush=True)
 print(f"[{elapsed()}] Lengan: tag={TAG_ARM} (perspektif-EV, PPOTrainer standar, V(s) atensi tunggal, "
@@ -147,8 +158,10 @@ def make_forecaster():
 def make_reward_calc():
     if args.reward_preset == "seimbang4x":
         return RewardCalculator.seimbang4x(alpha_trust=args.alpha_trust,
-                                           alpha_accept=args.alpha_accept)
-    return RewardCalculator(alpha_trust=args.alpha_trust, alpha_accept=args.alpha_accept)
+                                           alpha_accept=args.alpha_accept,
+                                           alpha_equity=args.alpha_equity)
+    return RewardCalculator(alpha_trust=args.alpha_trust, alpha_accept=args.alpha_accept,
+                            alpha_equity=args.alpha_equity)
 
 
 def train_one(seed, tag):
@@ -263,6 +276,7 @@ common.save_json(dict(
                n_critics=args.n_critics, pref=args.pref,
                pref_feature_mode=args.pref_feature_mode, horizon=args.horizon,
                alpha_trust=args.alpha_trust, alpha_accept=args.alpha_accept,
+               alpha_equity=args.alpha_equity,
                forecaster=args.forecaster, beta_mode=args.beta_mode,
                beta_sigma=args.beta_sigma, reward_preset=args.reward_preset, dataset=DATASET)),
     f"{TAG_ARM}_eval_results.json")

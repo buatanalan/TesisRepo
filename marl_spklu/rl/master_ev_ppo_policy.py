@@ -66,6 +66,13 @@ from marl_spklu.rl.p_ppo_policy import PREF_D_LSTM, PREF_D_ATTN
 STREAM_WAIT = 0     # perbaikan-wait SAJA (dulu tergabung STREAM_INDIVIDUAL)
 STREAM_PROX = 1     # Prox SAJA (dulu tergabung STREAM_INDIVIDUAL)
 STREAM_GLOBAL3 = 2  # Gini + anti-herding (identik STREAM_GLOBAL, indeks beda krn 3 aliran)
+# --- Aliran ke-4, KHUSUS n_critics=4 (2026-08-22, `RewardCalculator.local_equity_reward`) --
+# TERPISAH dari STREAM_GLOBAL3 SENGAJA -- diagnosis acceptance_reward vs gini "tarik-menarik"
+# saat berbagi GLOBAL3 (2026-08-21) menunjukkan berbagi 1 head kritik antar suku yg
+# tujuannya berlainan bisa saling melemahkan. Proksi equity lokal (Markovian, individual)
+# scr konsep beda dari Gini/flock (populasi, non-Markovian) -- head kritik sendiri
+# menghindari pengulangan interferensi yg sama.
+STREAM_EQUITY = 3
 
 
 class MasterEVPPOPolicy(nn.Module):
@@ -363,6 +370,27 @@ class MasterEV3Transition:
         self.reward_streams[stream] += float(value)
 
 
+class MasterEV4Transition(MasterEV3Transition):
+    """Duplikat `MasterEV3Transition`, HANYA beda `reward_streams` berukuran 4 --
+    STREAM_WAIT/PROX/GLOBAL3 identik indeks 0/1/2, ditambah STREAM_EQUITY=3 utk
+    `RewardCalculator.local_equity_reward` (2026-08-22, lihat catatan STREAM_EQUITY di
+    atas kenapa TERPISAH dari GLOBAL3, bukan ditumpuk)."""
+    __slots__ = ()
+
+    def __init__(self, obs, critic_obs, hist, mask, chosen_indices, n_rec, logp, value, step,
+                pref_hist=None):
+        super().__init__(obs, critic_obs, hist, mask, chosen_indices, n_rec, logp, value, step,
+                         pref_hist=pref_hist)
+        self.reward_streams = np.zeros(4, dtype=np.float64)
+
+    def reward_vec(self, n_critics: int) -> np.ndarray:
+        if n_critics == 1:
+            return np.array([self.reward_streams.sum()], dtype=np.float64)
+        if n_critics != 4:
+            raise ValueError(f"n_critics={n_critics} != 4 (MasterEV4Transition)")
+        return self.reward_streams
+
+
 class MasterEVPPORolloutAgent(RLRolloutAgent):
     """Override `get_recommendation` -- observasi §3.1+state-EV via
     `build_joint_obs_master_ev`. `on_decision`/`on_step_end`/`on_charge_complete`
@@ -387,7 +415,11 @@ class MasterEVPPORolloutAgent(RLRolloutAgent):
 
     def __init__(self, *args, pref_hist_k: int = None, **kwargs):
         super().__init__(*args, **kwargs)
-        self._split_prox = (int(getattr(self.policy, "n_critics", 1)) == 3)
+        _nc = int(getattr(self.policy, "n_critics", 1))
+        self._split_prox = (_nc in (3, 4))
+        # 2026-08-22: n_critics=4 -> aliran ke-4 (STREAM_EQUITY) aktif utk
+        # `RewardCalculator.local_equity_reward` -- lihat MasterEV4Transition.
+        self._split_equity = (_nc == 4)
         self.pref_hist_k = int(pref_hist_k) if pref_hist_k is not None else PDQN_HIST_K
 
     def _build_pref_hist(self, user):
@@ -438,6 +470,14 @@ class MasterEVPPORolloutAgent(RLRolloutAgent):
         flock_term = self.rc.flock_reward_rolling(recent_rec_count)
         tr.add_reward(flock_term, STREAM_GLOBAL3)
         tr.flock_penalty = self.rc.flocking_penalty_rolling(recent_rec_count)
+        # Suku pemerataan LOKAL (opsional, BAKU MATI, hanya n_critics=4) -- lihat
+        # `RewardCalculator.local_equity_reward` & catatan STREAM_EQUITY di atas.
+        if self._split_equity and self.rc.alpha_equity != 0.0:
+            chosen_idx_eq2 = self.sid_to_idx.get(chosen_spklu_id)
+            if chosen_idx_eq2 is not None:
+                utils_eq = np.array([s.get_utilization() for s in self.sim.spklus.values()])
+                tr.add_reward(self.rc.local_equity_reward(
+                    utils_eq[chosen_idx_eq2], utils_eq.mean()), STREAM_EQUITY)
         if self.equity_calc is not None:
             chosen_idx_eq = self.sid_to_idx.get(chosen_spklu_id)
             if chosen_idx_eq is not None:
@@ -532,7 +572,8 @@ class MasterEVPPORolloutAgent(RLRolloutAgent):
         idx_arr = np.zeros(self.k, dtype=np.int64)
         idx_arr[:n_rec] = chosen_indices
 
-        TransitionCls = MasterEV3Transition if self._split_prox else Transition
+        TransitionCls = (MasterEV4Transition if self._split_equity
+                        else MasterEV3Transition if self._split_prox else Transition)
         tr = TransitionCls(obs_flat, obs_flat, hist, mask, idx_arr, n_rec,
                            act["logp"], act["value"], self.sim.current_step,
                            pref_hist=pref_hist)
