@@ -9,6 +9,12 @@ PIPE=Eksekusi_RL/_run_master_ev_ppo_pipeline.py
 DS90=scenario_dataset_klaster12_4x_90d.json
 COMMON="--reward-preset seimbang4x --beta-mode gap_ratio --beta-sigma 1.0 --forecaster vwf"
 
+# PENTING (2026-08-22): tag SAMA dgn run equity SEBELUM fix anti-overshoot
+# (local_equity_reward). Pipeline resume via training_results.json yg sudah ada --
+# hapus dulu supaya BENAR-BENAR retrain dgn reward yg sudah diperbaiki, bukan
+# reuse checkpoint lama diam-diam.
+rm -f Eksekusi_RL/outputs/master_ev_ppo_eq1_vwf_seimbang4x_K4_gap_sig1*
+
 echo "=== 1. K4+equity 30d ==="
 $PY $PIPE --n-critics 4 --alpha-equity 1.0 $COMMON
 
