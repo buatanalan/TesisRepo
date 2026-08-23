@@ -175,6 +175,43 @@ hal sekaligus dan penyebab kemenangan tak dapat disimpulkan.)*
 | `h6b_utama` | `--pref --pref-feature-mode --alpha-accept 1.0 --no-hist --n-critics 3` |
 | `h1a_pemerataan` | `--no-hist --n-critics 3` |
 | `h2a_selera` | `--pref --pref-feature-mode --alpha-accept 1.0 --no-hist --n-critics 1` |
+| `h1a_pemerataan_dgr` | `--no-hist --n-critics 3 --beta-mode gap_ratio --beta-sigma 1.0` |
+
+### Lengan kesetiaan: koordinasi + DGR (ditambahkan 2026-08-23)
+
+Koordinasi MASTER = kritik terpusat ber-atensi **ditambah** *Dynamic Gradient
+Re-weighting*. `h1a_pemerataan` hanya memuat yang pertama — `beta_mode` terbawa sebagai
+nilai bawaan `"fixed"`, **bukan keputusan yang diambil sengaja**. Akibatnya lengan yang
+seharusnya mewakili kemampuan koordinasi MASTER hanya memuat separuhnya.
+
+Sempat diduga DGR memang tak berdaya di sini, mengikuti temuan bahwa normalisasi
+*advantage* per-aliran mematikan mekanisme berbasis penskalaan (kasus CMDP). Pemeriksaan
+`marl_spklu/rl/ppo.py` baris 184–190 **membantah** dugaan itu:
+
+```python
+adv = (adv - adv.mean(axis=0)) / (adv.std(axis=0) + 1e-8)   # normalisasi per-aliran
+beta = self._compute_beta(returns)
+adv_combined = adv @ beta                                    # BARU digabung
+```
+
+Normalisasi terjadi lebih dulu, lalu `beta` menggabungkan aliran yang **sudah setara** —
+sehingga `beta` benar-benar mengubah arah gradien. Beda dengan pengali skalar pada imbalan,
+yang memang tercuci normalisasi. **DGR berfungsi.**
+
+Data historis juga menunjukkan DGR kuat: setiap lengan koordinasi dengan `gap_ratio`
+mengalahkan *greedy* — Gini 0,0664 (*d* = −3,23) pada 30 hari, dan **0,0330 (*d* = −7,03)**
+pada 90 hari.
+
+`--beta-sigma 1.0`, bukan bawaan 0,1: ada catatan di `ppo.py` bahwa 0,1 terlalu tajam
+sehingga bobot kolaps nyaris *one-hot* antar-*chunk*, diduga penyebab entropi kebijakan
+runtuh permanen pada satu percobaan 90 hari.
+
+**Yang dijawab lengan ini:** (a) apakah DGR memang menolong — pertanyaan kesetiaan pada
+paper yang pasti ditanyakan penguji; (b) apakah penolakan H6b bertahan setelah
+pembandingnya diperkuat.
+
+Pasangannya dijaga `periksa_kesepadanan()`: kedua lengan koordinasi harus identik kecuali
+pengaturan `beta`, kalau tidak selisihnya tak bisa diatribusikan ke DGR.
 
 *Baseline* `greedy` (queue & util) dihitung otomatis di tiap lengan.
 

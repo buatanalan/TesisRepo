@@ -88,6 +88,26 @@ LENGAN = [
     ("h2a_selera",
      PAKET_PREFERENSI + ["--no-hist", "--n-critics", "1"],
      "preferensi saja, tanpa penilai terpisah"),
+    # --- Lengan kesetiaan (ditambahkan 2026-08-23) ------------------------------
+    # `h1a_pemerataan` di atas memakai `beta_mode="fixed"` -- bobot antar-aliran
+    # seragam sepanjang pelatihan. Itu BUKAN keputusan yang diambil sengaja; ia
+    # terbawa sebagai nilai bawaan pipeline. Akibatnya lengan yang seharusnya
+    # mewakili kemampuan koordinasi MASTER hanya memuat SEPARUHNYA: kritik terpusat
+    # ber-atensi ada, tetapi Dynamic Gradient Re-weighting -- kontribusi MASTER yang
+    # bernama -- tidak.
+    #
+    # Sempat diduga DGR memang tak berdaya di sini, mengikuti temuan bahwa
+    # normalisasi advantage per-aliran mematikan mekanisme berbasis penskalaan
+    # (kasus CMDP). Pemeriksaan `ppo.py` membantah itu: normalisasi terjadi LEBIH
+    # DULU, lalu `beta` menggabungkan aliran yang sudah setara -- sehingga `beta`
+    # benar-benar mengubah arah gradien. Alasan itu keliru; DGR berfungsi.
+    #
+    # `--beta-sigma 1.0`, BUKAN bawaan 0.1: ada catatan di `ppo.py` bahwa 0.1 terlalu
+    # tajam sehingga bobot kolaps nyaris one-hot antar-chunk, diduga penyebab entropi
+    # kebijakan runtuh permanen pada satu percobaan 90 hari.
+    ("h1a_pemerataan_dgr",
+     ["--no-hist", "--n-critics", "3", "--beta-mode", "gap_ratio", "--beta-sigma", "1.0"],
+     "koordinasi saja + DGR (MASTER setia)"),
 ]
 
 
@@ -141,17 +161,33 @@ def periksa_kesepadanan():
             f"dari induknya dalam DUA hal, dan penyebab kemenangan tak dapat "
             f"disimpulkan.")
 
-    # 3. Tepat SATU lengan tanpa teknik preferensi (yaitu koordinasi-saja).
-    tanpa_pref = [t for t, khas, _ in LENGAN if "--pref" not in khas]
-    assert tanpa_pref == ["h1a_pemerataan"], (
-        f"Rancangan 2x2 rusak: yang TANPA teknik preferensi seharusnya hanya "
-        f"h1a_pemerataan, tetapi yang ditemukan {tanpa_pref}.")
+    # 3. Yang TANPA teknik preferensi hanyalah lengan koordinasi (dua varian: tanpa
+    #    dan dengan DGR).
+    tanpa_pref = sorted(t for t, khas, _ in LENGAN if "--pref" not in khas)
+    assert tanpa_pref == ["h1a_pemerataan", "h1a_pemerataan_dgr"], (
+        f"Rancangan rusak: yang TANPA teknik preferensi seharusnya hanya kedua lengan "
+        f"koordinasi, tetapi yang ditemukan {tanpa_pref}.")
 
     # 4. Tepat SATU lengan memakai penilai gabungan (yaitu preferensi-saja).
     gabungan = [t for t, v in nilai.items() if v.get("--n-critics") == "1"]
     assert gabungan == ["h2a_selera"], (
-        f"Rancangan 2x2 rusak: yang memakai penilai GABUNGAN seharusnya hanya "
+        f"Rancangan rusak: yang memakai penilai GABUNGAN seharusnya hanya "
         f"h2a_selera, tetapi yang ditemukan {gabungan}.")
+
+    # 5. Pasangan DGR harus IDENTIK kecuali pengaturan beta. Kalau tidak, selisih
+    #    antara keduanya tak bisa diatribusikan ke DGR.
+    a = [khas for t, khas, _ in LENGAN if t == "h1a_pemerataan"][0]
+    b = [khas for t, khas, _ in LENGAN if t == "h1a_pemerataan_dgr"][0]
+    buang = lambda xs: [x for i, x in enumerate(xs)
+                        if not (x.startswith("--beta-")
+                                or (i and xs[i - 1].startswith("--beta-")))]
+    assert buang(a) == buang(b), (
+        f"Pasangan DGR tak sepadan: di luar pengaturan beta, `h1a_pemerataan` "
+        f"{buang(a)} berbeda dari `h1a_pemerataan_dgr` {buang(b)}. Selisih keduanya "
+        f"tak akan bisa diatribusikan ke DGR.")
+    assert "--beta-mode" not in a and "--beta-mode" in b, (
+        "Pasangan DGR terbalik: `h1a_pemerataan` harus TANPA --beta-mode (bawaan "
+        "'fixed'), `h1a_pemerataan_dgr` harus DENGAN 'gap_ratio'.")
 
 
 def main():

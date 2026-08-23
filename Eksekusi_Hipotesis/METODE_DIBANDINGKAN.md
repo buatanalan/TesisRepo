@@ -11,13 +11,17 @@ di tiap bagian supaya bisa diperiksa ulang.
 
 ## 1. Ringkasan: rancangan 2×2 atas dua teknik
 
-| Lengan | Teknik preferensi | Pemisahan penilai | Mewakili |
-|---|---|---|---|
-| `h1a_pemerataan` | — | ✓ | Kemampuan koordinasi (turunan MASTER) |
-| `h2a_selera` | ✓ | — | Kemampuan preferensi (turunan PDQN) |
-| `h6b_utama` | ✓ | ✓ | Keduanya — **yang diuji** |
-| `greedy_queue` | — | — | Heuristik antrean terpendek |
-| `greedy_util` | — | — | Heuristik utilisasi terendah |
+| Lengan | Teknik preferensi | Pemisahan penilai | DGR | Mewakili |
+|---|---|---|---|---|
+| `h1a_pemerataan` | — | ✓ | — | Koordinasi (turunan MASTER, tanpa DGR) |
+| `h2a_selera` | ✓ | — | — | Kemampuan preferensi (turunan PDQN) |
+| `h6b_utama` | ✓ | ✓ | — | Keduanya — **yang diuji** |
+| `h1a_pemerataan_dgr` | — | ✓ | **✓** | Koordinasi MASTER yang **setia** |
+| `greedy_queue` | — | — | — | Heuristik antrean terpendek |
+| `greedy_util` | — | — | — | Heuristik utilisasi terendah |
+
+Tiga lengan pertama membentuk rancangan 2×2 pokok. Lengan keempat ditambahkan 2026-08-23
+untuk menutup soal kesetiaan pada MASTER — lihat §4.3.
 
 Sel keempat rancangan 2×2 (tanpa kedua teknik) **tidak dijalankan**; kedua `greedy`
 mengisi peran lantai. Lihat §8.
@@ -54,11 +58,11 @@ adalah komponen yang sedang diteliti — dan itulah yang membuat atribusi mungki
 | Skema | CTDE — kritik terpusat, aktor terdesentralisasi | ketiganya |
 | Panjang *rollout* | 96 langkah per pembaruan | ketiganya |
 | Jumlah pembaruan | 300 | ketiganya |
-| Penggabung aliran (`beta_mode`) | `fixed` — bobot seragam $1/K$, **DGR tidak aktif** | ketiganya |
+| Penggabung aliran (`beta_mode`) | `fixed` — bobot seragam $1/K$ | ketiga lengan pokok |
 
-Catatan penting: `beta_mode="fixed"` berarti **Dynamic Gradient Re-weighting milik MASTER
-tidak dipakai**. Bobot antar-aliran tetap seragam sepanjang pelatihan. Ini harus disebut
-di bab metodologi — mekanisme DGR ada di kode tetapi sengaja tidak diaktifkan.
+Catatan penting: `beta_mode="fixed"` pada ketiga lengan pokok berarti **Dynamic Gradient
+Re-weighting milik MASTER tidak dipakai di sana**. Bobot antar-aliran tetap seragam
+sepanjang pelatihan. Lengan `h1a_pemerataan_dgr` (§4.3) mengaktifkannya sebagai pembanding.
 
 Hiperparameter PPO (`PPOTrainer`, baku, identik ketiganya):
 
@@ -240,6 +244,58 @@ besar imbalan.
 
 *Sumber: `MasterEV3Transition.reward_vec`, `MasterEVPPORolloutAgent._split_prox`.*
 
+### 4.3 Dynamic Gradient Re-weighting — lengan kesetiaan
+
+Ditambahkan 2026-08-23. `h1a_pemerataan_dgr` identik dengan `h1a_pemerataan` **kecuali**
+`--beta-mode gap_ratio --beta-sigma 1.0`.
+
+**Kenapa perlu.** Koordinasi MASTER = kritik terpusat ber-atensi **ditambah** DGR.
+`h1a_pemerataan` hanya memuat yang pertama, karena `beta_mode` terbawa sebagai nilai bawaan
+pipeline — **bukan keputusan yang diambil sengaja**. Akibatnya lengan yang seharusnya
+mewakili kemampuan koordinasi MASTER hanya memuat separuhnya, dan pertanyaan "apakah MASTER
+diimplementasikan dengan setia?" tak bisa dijawab ya.
+
+**Cara kerja DGR** (`ppo.py::_compute_beta`): untuk tiap aliran $k$ dihitung selisih relatif
+terhadap capaian terbaik yang pernah dilihat, $g^k = (R^{*k} - R^k)/|R^{*k}|$, lalu bobot
+$\beta = \mathrm{softmax}(g^k/\sigma)$. Aliran yang paling tertinggal mendapat bobot
+terbesar.
+
+**DGR berfungsi, meski sempat diduga tidak.** Dugaan itu mengikuti temuan bahwa normalisasi
+*advantage* per-aliran mematikan mekanisme berbasis penskalaan — yang memang membuat
+formulasi CMDP tak berdaya. Pemeriksaan `ppo.py` baris 184–190 membantahnya:
+
+```python
+adv = (adv - adv.mean(axis=0)) / (adv.std(axis=0) + 1e-8)   # normalisasi per-aliran
+beta = self._compute_beta(returns)
+adv_combined = adv @ beta                                    # BARU digabung
+```
+
+Normalisasi terjadi **lebih dulu**, lalu $\beta$ menggabungkan aliran yang sudah setara —
+sehingga $\beta$ benar-benar mengubah arah gradien. Berbeda dari pengali skalar pada
+imbalan, yang memang tercuci normalisasi.
+
+**`--beta-sigma 1.0`, bukan bawaan 0,1.** Ada catatan di `ppo.py` bahwa $\sigma = 0{,}1$
+terlalu tajam: $g$ diklip pada $[0,10]$ tetapi $z = g/\sigma$ bisa mencapai 100, sehingga
+$\beta$ kolaps nyaris *one-hot* antar-*chunk*. Diduga penyebab entropi kebijakan runtuh
+permanen pada satu percobaan 90 hari sebelumnya.
+
+**Bukti historis DGR kuat.** Setiap lengan koordinasi dengan `gap_ratio` mengalahkan
+*greedy* pada Gini:
+
+| Lengan historis | Gini | Cohen's $d$ vs `greedy_util` |
+|---|---|---|
+| eq1 K4 `gap_sig1`, 30 hari | 0,0664 | −3,23 |
+| eq1 K4 `gap_sig1`, **90 hari** | **0,0330** | **−7,03** |
+| eq1 accW1 K5 `gap_sig1` | 0,0744 | −2,59 |
+
+Konfigurasinya tak sepadan dengan lengan baru, jadi ini indikasi, bukan bukti.
+
+**Dua hal yang dijawab lengan ini**: (a) apakah DGR memang menolong — soal kesetiaan pada
+paper; (b) apakah penolakan H6b bertahan setelah pembandingnya diperkuat.
+
+Kesepadanan pasangannya dijaga `periksa_kesepadanan()`: keduanya harus identik kecuali
+pengaturan `beta`, kalau tidak selisihnya tak dapat diatribusikan ke DGR.
+
 ---
 
 ## 5. Yang BERBEDA — suku imbalan
@@ -312,26 +368,27 @@ Tak perlu eksperimen tambahan; datanya sudah ikut terkumpul.
 
 ## 6. Tabel pengaturan lengkap
 
-| Pengaturan | `h6b_utama` | `h1a_pemerataan` | `h2a_selera` |
-|---|---|---|---|
-| `--pref` | ✓ | — | ✓ |
-| `--pref-feature-mode` | ✓ | — | ✓ |
-| `--alpha-accept` | **1.0** | 0.0 | **1.0** |
-| `--n-critics` | **3** | **3** | **1** |
-| `--no-hist` | ✓ | ✓ | ✓ |
-| `--forecaster` | vwf | vwf | vwf |
-| `--reward-preset` | seimbang4x | seimbang4x | seimbang4x |
-| `--dataset` | 4x | 4x | 4x |
-| `--k` | 3 | 3 | 3 |
-| `--beta-mode` | fixed | fixed | fixed |
-| `--rollout-steps` | 96 | 96 | 96 |
-| `--n-updates` | 300 | 300 | 300 |
-| `--n-train-seed` | 5 | 5 | 5 |
-| `--n-eval-seed` | 10 | 10 | 10 |
-| `--initial-trust` | 0,3 / 0,5 / 0,7 | 0,3 / 0,5 / 0,7 | 0,3 / 0,5 / 0,7 |
+| Pengaturan | `h6b_utama` | `h1a_pemerataan` | `h2a_selera` | `h1a_..._dgr` |
+|---|---|---|---|---|
+| `--pref` | ✓ | — | ✓ | — |
+| `--pref-feature-mode` | ✓ | — | ✓ | — |
+| `--alpha-accept` | **1.0** | 0.0 | **1.0** | 0.0 |
+| `--n-critics` | **3** | **3** | **1** | **3** |
+| `--no-hist` | ✓ | ✓ | ✓ | ✓ |
+| `--forecaster` | vwf | vwf | vwf | vwf |
+| `--reward-preset` | seimbang4x | seimbang4x | seimbang4x | seimbang4x |
+| `--dataset` | 4x | 4x | 4x | 4x |
+| `--k` | 3 | 3 | 3 | 3 |
+| `--beta-mode` | fixed | fixed | fixed | **gap_ratio** |
+| `--rollout-steps` | 96 | 96 | 96 | 96 |
+| `--n-updates` | 300 | 300 | 300 | 300 |
+| `--n-train-seed` | 5 | 5 | 5 | 5 |
+| `--n-eval-seed` | 10 | 10 | 10 | 10 |
+| `--initial-trust` | 0,3 / 0,5 / 0,7 | 0,3 / 0,5 / 0,7 | 0,3 / 0,5 / 0,7 | 0,3 / 0,5 / 0,7 |
 
-**Ringkasnya**: dari 14 pengaturan, hanya **3** yang berbeda — dan ketiganya adalah
-komponen yang memang sedang diteliti.
+**Ringkasnya**: di antara ketiga lengan pokok, dari 14 pengaturan hanya **3** yang berbeda —
+dan ketiganya komponen yang memang sedang diteliti. Lengan DGR berbeda dari
+`h1a_pemerataan` hanya pada `--beta-mode` dan `--beta-sigma`.
 
 ---
 
@@ -360,10 +417,14 @@ pemisahan penilai. Sel itu akan menunjukkan apakah pemisahan penilai sendirian b
 apa-apa. Kedua `greedy` mengisi peran lantai, tetapi bukan sel yang setara. Ini bagian dari
 H4 yang dikeluarkan dari cakupan.
 
-**8.2 DGR tidak aktif.** `beta_mode="fixed"` — bobot antar-aliran tetap seragam. Mekanisme
-*Dynamic Gradient Re-weighting* milik MASTER ada di kode tetapi sengaja tidak dipakai. Jadi
-"pemisahan penilai" di sini berarti **kepala kritik terpisah dengan bobot tetap**, bukan
-DGR penuh.
+**8.2 DGR diuji terpisah, bukan di ketiga lengan pokok.** Ketiga lengan pokok memakai
+`beta_mode="fixed"` — bobot antar-aliran tetap seragam. Nilai itu **terbawa sebagai bawaan
+pipeline, bukan keputusan yang diambil sengaja**, dan akibatnya lengan yang mewakili
+koordinasi MASTER sempat hanya memuat separuh kontribusi MASTER (kritik ber-atensi ada,
+DGR tidak).
+
+Ditutup 2026-08-23 dengan lengan `h1a_pemerataan_dgr` — identik `h1a_pemerataan` kecuali
+`--beta-mode gap_ratio --beta-sigma 1.0`. Lihat §4.3.
 
 **8.3 H1 tidak diuji.** `hist_lstm` dimatikan di semua lengan, sehingga penaksiran
 kepercayaan dari riwayat interaksi tak pernah diuji. Tujuan Fungsional §1.3 butir pertama

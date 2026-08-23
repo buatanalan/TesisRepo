@@ -24,8 +24,9 @@ from scipy.stats import ks_2samp, wilcoxon
 
 STAMP = datetime.date.today().strftime("%Y%m%d")
 LENGAN = [("h6b_utama", "penyatuan (diuji)"),
-          ("h1a_pemerataan", "pemerataan saja"),
-          ("h2a_selera", "selera saja")]
+          ("h1a_pemerataan", "koordinasi saja"),
+          ("h2a_selera", "preferensi saja"),
+          ("h1a_pemerataan_dgr", "koordinasi + DGR")]
 
 # Toleransi. Ditulis eksplisit supaya jadi keputusan yang terlihat, bukan angka ajaib
 # yang terselip di tengah perbandingan.
@@ -227,6 +228,71 @@ def nilai(data, horizon):
             sebaran, v_revisi)
 
 
+def uji_dgr(data):
+    """Kesetiaan lengan koordinasi terhadap MASTER.
+
+    Koordinasi MASTER = kritik terpusat ber-atensi DITAMBAH Dynamic Gradient
+    Re-weighting. Lengan `h1a_pemerataan` hanya punya yang pertama -- `beta_mode`
+    terbawa sebagai nilai bawaan "fixed", bukan keputusan yang diambil sengaja.
+    `h1a_pemerataan_dgr` menutup kekurangan itu, identik kecuali pengaturan beta.
+
+    Dua hal yang dijawab sekaligus:
+      1. Apakah DGR memang menolong? (kesetiaan pada paper)
+      2. Apakah penolakan H6b bertahan bila pembandingnya diperkuat?
+    """
+    K.judul("KESETIAAN LENGAN MASTER -- pengaruh DGR")
+    ada = [i for i in K.TINGKAT_TRUST if data.get(("h1a_pemerataan_dgr", i))]
+    if not ada:
+        print("  Lengan `h1a_pemerataan_dgr` belum ada. Jalankan:")
+        print("      python 1_eksperimen.py --hanya h1a_pemerataan_dgr")
+        return None
+
+    print("Koordinasi MASTER = kritik ber-atensi + DGR. Lengan tanpa DGR hanya memuat")
+    print("separuhnya, sehingga pembanding H6b sempat lebih lemah dari semestinya.\n")
+    print(f"  {'percaya':<9} {'tanpa DGR':>10} {'dgn DGR':>10} {'selisih':>10} "
+          f"{'p':>8}  DGR menolong?")
+    hasil = {}
+    for it in ada:
+        a, b = data.get(("h1a_pemerataan", it)), data[("h1a_pemerataan_dgr", it)]
+        if not a:
+            continue
+        x, y = a["gini_policy"], b["gini_policy"]
+        pv = float(wilcoxon(x, y).pvalue)
+        beda = float(np.mean(y) - np.mean(x))
+        menolong = bool(beda < 0 and pv < 0.05)   # Gini turun = menolong
+        hasil[it] = dict(tanpa=float(np.mean(x)), dengan=float(np.mean(y)),
+                         selisih=beda, p=pv, menolong=menolong)
+        print(f"  {it:<9} {np.mean(x):>10.4f} {np.mean(y):>10.4f} {beda:>+10.4f} "
+              f"{pv:>8.4f}  {'ya' if menolong else ('tidak' if pv < 0.05 else 'tak nyata')}")
+
+    # Apakah penolakan H6b bertahan terhadap pembanding yang diperkuat?
+    print(f"\n  {'percaya':<9} {'penyatuan':>10} {'koord+DGR':>10} {'selisih':>10} "
+          f"{'p':>8}  unggul")
+    tetap = []
+    for it in ada:
+        du = data.get(("h6b_utama", it))
+        if not du:
+            continue
+        x, y = du["gini_policy"], data[("h1a_pemerataan_dgr", it)]["gini_policy"]
+        pv = float(wilcoxon(x, y).pvalue)
+        beda = float(np.mean(x) - np.mean(y))
+        koord_menang = bool(beda > 0 and pv < 0.05)
+        tetap.append(koord_menang)
+        hasil.setdefault(it, {})["vs_penyatuan"] = dict(
+            penyatuan=float(np.mean(x)), koordinasi_dgr=float(np.mean(y)),
+            selisih=beda, p=pv, koordinasi_menang=koord_menang)
+        print(f"  {it:<9} {np.mean(x):>10.4f} {np.mean(y):>10.4f} {beda:>+10.4f} "
+              f"{pv:>8.4f}  {'koord+DGR' if koord_menang else 'penyatuan/seri'}")
+
+    bertahan = bool(tetap) and all(tetap)
+    print("\n" + K.vonis(bertahan,
+        "Penolakan H6b BERTAHAN terhadap pembanding MASTER yang setia -- koordinasi "
+        "tetap unggul pemerataan bahkan setelah diperkuat DGR.",
+        "Penolakan H6b TIDAK bertahan di seluruh titik saat pembandingnya diperkuat. "
+        "Periksa titik mana yang berubah dan laporkan apa adanya."))
+    return dict(per_tingkat=hasil, penolakan_h6b_bertahan=bertahan)
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--horizon", type=str, default="30d", choices=["30d", "90d"])
@@ -266,6 +332,7 @@ def main():
             f"   Jalankan dulu:  python 1_eksperimen.py --horizon {args.horizon}")
 
     v_pokok, v_kurva, v_sebaran, v_revisi = nilai(data, args.horizon)
+    v_dgr = uji_dgr(data)
 
     K.judul("RINGKASAN")
     print(f"  {'H6b -- klaim utama (pra-daftar)':<38} "
@@ -274,13 +341,15 @@ def main():
           f"{'belum dinilai' if v_kurva['h2b'] is None else ('LULUS' if v_kurva['h2b'] else 'tidak lulus')}")
     print(f"  {'pertukaran (PASCA-HOC, bukan lulus)':<38} "
           f"{'pola konsisten' if v_revisi['pola_konsisten'] else 'pola tak konsisten'}")
+    print(f"  {'penolakan H6b vs MASTER+DGR':<38} "
+          f"{'belum dinilai' if v_dgr is None else ('BERTAHAN' if v_dgr['penolakan_h6b_bertahan'] else 'goyah')}")
 
     K.simpan(dict(tanggal=STAMP, horizon=args.horizon,
                   toleransi=dict(gini=TOL_GINI, acc=TOL_ACC),
                   berkas={f"{t}|{i}": (data[(t, i)] or {}).get("_berkas")
                           for t, _ in LENGAN for i in K.TINGKAT_TRUST},
                   h6b=v_pokok, h2b=v_kurva, sebaran_trust=v_sebaran,
-                  klaim_revisi_pascahoc=v_revisi),
+                  klaim_revisi_pascahoc=v_revisi, kesetiaan_dgr=v_dgr),
              f"analisis{suf(args.horizon)}_{STAMP}.json")
 
     if args.horizon == "30d":

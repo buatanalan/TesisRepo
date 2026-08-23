@@ -14,7 +14,10 @@
     "h1a_pemerataan|0.7": "h1a_pemerataan__it07_20260823_eval.json",
     "h2a_selera|0.3": "h2a_selera__it03_20260823_eval.json",
     "h2a_selera|0.5": "h2a_selera__it05_20260823_eval.json",
-    "h2a_selera|0.7": "h2a_selera__it07_20260823_eval.json"
+    "h2a_selera|0.7": "h2a_selera__it07_20260823_eval.json",
+    "h1a_pemerataan_dgr|0.3": null,
+    "h1a_pemerataan_dgr|0.5": null,
+    "h1a_pemerataan_dgr|0.7": null
   },
   "h6b": {
     "lulus": false,
@@ -193,5 +196,6 @@
         }
       }
     }
-  }
+  },
+  "kesetiaan_dgr": null
 }
