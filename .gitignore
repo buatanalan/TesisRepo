@@ -46,6 +46,7 @@ Synthetic Model/
 # petunjuk menjalankan skrip di folder yang sama -- kalau tertinggal, skripnya ada di
 # server tapi cara memakainya tidak.
 !Eksekusi_Hipotesis/README.md
+!Eksekusi_Hipotesis/METODE_DIBANDINGKAN.md
 !Eksekusi_RL/README.md
 
 # ============ Arsip kode lama ============
