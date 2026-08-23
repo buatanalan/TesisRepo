@@ -1,8 +1,16 @@
 # Metode yang Dibandingkan — Rincian Lengkap
 
 Dokumen acuan untuk menulis bab metodologi. Isinya: apa **persis** yang sama dan apa yang
-berbeda di antara ketiga lengan eksperimen, sampai ke tingkat komponen jaringan, suku
-imbalan, dan hiperparameter.
+berbeda di antara lengan-lengan eksperimen, sampai ke tingkat arsitektur jaringan, aliran
+data, komponen, suku imbalan, dan hiperparameter.
+
+**Jawaban ringkas untuk tiga pertanyaan yang sering muncul:**
+
+| Pertanyaan | Jawaban |
+|---|---|
+| Apakah observasinya berbeda? | **Tidak.** Identik `(N, 10)` di seluruh lengan — lihat §3A.1 |
+| Lalu apa yang berbeda? | Masukan **tambahan** (`pref_hist`), dimensi konteks, dan jumlah keluaran kritik — §3A.5 |
+| Bagaimana alur datanya? | Diagram per lengan di §3A.3 dan §3A.4 |
 
 Semua angka di sini dibaca langsung dari kode, bukan dari catatan. Sumbernya disebutkan
 di tiap bagian supaya bisa diperiksa ulang.
@@ -172,6 +180,163 @@ dan kompatibilitas model tak berubah.
 
 Konsekuensinya untuk tesis: **H1 (penaksiran kepercayaan dari riwayat) tidak diuji.**
 Tujuan Fungsional §1.3 butir pertama perlu direvisi.
+
+---
+
+## 3A. Arsitektur & aliran data
+
+### 3A.1 Observasi — IDENTIK di ketiga lengan
+
+**Tidak ada perbedaan observasi sama sekali.** Ketiga lengan menerima matriks yang sama
+persis dari `build_joint_obs_master_ev`:
+
+```
+station_feats : (N, 10)     N = jumlah stasiun kandidat layak
+```
+
+Tiap baris = satu stasiun kandidat, 10 kolom:
+
+| Kolom | Isi | Asal |
+|---|---|---|
+| 1–7 | indeks stasiun, waktu sin, waktu cos, slot tersedia, permintaan mendatang, daya, ETA | §3.1 MASTER |
+| 8–10 | jarak pemohon, SoC, kapasitas baterai | keadaan EV pemohon |
+
+Perhatikan kolom 8–10: **keadaan pemohon disisipkan ke tiap baris kandidat**, bukan
+diletakkan di blok skalar terpisah (`scalar_dim = 0`). Konsekuensinya, aktor tetap
+mengetahui siapa yang sedang dilayani tanpa merusak invariansi permutasi atas stasiun.
+
+Yang **tidak pernah** masuk observasi di lengan mana pun: `user.trust` mentah, dan
+identitas pengguna.
+
+### 3A.2 Yang berbeda bukan observasinya, melainkan MASUKAN TAMBAHAN
+
+| Masukan | Bentuk | `h6b` | `h1a` | `h2a` |
+|---|---|---|---|---|
+| `station_feats` | (N, 10) | ✓ | ✓ | ✓ |
+| `hist` | (10, 4) | ✓ tapi **dinolkan** | ✓ tapi **dinolkan** | ✓ tapi **dinolkan** |
+| `pref_hist` | (10, 10) | ✓ | **—** | ✓ |
+
+`hist` = riwayat interaksi 10 langkah × 4 fitur (patuh, `estwait` ternormalisasi,
+`wait_default` ternormalisasi, galat terealisasi). Tetap dibangun dan diteruskan, tetapi
+`--no-hist` membuat `_encode_hist` mengembalikan **vektor nol** tanpa menyentuh LSTM-nya.
+
+`pref_hist` = riwayat 10 pasangan (rekomendasi, pilihan nyata), masing-masing disandikan
+sebagai `feat(a_hat) ++ feat(a)` — dua vektor deskriptif stasiun 5-dimensi (jarak, wait,
+antrean, konektor, utilisasi), bukan *one-hot* identitas. Karena itu modul preferensi
+belajar dari **karakteristik** stasiun, bukan menghafal indeksnya. Padding nol diletakkan
+**di belakang**, syarat `pack_padded_sequence` agar LSTM melewati langkah kosong
+sepenuhnya.
+
+### 3A.3 Aliran data — `h1a_pemerataan` (koordinasi saja)
+
+```
+station_feats (N,10) ─────────────────────────────┬──────────────────────┐
+                                                  │                      │
+hist (10,4) ──[ _encode_hist ]──► c_t (16)        │                      │
+                 use_hist=False                   │                      │
+                 → SELALU NOL                     │                      │
+                        │                         │                      │
+                        └── context (16, nol) ────┤                      │
+                                                  ▼                      ▼
+                                     StationEncoder(hidden=64)   StationEncoder(hidden=128)
+                                     bobot TERBAGI antar-stasiun        [kritik]
+                                                  │                      │
+                                                  ▼                      ▼
+                                            emb (N,64)             c_emb (N,128)
+                                                  │                      │
+                                          disc_head Linear(64,1)   AttentionPooling
+                                                  │                      │
+                                                  ▼                      ▼
+                                            logits (N)             pooled (128)
+                                                  │                      │
+                                    mask → softmax → top-K/threshold      ▼
+                                                  │              critic_head MLP
+                                                  ▼                      │
+                                          rekomendasi k=3                ▼
+                                                                    V (3 nilai)
+```
+
+**Catatan penting**: karena `use_hist=False` **dan** tak ada modul preferensi, `context`
+pada lengan ini adalah **16 dimensi bernilai nol seluruhnya**. Jaringannya secara efektif
+menjadi MLP murni per-stasiun tanpa konteks per-pengguna dari riwayat — informasi pemohon
+hanya masuk lewat kolom 8–10 tiap baris kandidat.
+
+### 3A.4 Aliran data — `h6b_utama` dan `h2a_selera` (dengan teknik preferensi)
+
+```
+station_feats (N,10) ──────────────────────┬───────────────────┬──────────────┐
+                                           │                   │              │
+hist (10,4) ──[ _encode_hist ]──► c_t (16, SELALU NOL)         │              │
+                                           │                   │              │
+pref_hist (10,10)                          │                   │              │
+     │                                     │                   │              │
+     ▼ pack_padded_sequence                │                   │              │
+  pref_lstm (LSTM 10→16)                   │                   │              │
+     │                                     │                   │              │
+     ▼ c_pref (16)                         │                   │              │
+     └──────────► PreferenceAttention ◄────┘                   │              │
+                   q = W_q·c_pref                              │              │
+                   k,v = W_kv·station_feats                    │              │
+                   w = softmax(q·kᵀ/√d)                        │              │
+                   attended = Σ w·v          (16)              │              │
+                          │                                    │              │
+                          ▼                                    │              │
+                  × pref_gate  (skalar, init 0)                │              │
+                          │                                    │              │
+        context = [ c_t(16, nol) ‖ attended_pref(16) ]  (32)    │              │
+                          │                                    │              │
+                          ├────────────────────────────────────┤              │
+                          ▼                                    ▼              ▼
+                  StationEncoder(64)                  StationEncoder(128)  [kritik]
+                          │                                    │
+                          ▼                                    ▼
+                    logits (N)                          V (3 nilai / 1 nilai)
+```
+
+**`pref_gate` diinisialisasi nol**, sehingga pada awal pelatihan `attended_pref` = 0 dan
+jaringannya berperilaku identik dengan lengan koordinasi. Kontribusi modul preferensi
+masuk **bertahap** seiring gerbang belajar membuka.
+
+**`PreferenceAttention` memakai preferensi sebagai *query***, fitur stasiun sebagai
+*key/value*. Jadi keluarannya adalah ringkasan stasiun yang **dibobot menurut relevansinya
+terhadap selera pengguna yang sedang dilayani** — bukan konkatenasi polos.
+
+### 3A.5 Di mana ketiga lengan benar-benar berpisah
+
+| Titik | `h1a` | `h2a` | `h6b` |
+|---|---|---|---|
+| Dimensi `context` | 16 (semua nol) | 32 | 32 |
+| Cabang preferensi | tidak ada | ada | ada |
+| Keluaran `critic_head` | **3** | **1** | **3** |
+
+Selain tiga baris itu, **jalur datanya sama persis** — penyandi yang sama, penggabung
+atensi yang sama, kepala diskrit yang sama, aturan pemilihan aksi yang sama.
+
+### 3A.6 Aturan pemilihan aksi — identik ketiganya
+
+1. `logits` dimasker: kandidat tak layak diberi $-\infty$
+2. `softmax` atas kandidat layak
+3. Ambil semua kandidat berpeluang $> 0{,}20$ (*threshold*); bila tak ada satu pun, ambil
+   yang tertinggi
+4. Potong pada $k = 3$
+5. $\varepsilon$-*greedy*: dengan peluang $\varepsilon$, ambil subhimpunan acak
+   (saat evaluasi $\varepsilon = 0$)
+
+Log-peluangnya dihitung sebagai `Categorical` berurutan tanpa pengembalian.
+
+### 3A.7 Invariansi permutasi — dasar bersama, bukan variabel
+
+`StationEncoder` memproses **tiap baris stasiun lewat bobot yang sama** (pola *Deep Sets*),
+dan `AttentionPooling` meringkas dengan bobot ber-*softmax* yang selalu berjumlah 1 berapa
+pun $N$. Akibatnya menukar urutan stasiun menghasilkan keluaran yang tertukar identik.
+
+Ini yang menjawab pelanggaran invariansi permutasi PDQN (`Linear(128,N)` datar). **Ketiga
+lengan memakainya**, jadi perbaikan itu bukan variabel yang dibandingkan melainkan dasar
+bersama — dan konsekuensinya tesis ini **tidak** mengukur seberapa besar perbaikan itu
+sendiri berkontribusi.
+
+*Sumber: `master_ev_ppo_policy.py::forward/act`, `policy.py::StationEncoder/AttentionPooling`,
+`pdqn_policy.py::PreferenceAttention/hist_feat_dim_feature`, `master_paper_obs.py`.*
 
 ---
 
