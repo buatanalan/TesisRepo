@@ -55,6 +55,17 @@ def muat_rapi(horizon):
             with open(berkas[-1], encoding="utf-8") as f:
                 d = json.load(f)
             d["_berkas"] = os.path.basename(berkas[-1])
+            # Pagar terhadap hasil mode cepat. Berkasnya sudah berawalan `zzcepat_`
+            # sehingga tak akan terjaring pola di atas, tapi anggaran diperiksa ulang
+            # di sini -- vonis yang dihitung dari kebijakan 3-pembaruan akan tampak
+            # normal dan itulah bahayanya.
+            c = d.get("config", {})
+            if c.get("n_updates", 999) < 50 or c.get("n_train_seed", 99) < 3:
+                print(f"    !! {os.path.basename(berkas[-1])} anggarannya terlalu kecil "
+                      f"({c.get('n_train_seed')} seed x {c.get('n_updates')} pembaruan) "
+                      f"-- DIABAIKAN, bukan hasil sah")
+                out[(tag, it)] = None
+                continue
             out[(tag, it)] = d
     return out
 

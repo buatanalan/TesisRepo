@@ -55,13 +55,22 @@ LENGAN = [
 ]
 
 
-def nama_berkas(tag, it, horizon):
+# Hasil mode cepat diberi awalan tersendiri. Tanpa ini, uji rangkaian yang dijalankan
+# pada hari yang sama akan menghasilkan nama berkas IDENTIK dengan run sungguhan --
+# sehingga run sungguhan dilewati ("sudah ada") dan yang terbaca `2_analisis.py` adalah
+# hasil 3-pembaruan yang tak berarti. Jebakan yang sangat mudah tak disadari, karena
+# semuanya tampak berjalan normal.
+AWALAN_CEPAT = "zzcepat_"
+
+
+def nama_berkas(tag, it, horizon, cepat=False):
     suf = "" if horizon == "30d" else f"_{horizon}"
-    return f"{tag}__it{it.replace('.', '')}{suf}_{STAMP}_eval.json"
+    pre = AWALAN_CEPAT if cepat else ""
+    return f"{pre}{tag}__it{it.replace('.', '')}{suf}_{STAMP}_eval.json"
 
 
-def sudah_ada(tag, it, horizon):
-    return os.path.exists(os.path.join(K.OUTDIR, nama_berkas(tag, it, horizon)))
+def sudah_ada(tag, it, horizon, cepat=False):
+    return os.path.exists(os.path.join(K.OUTDIR, nama_berkas(tag, it, horizon, cepat)))
 
 
 def main():
@@ -98,10 +107,13 @@ def main():
         print("!! MODE CEPAT: hasilnya TIDAK SAH untuk dilaporkan\n")
     lewati = 0
     for tag, khas, it, ket in tugas:
-        ada = sudah_ada(tag, it, args.horizon)
+        ada = sudah_ada(tag, it, args.horizon, args.cepat)
         lewati += ada
         print(f"  {'LEWATI' if ada else 'jalan '}  {tag:<16} it={it}   {ket}")
     print(f"\n  {len(tugas)-lewati} akan dijalankan, {lewati} dilewati (sudah ada)")
+    if args.cepat:
+        print(f"  berkasnya berawalan `{AWALAN_CEPAT}` -- tak akan tertukar dengan hasil "
+              f"sungguhan, dan diabaikan `2_analisis.py`")
 
     if args.lihat:
         print("\n(--lihat: tidak ada yang dijalankan)")
@@ -109,10 +121,11 @@ def main():
 
     t0 = time.time()
     for i, (tag, khas, it, ket) in enumerate(tugas, 1):
-        if sudah_ada(tag, it, args.horizon):
+        if sudah_ada(tag, it, args.horizon, args.cepat):
             print(f"\n[{i}/{len(tugas)}] {tag} it={it} -- LEWATI", flush=True)
             continue
-        cmd = ([sys.executable, PIPELINE, "--tag", tag, "--initial-trust", it]
+        tag_jalan = (AWALAN_CEPAT + tag) if args.cepat else tag
+        cmd = ([sys.executable, PIPELINE, "--tag", tag_jalan, "--initial-trust", it]
                + khas + BERSAMA + ds + horizon_arg
                + ["--n-train-seed", str(n_seed), "--n-updates", str(n_upd),
                   "--n-eval-seed", str(n_eval)])
