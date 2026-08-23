@@ -30,20 +30,21 @@ hanya membaca hasil H6b dari sudut berbeda.
 | Dikeluarkan | Alasan | Jadi apa di tesis |
 |---|---|---|
 | Aturan kepercayaan asimetris | Sudah jadi bawaan kode (`TRUST_PENALTY_MODE = "signed"`) dan sudah tervalidasi 4/4 sel di lini lama | Dikutip, bukan diuji ulang |
-| Atribusi `alpha_accept` | Butuh satu lengan pembanding lagi | **Penjelasan mekanisme H6b dihapus dari tesis** — lihat peringatan di bawah |
 | Penaksir kepercayaan dari riwayat | Butuh ablasi baru + 10 unit | Penelitian lanjutan; **Tujuan Fungsional §1.3 perlu direvisi** |
-| Penilai terpisah vs gabungan | Menjelaskan H6b, bukan membuktikannya | Penelitian lanjutan; **§1.3 perlu direvisi** |
-| Performativitas | Ada bukti dari lini lama (beban 1x vs 4x) | Dikutip sebagai temuan pendukung |
+| Sel keempat 2×2 (tanpa keduanya) | Bagian dari H4 | Penelitian lanjutan; `greedy` mengisi peran lantai |
+| Performativitas | Ada bukti dari lini lama (beban 1× vs 4×) | Dikutip sebagai temuan pendukung |
 
 ### Dua konsekuensi yang harus diterima
 
-**1. Penjelasan mekanisme H6b tidak boleh ditulis sebagai terbukti.** Dugaan bahwa
-`alpha_accept` bertindak sebagai penstabil **tidak diuji**. Yang boleh dilaporkan hanya
-angka hasilnya, tanpa keterangan kenapa.
+**1. Klaim "imbalan kepatuhan menyelamatkan penyatuan naif" gugur.** Setelah suku itu
+dimasukkan ke dalam paket teknik preferensi, ia ada di *baseline* juga — sehingga tak bisa
+lagi diklaim sebagai penstabil khusus penyatuan. Ini pertukaran yang menguntungkan: klaim
+lama belum pernah terverifikasi, dan sebagai gantinya kedua perbandingan jadi bisa
+diatribusikan.
 
-**2. Tujuan Fungsional §1.3 memuat dua butir yang tidak lagi diuji** — *implicit trust
-encoder* dan skema dekomposisi imbalan. Revisi §1.3 supaya tujuannya sesuai dengan yang
-benar-benar dibuktikan, atau butir itu akan jadi lubang yang ditanyakan penguji.
+**2. Tujuan Fungsional §1.3 memuat butir yang tidak lagi diuji** — *implicit trust
+encoder* berbasis LSTM. Revisi §1.3 supaya tujuannya sesuai dengan yang benar-benar
+dibuktikan, atau butir itu akan jadi lubang yang ditanyakan penguji.
 
 ---
 
@@ -141,18 +142,65 @@ python 1_eksperimen.py
 
 Sembilan lengan: tiga arsitektur × tiga tingkat kepercayaan awal.
 
-| Lengan | Perannya | Pengaturan khas |
-|---|---|---|
-| `h6b_utama` | yang diuji | `--pref --pref-feature-mode --no-hist --alpha-accept 1.0 --n-critics 3` |
-| `h1a_pemerataan` | sistem asal 1 | `--n-critics 3` |
-| `h2a_selera` | sistem asal 2 | `--pref --pref-feature-mode --no-hist --n-critics 1` |
+### Rancangan 2×2 atas dua teknik
+
+| | Teknik preferensi | Penilai terpisah | Mewakili |
+|---|---|---|---|
+| `h1a_pemerataan` | mati | ✓ | kemampuan koordinasi (MASTER) |
+| `h2a_selera` | ✓ | mati | kemampuan preferensi (PDQN) |
+| `h6b_utama` | ✓ | ✓ | keduanya — yang diuji |
+
+**Teknik preferensi adalah satu paket**: modul selera (`--pref --pref-feature-mode`)
+**ditambah** imbalan kepatuhan (`--alpha-accept 1.0`). Modul menyediakan *representasi*
+(siapa pengguna ini, apa yang ia suka); imbalan kepatuhan menyediakan *objektifnya*
+(apakah pencocokan itu benar-benar berbuah kepatuhan). Tanpa yang kedua, modul preferensi
+belajar mencocokkan selera tanpa pernah diberi tahu apakah pencocokan itu berguna.
+
+Karena paketnya utuh di kedua lengan yang memilikinya, **kedua perbandingan menjadi satu
+faktor**:
+
+| Perbandingan | Yang berbeda |
+|---|---|
+| `h6b` vs `h1a` — Gini | teknik preferensi |
+| `h6b` vs `h2a` — penerimaan | pemisahan penilai |
+
+Ini yang membuat selisihnya bisa diatribusikan. *(Keputusan 2026-08-23. Sebelumnya
+`--alpha-accept` hanya dipasang di `h6b`, sehingga `h6b` berbeda dari tiap induk dalam dua
+hal sekaligus dan penyebab kemenangan tak dapat disimpulkan.)*
+
+**Pengaturan lengkap:**
+
+| Lengan | Pengaturan khas |
+|---|---|
+| `h6b_utama` | `--pref --pref-feature-mode --alpha-accept 1.0 --no-hist --n-critics 3` |
+| `h1a_pemerataan` | `--no-hist --n-critics 3` |
+| `h2a_selera` | `--pref --pref-feature-mode --alpha-accept 1.0 --no-hist --n-critics 1` |
 
 *Baseline* `greedy` (queue & util) dihitung otomatis di tiap lengan.
 
-**Kenapa ketiga lengan harus dijalankan**, bukan cuma yang diuji: klaimnya adalah
-penyatuan mengungguli **kedua** sistem asal. Tanpa keduanya dijalankan pada kondisi yang
-sama persis, klaim itu tak punya pembanding. Memakai angka dari lini eksperimen lama
-tidak sah — protokol pengukurannya berbeda.
+**Kenapa ketiga lengan harus dijalankan.** Klaimnya adalah penyatuan mengungguli **kedua**
+sistem asal. Kalau hanya dibandingkan dengan satu, klaimnya bisa dijatuhkan dengan satu
+kalimat: *"mungkin yang satunya juga menang, jadi penyatuannya tidak menambah apa-apa."*
+
+Ketiganya juga bukan tiga sistem berbeda, melainkan **satu sistem dengan komponen
+dinyalakan dan dimatikan** — penyandi, pelatih, penaksir, preset imbalan, dataset, dan
+anggaran semuanya identik. Menjalankan kode asli MASTER dan PDQN justru akan mencampur
+beda arsitektur dengan beda domain (MASTER mengasumsikan kepatuhan penuh, PDQN
+mengasumsikan kepatuhan stasioner), sehingga selisihnya tak bisa diatribusikan.
+
+**Pemeriksa kesepadanan.** `1_eksperimen.py` menjalankan `periksa_kesepadanan()` sebelum
+apa pun dimulai, menjaga empat syarat: `--no-hist` ada di semua lengan, paket preferensi
+tak pernah pecah, tepat satu lengan tanpa teknik preferensi, tepat satu lengan berpenilai
+gabungan. Diuji dengan empat sabotase sengaja; semuanya tertangkap. Skripnya berhenti
+sebelum membuang waktu komputasi, bukan setelah.
+
+### Satu asumsi yang datanya akan terlihat sendiri
+
+Framing "imbalan kepatuhan itu bagian dari teknik preferensi" benar **bila** erosi
+penerimaan memang khas preferensi. `h1a_pemerataan` sengaja tetap dijalankan tanpa imbalan
+kepatuhan — jadi kalau penerimaannya ternyata **ikut tergerus parah**, berarti suku itu
+perbaikan umum, bukan milik teknik preferensi, dan framing ini harus dicatat sebagai
+keterbatasan. Periksa kolom "Terima" pada `h1a` saat hasilnya keluar.
 
 **Pengaturan bersama dikunci di kode**, bukan disalin ke tiap baris perintah:
 `--forecaster vwf`, `--reward-preset seimbang4x`, `--n-eval-seed 10`, `--dataset 4x`.

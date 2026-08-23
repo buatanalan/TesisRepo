@@ -42,33 +42,52 @@ STAMP = datetime.date.today().strftime("%Y%m%d")
 BERSAMA = ["--forecaster", "vwf", "--reward-preset", "seimbang4x", "--dataset", "4x"]
 N_EVAL_SEED = 10
 
-# Rancangan 2x2 atas DUA komponen: modul selera (hidup/mati) x penilai (terpisah/gabungan).
+# Rancangan 2x2 atas DUA teknik: teknik preferensi x pemisahan penilai.
 #
-#                      modul selera   penilai
-#   h1a_pemerataan     mati           3 terpisah    <- kemampuan koordinasi saja
-#   h2a_selera         hidup          1 gabungan    <- kemampuan selera saja
-#   h6b_utama          hidup          3 terpisah    <- keduanya + imbalan kepatuhan
+#                      teknik preferensi   penilai
+#   h1a_pemerataan     mati                3 terpisah   <- koordinasi saja
+#   h2a_selera         hidup               1 gabungan   <- preferensi saja
+#   h6b_utama          hidup               3 terpisah   <- keduanya
+#
+# TEKNIK PREFERENSI = modul selera (`--pref --pref-feature-mode`) DITAMBAH imbalan
+# kepatuhan (`--alpha-accept 1.0`). Keduanya satu paket, bukan dua hal terpisah:
+# modul menyediakan REPRESENTASI (siapa pengguna ini, apa yang ia suka), imbalan
+# kepatuhan menyediakan OBJEKTIFNYA (apakah pencocokan itu benar-benar berbuah
+# kepatuhan). Tanpa imbalan kepatuhan, modul preferensi belajar mencocokkan selera
+# tanpa pernah diberi tahu apakah pencocokan itu berguna -- teknik yang tak lengkap.
+#
+# Keputusan 2026-08-23. Sebelumnya `--alpha-accept` hanya dipasang di h6b, sehingga h6b
+# berbeda dari TIAP induk dalam dua hal sekaligus dan komponen penyebab kemenangan tak
+# dapat disimpulkan. Dengan memasukkannya ke dalam paket teknik preferensi, kedua
+# perbandingan menjadi SATU FAKTOR:
+#     h6b vs h1a (Gini)       -> bedanya teknik preferensi
+#     h6b vs h2a (penerimaan) -> bedanya pemisahan penilai
+#
+# Konsekuensi yang diterima: klaim "imbalan kepatuhan menyelamatkan penyatuan naif"
+# gugur, karena suku itu kini ada di baseline juga. Ditukar dengan hasil yang bisa
+# diatribusikan -- klaim lama pun belum pernah terverifikasi.
+#
+# ASUMSI yang datanya akan terlihat sendiri: framing ini benar bila erosi penerimaan
+# memang KHAS preferensi. `h1a_pemerataan` sengaja tetap tanpa imbalan kepatuhan, jadi
+# bila penerimaannya ternyata ikut tergerus parah, berarti suku itu perbaikan umum --
+# bukan milik teknik preferensi -- dan framing ini harus dicatat sebagai keterbatasan.
 #
 # `--no-hist` WAJIB ada di ketiganya. Bawaan kelas kebijakan adalah `use_hist=True`,
 # jadi lengan yang tak menyebutkannya diam-diam mendapat penyandi riwayat interaksi
 # (proxy kepercayaan berbasis LSTM) yang tak dimiliki lengan lain. Sempat terjadi pada
-# `h1a_pemerataan` dan baru ketahuan saat memeriksa ulang -- justru memberi keunggulan
-# tambahan pada pembanding.
-#
-# `--alpha-accept` SENGAJA hanya di h6b: ia bagian dari metode yang diusulkan, bukan
-# milik arsitektur induk. Konsekuensinya h6b berbeda dari tiap induk dalam DUA hal
-# sekaligus, sehingga bila h6b menang, komponen penyebabnya TAK dapat disimpulkan --
-# itu uji atribusi yang sengaja dikeluarkan dari cakupan (lihat README).
+# `h1a_pemerataan` dan baru ketahuan saat memeriksa ulang.
+PAKET_PREFERENSI = ["--pref", "--pref-feature-mode", "--alpha-accept", "1.0"]
+
 LENGAN = [
     ("h6b_utama",
-     ["--pref", "--pref-feature-mode", "--no-hist", "--alpha-accept", "1.0", "--n-critics", "3"],
-     "penyatuan + penyeimbang (yang diuji)"),
+     PAKET_PREFERENSI + ["--no-hist", "--n-critics", "3"],
+     "preferensi + penilai terpisah (yang diuji)"),
     ("h1a_pemerataan",
      ["--no-hist", "--n-critics", "3"],
-     "pemerataan saja, tanpa modul selera"),
+     "koordinasi saja, tanpa teknik preferensi"),
     ("h2a_selera",
-     ["--pref", "--pref-feature-mode", "--no-hist", "--n-critics", "1"],
-     "selera saja, tanpa penilai terpisah"),
+     PAKET_PREFERENSI + ["--no-hist", "--n-critics", "1"],
+     "preferensi saja, tanpa penilai terpisah"),
 ]
 
 
@@ -108,24 +127,31 @@ def periksa_kesepadanan():
         f"use_hist=True, jadi lengan itu akan diam-diam memakai penyandi riwayat "
         f"yang tak dimiliki lengan lain -- perbandingannya jadi tak sepadan.")
 
-    # 2. Modul selera: tepat SATU lengan tanpa `--pref` (yaitu pemerataan-saja).
-    tanpa_pref = [t for t, b in bendera.items() if "--pref" not in b]
+    # 2. Teknik preferensi adalah SATU PAKET. Modul selera dan imbalan kepatuhan harus
+    #    selalu hidup bersama atau mati bersama -- kalau terpisah, perbandingan
+    #    h6b-vs-induk kembali jadi dua faktor dan tak bisa diatribusikan.
+    for tag, khas, _ in LENGAN:
+        punya_modul = "--pref" in khas
+        punya_accept = float(nilai[tag].get("--alpha-accept", 0.0) or 0.0) != 0.0
+        assert punya_modul == punya_accept, (
+            f"Paket teknik preferensi pecah di `{tag}`: modul selera="
+            f"{punya_modul}, imbalan kepatuhan={punya_accept}. Keduanya harus hidup "
+            f"bersama atau mati bersama -- modul menyediakan representasi, imbalan "
+            f"kepatuhan menyediakan objektifnya. Memisahkannya membuat h6b berbeda "
+            f"dari induknya dalam DUA hal, dan penyebab kemenangan tak dapat "
+            f"disimpulkan.")
+
+    # 3. Tepat SATU lengan tanpa teknik preferensi (yaitu koordinasi-saja).
+    tanpa_pref = [t for t, khas, _ in LENGAN if "--pref" not in khas]
     assert tanpa_pref == ["h1a_pemerataan"], (
-        f"Rancangan 2x2 rusak: yang TANPA modul selera seharusnya hanya "
+        f"Rancangan 2x2 rusak: yang TANPA teknik preferensi seharusnya hanya "
         f"h1a_pemerataan, tetapi yang ditemukan {tanpa_pref}.")
 
-    # 3. Penilai: tepat SATU lengan memakai penilai gabungan (yaitu selera-saja).
+    # 4. Tepat SATU lengan memakai penilai gabungan (yaitu preferensi-saja).
     gabungan = [t for t, v in nilai.items() if v.get("--n-critics") == "1"]
     assert gabungan == ["h2a_selera"], (
         f"Rancangan 2x2 rusak: yang memakai penilai GABUNGAN seharusnya hanya "
         f"h2a_selera, tetapi yang ditemukan {gabungan}.")
-
-    # 4. `--alpha-accept` hanya di lengan yang diuji.
-    pakai = [t for t, v in nilai.items()
-             if float(v.get("--alpha-accept", 0.0) or 0.0) != 0.0]
-    assert pakai == ["h6b_utama"], (
-        f"`--alpha-accept` seharusnya hanya di h6b_utama (bagian dari metode yang "
-        f"diusulkan, bukan milik arsitektur induk), tetapi dipakai {pakai}.")
 
 
 def main():
