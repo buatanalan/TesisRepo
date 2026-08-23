@@ -9,8 +9,8 @@ data, komponen, suku imbalan, dan hiperparameter.
 | Pertanyaan | Jawaban |
 |---|---|
 | Apakah observasinya berbeda? | **Tidak.** Identik `(N, 10)` di seluruh lengan — lihat §3A.1 |
-| Lalu apa yang berbeda? | Masukan **tambahan** (`pref_hist`), dimensi konteks, dan jumlah keluaran kritik — §3A.5 |
-| Bagaimana alur datanya? | Diagram per lengan di §3A.3 dan §3A.4 |
+| Lalu apa yang berbeda? | Masukan **tambahan** (`pref_hist`), dimensi konteks, dan jumlah keluaran kritik — §3A.6 |
+| Bagaimana alur datanya? | Diagram per lengan di §3A.3 (koordinasi), §3A.4 (penyatuan), §3A.5 (preferensi) |
 
 Semua angka di sini dibaca langsung dari kode, bukan dari catatan. Sumbernya disebutkan
 di tiap bagian supaya bisa diperiksa ulang.
@@ -261,7 +261,7 @@ pada lengan ini adalah **16 dimensi bernilai nol seluruhnya**. Jaringannya secar
 menjadi MLP murni per-stasiun tanpa konteks per-pengguna dari riwayat — informasi pemohon
 hanya masuk lewat kolom 8–10 tiap baris kandidat.
 
-### 3A.4 Aliran data — `h6b_utama` dan `h2a_selera` (dengan teknik preferensi)
+### 3A.4 Aliran data — `h6b_utama` (penyatuan)
 
 ```
 station_feats (N,10) ──────────────────────┬───────────────────┬──────────────┐
@@ -301,18 +301,82 @@ masuk **bertahap** seiring gerbang belajar membuka.
 *key/value*. Jadi keluarannya adalah ringkasan stasiun yang **dibobot menurut relevansinya
 terhadap selera pengguna yang sedang dilayani** — bukan konkatenasi polos.
 
-### 3A.5 Di mana ketiga lengan benar-benar berpisah
+### 3A.5 Aliran data — `h2a_selera` (preferensi saja)
 
-| Titik | `h1a` | `h2a` | `h6b` |
+Jalur **aktor**-nya identik dengan `h6b_utama` di atas: `pref_lstm` →
+`PreferenceAttention` → `pref_gate` → konteks 32 dimensi → `StationEncoder` → `disc_head`.
+Yang berbeda ada di **ujung kritik**, dan perbedaan itu merambat sampai ke cara imbalan
+disusun.
+
+```
+station_feats (N,10) ──┬───────────────────────────────────────────┐
+                       │                                           │
+pref_hist (10,10) ─► pref_lstm ─► PreferenceAttention ─► ×pref_gate│
+                       │                                           │
+     context = [ c_t(16, nol) ‖ attended_pref(16) ]  (32)          │
+                       │                                           │
+                       ▼                                           ▼
+              StationEncoder(64)                      StationEncoder(128) [kritik]
+                       │                                           │
+                       ▼                                           ▼
+                 logits (N)                                AttentionPooling
+                                                                   │
+                                                                   ▼
+                                                        critic_head → V (1 nilai)
+                                                                        ▲
+                                                        SATU keluaran, bukan tiga
+```
+
+**Konsekuensi yang merambat ke penyusunan imbalan.** Pemisahan aliran dideteksi otomatis
+dari `n_critics`. Karena di sini `n_critics = 1`:
+
+| | `h6b` / `h1a` (K=3) | `h2a` (K=1) |
+|---|---|---|
+| Kelas transisi | `MasterEV3Transition` | `Transition` (kelas dasar) |
+| Jumlah aliran tercatat | 3 | 2 |
+| Nama aliran | `WAIT` / `PROX` / `GLOBAL3` | `INDIVIDUAL` / `GLOBAL` |
+| `reward_vec()` | vektor 3 elemen | **jumlah seluruh aliran → 1 skalar** |
+
+Jadi pada `h2a`, seluruh tujuan — perbaikan waktu tunggu, kecocokan fitur, Gini,
+anti-penumpukan, kepatuhan — **dijumlahkan menjadi satu angka** sebelum masuk ke kritik.
+
+**Inilah bentuk yang sedang diteliti.** Penjumlahan prematur ke satu bidang skalar adalah
+persis pola dekomposisi aditif VDN yang dipakai PDQN ($Q_{tot} = Q_1 + Q_2$) dan
+terdokumentasi gagal menangkap interaksi non-linier antara imbalan individual dan global.
+
+**Di dalam PPO** (`ppo.py`), akibatnya:
+
+```
+K=3 : adv (T,3) → normalisasi PER-ALIRAN → beta (3,) → adv_combined = adv @ beta
+K=1 : adv (T,1) → normalisasi skalar biasa → beta = [1.0] → adv_combined = adv
+```
+
+Dengan satu aliran, normalisasi per-aliran runtuh menjadi normalisasi skalar biasa, dan
+pembobotan antar-aliran hilang sama sekali. Sinyal pemerataan — yang **jarang, tertunda,
+dan bernilai kecil** — harus bersaing dalam satu angka melawan sinyal kepatuhan yang
+**sering, segera, dan bernilai $\pm 1$**.
+
+**Total imbalannya tetap identik dengan lengan lain.** Yang berbeda hanyalah apakah ia
+diregresikan terpisah atau digabung lebih dulu. Karena itu perbandingan `h6b` vs `h2a`
+benar-benar mengisolasi pemisahan penilai, bukan besar imbalan.
+
+### 3A.6 Di mana ketiga lengan benar-benar berpisah
+
+| Titik | `h1a` koordinasi | `h2a` preferensi | `h6b` penyatuan |
 |---|---|---|---|
 | Dimensi `context` | 16 (semua nol) | 32 | 32 |
-| Cabang preferensi | tidak ada | ada | ada |
+| Cabang preferensi | tidak ada | **ada** | **ada** |
 | Keluaran `critic_head` | **3** | **1** | **3** |
+| Kelas transisi | `MasterEV3Transition` | `Transition` | `MasterEV3Transition` |
+| Imbalan ke kritik | vektor 3 | **1 skalar (dijumlah)** | vektor 3 |
 
-Selain tiga baris itu, **jalur datanya sama persis** — penyandi yang sama, penggabung
+Dua komponen, tiga kombinasi. `h1a` punya pemisahan penilai tanpa preferensi; `h2a` punya
+preferensi tanpa pemisahan penilai; `h6b` punya keduanya.
+
+Selain baris-baris di atas, **jalur datanya sama persis** — penyandi yang sama, penggabung
 atensi yang sama, kepala diskrit yang sama, aturan pemilihan aksi yang sama.
 
-### 3A.6 Aturan pemilihan aksi — identik ketiganya
+### 3A.7 Aturan pemilihan aksi — identik ketiganya
 
 1. `logits` dimasker: kandidat tak layak diberi $-\infty$
 2. `softmax` atas kandidat layak
@@ -324,7 +388,7 @@ atensi yang sama, kepala diskrit yang sama, aturan pemilihan aksi yang sama.
 
 Log-peluangnya dihitung sebagai `Categorical` berurutan tanpa pengembalian.
 
-### 3A.7 Invariansi permutasi — dasar bersama, bukan variabel
+### 3A.8 Invariansi permutasi — dasar bersama, bukan variabel
 
 `StationEncoder` memproses **tiap baris stasiun lewat bobot yang sama** (pola *Deep Sets*),
 dan `AttentionPooling` meringkas dengan bobot ber-*softmax* yang selalu berjumlah 1 berapa
