@@ -129,6 +129,14 @@ p.add_argument("--tau-acc", type=float, default=None,
               help="ambang |Delta W| (menit) sebelum accuracy_reward mulai menghukum -- "
                    "baku None -> DELTAW_TOL_HIGH (marl_spklu/env/user.py), ambang PERSIS "
                    "yg sama dipakai User.update_trust menghukum trust.")
+p.add_argument("--overwrite", action="store_true",
+              help="WAJIB diberikan bila `eval_results.json` yang SUDAH ADA untuk tag "
+                   "ini punya `n_updates` LEBIH BESAR dari run ini (mis. hasil serius "
+                   "300-update ditimpa smoke-test 5-update) -- pengaman ditambahkan "
+                   "2026-08-23 setelah checkpoint eksperimen utama nyaris hilang krn "
+                   "tabrakan tag. Tanpa ini, pipeline BERHENTI sebelum menulis "
+                   "eval_results.json (training & checkpoint TETAP jalan/tersimpan -- "
+                   "hanya file ringkasan evaluasi yang dilindungi).")
 p.add_argument("--pref-hist-k", type=int, default=None,
               help="ABLASI: panjang jendela riwayat P (baku None=PDQN_HIST_K=10, sama "
                    "dgn lengan +P lain & PDQN diskrit). Diperkecil (mis. 5, disamakan "
@@ -384,6 +392,20 @@ if diag.get("n", 0) > 0:
          f"(acuan H1a: rho=+0,359 rendah=4,39 tinggi=25,58 rasio=5,83x)", flush=True)
 else:
     print(f"[{elapsed()}] diagnosis: 0 trip patuh terekam (cek k/forecaster)", flush=True)
+
+_eval_out_path = os.path.join(common.OUTDIR, f"{TAG_ARM}_eval_results.json")
+if os.path.exists(_eval_out_path) and not args.overwrite:
+    import json as _json
+    _existing_eval = _json.load(open(_eval_out_path, encoding="utf-8"))
+    _existing_nu = (_existing_eval.get("config") or {}).get("n_updates")
+    if _existing_nu is not None and _existing_nu > args.n_updates:
+        raise SystemExit(
+            f"[{elapsed()}] MENOLAK menimpa {_eval_out_path}: n_updates run ini "
+            f"({args.n_updates}) LEBIH KECIL dari yang sudah tersimpan ({_existing_nu}) "
+            f"-- kemungkinan besar run smoke-test yang tak sengaja menimpa hasil serius "
+            f"(persis insiden 2026-08-23, checkpoint eksperimen utama nyaris hilang). "
+            f"Training & checkpoint SUDAH tersimpan dgn aman di atas -- ulangi HANYA "
+            f"perintah ini dgn --overwrite bila memang bermaksud menimpa.")
 
 common.save_json(dict(
     gini_policy=ginis_policy, gini_greedy_queue=gq, gini_greedy_util=gu,

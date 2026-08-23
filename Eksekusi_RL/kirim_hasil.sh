@@ -42,15 +42,30 @@ fi
 
 # Kumpulkan kandidat. JSONL = kurva per-iterasi (yang dipakai menganalisis kapan run
 # memburuk); meta = konfigurasi + riwayat; uji_*.json = tabel hasil akhir.
+# Pola master_ev_ppo_*/master_ddpg_* (2026-08) DITAMBAHKAN di sini -- skrip lama hanya
+# cocok skema t2_*/_eval.log, sehingga hasil pipeline PPO/DDPG lebih baru (eval_results.
+# json, training_results.json, actor_seed*.pt, *_pipeline.log) tak pernah ikut terkirim
+# meski sudah lama ada di outputs/ server (ditemukan 2026-08-23, log accW1 terkirim
+# manual tapi eval_results/training_results/checkpoint TIDAK -- akar penyebabnya di sini).
 mapfile -t BERKAS < <(
     ls -1 outputs/t2_*"$TAG"*.jsonl                2>/dev/null || true
     ls -1 outputs/t2_*"$TAG"*_meta.json            2>/dev/null || true
     ls -1 outputs/uji_*"$TAG"*.json                2>/dev/null || true
     ls -1 outputs/*"$TAG"*_eval.log                2>/dev/null || true
+    ls -1 outputs/*"$TAG"*_eval_results.json       2>/dev/null || true
+    ls -1 outputs/*"$TAG"*_training_results.json   2>/dev/null || true
+    ls -1 outputs/*"$TAG"*_pipeline.log            2>/dev/null || true
+    ls -1 outputs/*"$TAG"*.jsonl                   2>/dev/null || true
     if [ "$DENGAN_BOBOT" = "1" ]; then
         ls -1 outputs/t2_*"$TAG"*.pt               2>/dev/null || true
+        ls -1 outputs/*"$TAG"*_actor_seed*.pt      2>/dev/null || true
+        ls -1 outputs/*"$TAG"*_critic_seed*.pt     2>/dev/null || true
     fi
 )
+# Buang duplikat (beberapa pola di atas bisa saling tumpang tindih) sambil
+# mempertahankan urutan -- penting krn `mapfile` di atas bisa mendaftarkan berkas
+# yang sama dua kali (mis. *_eval_results.json matched oleh uji_*.json juga).
+mapfile -t BERKAS < <(printf '%s\n' "${BERKAS[@]}" | awk '!seen[$0]++')
 
 if [ "${#BERKAS[@]}" -eq 0 ]; then
     echo "tak ada berkas cocok untuk tag '$TAG'"

@@ -1,6 +1,7 @@
 {
   "horizon": "30d",
-  "seeds": [
+  "ckpt_seed": 0,
+  "eval_seeds": [
     0
   ],
   "per_seed": {
