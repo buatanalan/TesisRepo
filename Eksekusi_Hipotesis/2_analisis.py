@@ -20,7 +20,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _kakas as K
-from scipy.stats import ks_2samp
+from scipy.stats import ks_2samp, wilcoxon
 
 STAMP = datetime.date.today().strftime("%Y%m%d")
 LENGAN = [("h6b_utama", "penyatuan (diuji)"),
@@ -113,10 +113,56 @@ def nilai(data, horizon):
     lulus = all(v is True for v in inti)
     print("\n" + K.vonis(lulus,
         "H6b terdukung di kepercayaan sedang & tinggi.",
-        "H6b TIDAK terpenuhi pada syaratnya sendiri. Periksa BAGIAN MANA yang gagal: "
-        "bila penyatuan tetap menang di penerimaan & kepercayaan tapi kalah di Gini, "
-        "turunkan klaimnya jadi 'mempertahankan pemerataan sambil menaikkan penerimaan' "
-        "-- klaim lebih lemah tapi sah. Jangan dipaksakan."))
+        "H6b DITOLAK pada syaratnya sendiri. Lihat klaim revisi di bawah."))
+
+    # ------------------------------------------------------------------ klaim revisi
+    # PASCA-HOC. Dirumuskan SETELAH melihat data 30 hari, jadi TIDAK boleh dilaporkan
+    # sebagai hipotesis yang lulus -- statusnya dugaan baru yang butuh konfirmasi
+    # independen. Uji 90 hari adalah konfirmasi pertamanya.
+    K.judul(f"KLAIM REVISI (PASCA-HOC) -- pertukaran pemerataan vs pengalaman pengguna")
+    print("H6b ditolak. Dugaan pengganti, dirumuskan SETELAH data terlihat:\n")
+    print("  Teknik preferensi TIDAK memperbaiki pemerataan -- justru memperburuknya.")
+    print("  Namun ia menaikkan kepatuhan, menurunkan waktu tunggu, dan menaikkan")
+    print("  kepercayaan secara signifikan. Ada PERTUKARAN antara pemerataan jaringan")
+    print("  dan pengalaman pengguna, dan teknik preferensi menggeser sistem ke sisi")
+    print("  pengalaman pengguna.\n")
+    print(f"  {'percaya':<9} {'metrik':<8} {'penyatuan':>10} {'koord-saja':>11} "
+          f"{'selisih':>10} {'p':>8}  unggul")
+    revisi, arah_baik = {}, dict(gini=-1, acc=+1, wait=-1, trust=+1)
+    for it in K.TINGKAT_TRUST:
+        du, dp = data.get(("h6b_utama", it)), data.get(("h1a_pemerataan", it))
+        if not (du and dp):
+            continue
+        sel = {}
+        for m, baik in arah_baik.items():
+            x = [r[m] for r in du["per_eval_seed"]]
+            y = [r[m] for r in dp["per_eval_seed"]]
+            pv = float(wilcoxon(x, y).pvalue)
+            beda = float(np.mean(x) - np.mean(y))
+            unggul = "penyatuan" if beda * baik > 0 else "koord-saja"
+            sel[m] = dict(penyatuan=float(np.mean(x)), koordinasi=float(np.mean(y)),
+                          selisih=beda, p=pv, unggul=unggul, nyata=pv < 0.05)
+            print(f"  {it:<9} {m:<8} {np.mean(x):>10.4f} {np.mean(y):>11.4f} "
+                  f"{beda:>+10.4f} {pv:>8.4f}{'*' if pv < 0.05 else ' '} {unggul}")
+        revisi[it] = sel
+        print()
+
+    # Pola yang dicari: pemerataan kalah, TIGA metrik pengalaman pengguna menang,
+    # dan semuanya nyata. Itulah bentuk "pertukaran" yang diklaim.
+    pola = []
+    for it, sel in revisi.items():
+        pola.append(sel["gini"]["unggul"] == "koord-saja"
+                    and all(sel[m]["unggul"] == "penyatuan" for m in ("acc", "wait")))
+    tukar = bool(pola) and all(pola)
+    print(K.vonis(tukar,
+        "Pola pertukaran konsisten di seluruh tingkat kepercayaan: pemerataan kalah, "
+        "kepatuhan dan waktu tunggu menang. WAJIB ditulis sebagai dugaan pasca-hoc, "
+        "bukan hipotesis yang lulus -- konfirmasinya menunggu uji 90 hari.",
+        "Pola pertukaran TIDAK konsisten. Klaim revisi pun tak terdukung; laporkan "
+        "H6b ditolak tanpa klaim pengganti."))
+    v_revisi = dict(pola_konsisten=tukar, catatan="PASCA-HOC -- dirumuskan setelah "
+                    "data 30 hari terlihat; bukan hipotesis pra-daftar. Konfirmasi "
+                    "independen menunggu uji 90 hari.", per_tingkat=revisi)
 
     # ---------------------------------------------------------------- kurva H2b
     K.judul(f"H2b -- kurva kepercayaan   (horizon {horizon})")
@@ -135,13 +181,21 @@ def nilai(data, horizon):
 
     h2b = None
     if len(kurva) == 3:
-        # d negatif = lebih baik dari greedy. Menyusut = |d| mengecil dari 0,7 ke 0,3.
-        besar = [abs(kurva[i]["d"]) for i in ("0.7", "0.5", "0.3")]
-        h2b = bool(besar[0] >= besar[1] >= besar[2])
-        print(f"\n  besar efek 0,7 -> 0,5 -> 0,3 : "
-              f"{besar[0]:.3f} -> {besar[1]:.3f} -> {besar[2]:.3f}")
+        # d BERTANDA, bukan nilai mutlaknya. d negatif = Gini lebih rendah dari greedy
+        # (unggul); d positif = lebih tinggi (kalah). "Keunggulan menyusut" berarti d
+        # NAIK dari 0,7 ke 0,3 -- termasuk bila ia menyeberang nol dari unggul ke kalah.
+        #
+        # Memakai abs() di sini KELIRU dan sempat terjadi: lengan yang unggul d=-1,9 di
+        # kepercayaan tinggi lalu kalah telak d=+5,6 di kepercayaan rendah akan terbaca
+        # |1,9| -> |5,6| sebagai "membesar", padahal itu justru keruntuhan keunggulan
+        # yang persis diramalkan H2b.
+        d = [kurva[i]["d"] for i in ("0.7", "0.5", "0.3")]
+        h2b = bool(d[0] <= d[1] <= d[2])
+        print(f"\n  d bertanda 0,7 -> 0,5 -> 0,3 : "
+              f"{d[0]:+.3f} -> {d[1]:+.3f} -> {d[2]:+.3f}   (negatif = unggul)")
         print("\n" + K.vonis(h2b,
-            "Menyusut berurutan. Keunggulan koordinasi memang bersyarat kepercayaan.",
+            "Keunggulan menyusut berurutan seiring turunnya kepercayaan awal -- "
+            "manfaat koordinasi memang bersyarat kepatuhan.",
             "TIDAK menyusut berurutan. Ini temuan, bukan kegagalan teknis: masalah "
             "non-kepatuhan tidak sepenting yang diklaim di latar belakang, dan "
             "pembingkaian tesis perlu disesuaikan. Laporkan apa adanya."))
@@ -169,7 +223,8 @@ def nilai(data, horizon):
               f"{'-> berbeda (kondisi akhir bergantung kondisi awal)' if ks.pvalue < 0.05 else '-> menyatu'}")
         sebaran["ks_p"] = float(ks.pvalue)
 
-    return dict(lulus=lulus, per_tingkat=vonis), dict(h2b=h2b, per_tingkat=kurva), sebaran
+    return (dict(lulus=lulus, per_tingkat=vonis), dict(h2b=h2b, per_tingkat=kurva),
+            sebaran, v_revisi)
 
 
 def main():
@@ -210,19 +265,22 @@ def main():
             f"Lengan pokok `h6b_utama it=0.5` (horizon {args.horizon}) belum ada.\n"
             f"   Jalankan dulu:  python 1_eksperimen.py --horizon {args.horizon}")
 
-    v_pokok, v_kurva, v_sebaran = nilai(data, args.horizon)
+    v_pokok, v_kurva, v_sebaran, v_revisi = nilai(data, args.horizon)
 
     K.judul("RINGKASAN")
-    for nama, v in (("H6b -- klaim utama", v_pokok["lulus"]),
-                    ("H2b -- kurva menyusut", v_kurva["h2b"])):
-        print(f"  {nama:<26} "
-              f"{'belum bisa dinilai' if v is None else ('LULUS' if v else 'tidak lulus')}")
+    print(f"  {'H6b -- klaim utama (pra-daftar)':<38} "
+          f"{'LULUS' if v_pokok['lulus'] else 'DITOLAK'}")
+    print(f"  {'H2b -- kurva menyusut (pra-daftar)':<38} "
+          f"{'belum dinilai' if v_kurva['h2b'] is None else ('LULUS' if v_kurva['h2b'] else 'tidak lulus')}")
+    print(f"  {'pertukaran (PASCA-HOC, bukan lulus)':<38} "
+          f"{'pola konsisten' if v_revisi['pola_konsisten'] else 'pola tak konsisten'}")
 
     K.simpan(dict(tanggal=STAMP, horizon=args.horizon,
                   toleransi=dict(gini=TOL_GINI, acc=TOL_ACC),
                   berkas={f"{t}|{i}": (data[(t, i)] or {}).get("_berkas")
                           for t, _ in LENGAN for i in K.TINGKAT_TRUST},
-                  h6b=v_pokok, h2b=v_kurva, sebaran_trust=v_sebaran),
+                  h6b=v_pokok, h2b=v_kurva, sebaran_trust=v_sebaran,
+                  klaim_revisi_pascahoc=v_revisi),
              f"analisis{suf(args.horizon)}_{STAMP}.json")
 
     if args.horizon == "30d":

@@ -1,0 +1,197 @@
+{
+  "tanggal": "20260823",
+  "horizon": "30d",
+  "toleransi": {
+    "gini": 1.02,
+    "acc": 0.95
+  },
+  "berkas": {
+    "h6b_utama|0.3": "h6b_utama__it03_20260823_eval.json",
+    "h6b_utama|0.5": "h6b_utama__it05_20260823_eval.json",
+    "h6b_utama|0.7": "h6b_utama__it07_20260823_eval.json",
+    "h1a_pemerataan|0.3": "h1a_pemerataan__it03_20260823_eval.json",
+    "h1a_pemerataan|0.5": "h1a_pemerataan__it05_20260823_eval.json",
+    "h1a_pemerataan|0.7": "h1a_pemerataan__it07_20260823_eval.json",
+    "h2a_selera|0.3": "h2a_selera__it03_20260823_eval.json",
+    "h2a_selera|0.5": "h2a_selera__it05_20260823_eval.json",
+    "h2a_selera|0.7": "h2a_selera__it07_20260823_eval.json"
+  },
+  "h6b": {
+    "lulus": false,
+    "per_tingkat": {
+      "0.3": {
+        "gini_vs_asal": false,
+        "terima_vs_asal": false,
+        "nyata_vs_greedy": false,
+        "p_vs_greedy_util": 0.001953125,
+        "lulus": false
+      },
+      "0.5": {
+        "gini_vs_asal": false,
+        "terima_vs_asal": true,
+        "nyata_vs_greedy": false,
+        "p_vs_greedy_util": 0.001953125,
+        "lulus": false
+      },
+      "0.7": {
+        "gini_vs_asal": false,
+        "terima_vs_asal": true,
+        "nyata_vs_greedy": true,
+        "p_vs_greedy_util": 0.001953125,
+        "lulus": false
+      }
+    }
+  },
+  "h2b": {
+    "h2b": true,
+    "per_tingkat": {
+      "0.3": {
+        "d": 5.599016601113046,
+        "gini": 0.13870604870394326,
+        "trust": 0.3504584537595689
+      },
+      "0.5": {
+        "d": 1.8210145078432054,
+        "gini": 0.10293032812952811,
+        "trust": 0.5120636561628806
+      },
+      "0.7": {
+        "d": -1.8972267426917135,
+        "gini": 0.08000337556109278,
+        "trust": 0.6528018014082837
+      }
+    }
+  },
+  "sebaran_trust": {
+    "0.3": {
+      "trust": 0.3504584537595689,
+      "trust_p10": 0.2718602106014282,
+      "trust_p50": 0.29999999999999993,
+      "trust_p90": 0.5624999999999789,
+      "trust_frac_bawah_03": 0.1054628224582701
+    },
+    "0.5": {
+      "trust": 0.5120636561628806,
+      "trust_p10": 0.28465012175013593,
+      "trust_p50": 0.5,
+      "trust_p90": 0.6874999999999992,
+      "trust_frac_bawah_03": 0.10584218512898332
+    },
+    "0.7": {
+      "trust": 0.6528018014082837,
+      "trust_p10": 0.28741420942412704,
+      "trust_p50": 0.7,
+      "trust_p90": 0.8124999999999947,
+      "trust_frac_bawah_03": 0.10595599393019728
+    },
+    "ks_p": 1.0825088224469026e-05
+  },
+  "klaim_revisi_pascahoc": {
+    "pola_konsisten": true,
+    "catatan": "PASCA-HOC -- dirumuskan setelah data 30 hari terlihat; bukan hipotesis pra-daftar. Konfirmasi independen menunggu uji 90 hari.",
+    "per_tingkat": {
+      "0.3": {
+        "gini": {
+          "penyatuan": 0.13870604870394326,
+          "koordinasi": 0.07894642387698923,
+          "selisih": 0.05975962482695403,
+          "p": 0.00390625,
+          "unggul": "koord-saja",
+          "nyata": true
+        },
+        "acc": {
+          "penyatuan": 0.6546171663783185,
+          "koordinasi": 0.5907591620835955,
+          "selisih": 0.06385800429472299,
+          "p": 0.001953125,
+          "unggul": "penyatuan",
+          "nyata": true
+        },
+        "wait": {
+          "penyatuan": 81.74688528437534,
+          "koordinasi": 215.1625133986634,
+          "selisih": -133.41562811428807,
+          "p": 0.001953125,
+          "unggul": "penyatuan",
+          "nyata": true
+        },
+        "trust": {
+          "penyatuan": 0.3504584537595689,
+          "koordinasi": 0.32650716464525514,
+          "selisih": 0.023951289114313767,
+          "p": 0.001953125,
+          "unggul": "penyatuan",
+          "nyata": true
+        }
+      },
+      "0.5": {
+        "gini": {
+          "penyatuan": 0.10293032812952811,
+          "koordinasi": 0.05705035112136231,
+          "selisih": 0.045879977008165804,
+          "p": 0.001953125,
+          "unggul": "koord-saja",
+          "nyata": true
+        },
+        "acc": {
+          "penyatuan": 0.8035897023413845,
+          "koordinasi": 0.6859096161640976,
+          "selisih": 0.11768008617728687,
+          "p": 0.001953125,
+          "unggul": "penyatuan",
+          "nyata": true
+        },
+        "wait": {
+          "penyatuan": 53.378390805398986,
+          "koordinasi": 80.5828256925086,
+          "selisih": -27.20443488710962,
+          "p": 0.001953125,
+          "unggul": "penyatuan",
+          "nyata": true
+        },
+        "trust": {
+          "penyatuan": 0.5120636561628806,
+          "koordinasi": 0.4939978475875983,
+          "selisih": 0.01806580857528234,
+          "p": 0.001953125,
+          "unggul": "penyatuan",
+          "nyata": true
+        }
+      },
+      "0.7": {
+        "gini": {
+          "penyatuan": 0.08000337556109278,
+          "koordinasi": 0.0706337503331134,
+          "selisih": 0.009369625227979392,
+          "p": 0.001953125,
+          "unggul": "koord-saja",
+          "nyata": true
+        },
+        "acc": {
+          "penyatuan": 0.9219288363453824,
+          "koordinasi": 0.789600448005976,
+          "selisih": 0.1323283883394064,
+          "p": 0.001953125,
+          "unggul": "penyatuan",
+          "nyata": true
+        },
+        "wait": {
+          "penyatuan": 57.087296030604094,
+          "koordinasi": 62.681285072410944,
+          "selisih": -5.59398904180685,
+          "p": 0.001953125,
+          "unggul": "penyatuan",
+          "nyata": true
+        },
+        "trust": {
+          "penyatuan": 0.6528018014082837,
+          "koordinasi": 0.651705169551366,
+          "selisih": 0.0010966318569176625,
+          "p": 0.556640625,
+          "unggul": "penyatuan",
+          "nyata": false
+        }
+      }
+    }
+  }
+}

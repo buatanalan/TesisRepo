@@ -300,7 +300,25 @@ per-pembaruan; versi lama sampai 31.000 baris). Model dibiarkan di server.
 | Langkah | Status | Hasil | Tanggal |
 |---|---|---|---|
 | 0 — periksa pemasangan | **SELESAI** | lulus 15/15 | 2026-08-23 |
-| 1 — eksperimen 30 hari | belum | — | — |
-| 2 — vonis 30 hari | belum | — | — |
+| 1 — eksperimen 30 hari | **SELESAI** | 9/9 lengan, konfigurasi terverifikasi sepadan | 2026-08-23 |
+| 2 — vonis 30 hari | **SELESAI** | **H6b DITOLAK**, H2b terdukung | 2026-08-23 |
 | 3 — eksperimen 90 hari | belum | — | — |
 | 4 — vonis ketahanan | belum | — | — |
+
+### Hasil 30 hari — ringkas
+
+**H6b ditolak.** Koordinasi-saja mengungguli penyatuan pada Gini di ketiga tingkat
+kepercayaan (0,079 / 0,057 / 0,071 vs 0,139 / 0,103 / 0,080), seluruhnya signifikan.
+Modul preferensi merusak pemerataan.
+
+**Namun penyatuan unggul di segalanya yang lain**, seluruhnya signifikan: kepatuhan
++6 sampai +13 poin, waktu tunggu turun hingga **133 menit**, kepercayaan naik.
+
+**H2b terdukung.** Ukuran efek bertanda terhadap *greedy* menyeberang nol seiring turunnya
+kepercayaan awal: −1,90 (unggul) → +1,82 → +5,60 (kalah telak).
+
+**Klaim revisi bersifat PASCA-HOC** — dirumuskan setelah data terlihat, jadi bukan
+hipotesis yang lulus. Uji 90 hari adalah konfirmasi pertamanya.
+
+Rincian lengkap: `draft tesis/Hipotesis_Penelitian.md` §HASIL, dan
+`outputs/analisis_20260823.json`.

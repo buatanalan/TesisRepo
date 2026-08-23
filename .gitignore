@@ -22,7 +22,7 @@ Eksekusi_RL/outputs/*
 !Eksekusi_Hipotesis/outputs/
 Eksekusi_Hipotesis/outputs/*
 !Eksekusi_Hipotesis/outputs/*_eval.json
-!Eksekusi_Hipotesis/outputs/e[0-9]_*.json
+!Eksekusi_Hipotesis/outputs/analisis*.json
 !Eksekusi_Hipotesis/outputs/.gitkeep
 # Log jalannya eksperimen TETAP lokal -- besar, dan isinya sudah teringkas di
 # `*_eval.json`. Hanya .gitkeep yang dilacak supaya foldernya ada setelah clone
