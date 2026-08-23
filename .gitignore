@@ -15,6 +15,17 @@ Eksekusi_RL/outputs/*
 !Eksekusi_RL/outputs/kalibrasi_*.json
 !Eksekusi_RL/outputs/uji_*.json
 
+# Eksekusi_Hipotesis/outputs -- pola SAMA: ringkasan hasil ikut git, sisanya tidak.
+# `*_eval.json` = empat metrik inti + sebaran trust + uji statistik (puluhan KB).
+# `*_training_results.json` SENGAJA dikecualikan: memuat `history` per-pembaruan
+# (versi lama mencapai 31.000 baris) dan tak dipakai saat pelaporan.
+!Eksekusi_Hipotesis/outputs/
+Eksekusi_Hipotesis/outputs/*
+!Eksekusi_Hipotesis/outputs/*_eval.json
+!Eksekusi_Hipotesis/outputs/e[0-9]_*.json
+!Eksekusi_Hipotesis/outputs/.gitkeep
+!Eksekusi_Hipotesis/logs/.gitkeep
+
 # ============ Dokumen & bahan tulisan (TETAP LOKAL) ============
 Dokumen_Penting/
 Dokumen tambahan/
@@ -27,6 +38,11 @@ Synthetic Model/
 *.pdf
 # Seluruh dokumen/catatan Markdown TETAP LOKAL -- server hanya menjalankan skrip.
 *.md
+# PENGECUALIAN: README folder eksekusi IKUT git. Bukan catatan pribadi, melainkan
+# petunjuk menjalankan skrip di folder yang sama -- kalau tertinggal, skripnya ada di
+# server tapi cara memakainya tidak.
+!Eksekusi_Hipotesis/README.md
+!Eksekusi_RL/README.md
 
 # ============ Arsip kode lama ============
 archive/
