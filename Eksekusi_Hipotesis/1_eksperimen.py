@@ -42,12 +42,29 @@ STAMP = datetime.date.today().strftime("%Y%m%d")
 BERSAMA = ["--forecaster", "vwf", "--reward-preset", "seimbang4x", "--dataset", "4x"]
 N_EVAL_SEED = 10
 
+# Rancangan 2x2 atas DUA komponen: modul selera (hidup/mati) x penilai (terpisah/gabungan).
+#
+#                      modul selera   penilai
+#   h1a_pemerataan     mati           3 terpisah    <- kemampuan koordinasi saja
+#   h2a_selera         hidup          1 gabungan    <- kemampuan selera saja
+#   h6b_utama          hidup          3 terpisah    <- keduanya + imbalan kepatuhan
+#
+# `--no-hist` WAJIB ada di ketiganya. Bawaan kelas kebijakan adalah `use_hist=True`,
+# jadi lengan yang tak menyebutkannya diam-diam mendapat penyandi riwayat interaksi
+# (proxy kepercayaan berbasis LSTM) yang tak dimiliki lengan lain. Sempat terjadi pada
+# `h1a_pemerataan` dan baru ketahuan saat memeriksa ulang -- justru memberi keunggulan
+# tambahan pada pembanding.
+#
+# `--alpha-accept` SENGAJA hanya di h6b: ia bagian dari metode yang diusulkan, bukan
+# milik arsitektur induk. Konsekuensinya h6b berbeda dari tiap induk dalam DUA hal
+# sekaligus, sehingga bila h6b menang, komponen penyebabnya TAK dapat disimpulkan --
+# itu uji atribusi yang sengaja dikeluarkan dari cakupan (lihat README).
 LENGAN = [
     ("h6b_utama",
      ["--pref", "--pref-feature-mode", "--no-hist", "--alpha-accept", "1.0", "--n-critics", "3"],
      "penyatuan + penyeimbang (yang diuji)"),
     ("h1a_pemerataan",
-     ["--n-critics", "3"],
+     ["--no-hist", "--n-critics", "3"],
      "pemerataan saja, tanpa modul selera"),
     ("h2a_selera",
      ["--pref", "--pref-feature-mode", "--no-hist", "--n-critics", "1"],
@@ -73,7 +90,46 @@ def sudah_ada(tag, it, horizon, cepat=False):
     return os.path.exists(os.path.join(K.OUTDIR, nama_berkas(tag, it, horizon, cepat)))
 
 
+def periksa_kesepadanan():
+    """Menjaga agar perbedaan antar-lengan hanya yang DISENGAJA.
+
+    Cacat yang dicegah di sini sudah pernah terjadi: `--no-hist` tertinggal di satu
+    lengan, sehingga lengan itu diam-diam memakai penyandi riwayat yang tak dimiliki
+    lengan lain. Tak ada galat, tak ada peringatan -- angkanya saja yang jadi tak
+    sepadan. Diperiksa di kode, bukan dipercayakan pada ketelitian membaca."""
+    bendera = {tag: {x for x in khas if x.startswith("--")} for tag, khas, _ in LENGAN}
+    nilai = {tag: dict(zip(khas[::1][:-1], khas[1:]))
+             for tag, khas, _ in LENGAN}
+
+    # 1. `--no-hist` wajib di SEMUA lengan (bawaan kelas kebijakan use_hist=True).
+    tanpa = [t for t, b in bendera.items() if "--no-hist" not in b]
+    assert not tanpa, (
+        f"`--no-hist` tertinggal di: {tanpa}. Bawaan kelas kebijakan adalah "
+        f"use_hist=True, jadi lengan itu akan diam-diam memakai penyandi riwayat "
+        f"yang tak dimiliki lengan lain -- perbandingannya jadi tak sepadan.")
+
+    # 2. Modul selera: tepat SATU lengan tanpa `--pref` (yaitu pemerataan-saja).
+    tanpa_pref = [t for t, b in bendera.items() if "--pref" not in b]
+    assert tanpa_pref == ["h1a_pemerataan"], (
+        f"Rancangan 2x2 rusak: yang TANPA modul selera seharusnya hanya "
+        f"h1a_pemerataan, tetapi yang ditemukan {tanpa_pref}.")
+
+    # 3. Penilai: tepat SATU lengan memakai penilai gabungan (yaitu selera-saja).
+    gabungan = [t for t, v in nilai.items() if v.get("--n-critics") == "1"]
+    assert gabungan == ["h2a_selera"], (
+        f"Rancangan 2x2 rusak: yang memakai penilai GABUNGAN seharusnya hanya "
+        f"h2a_selera, tetapi yang ditemukan {gabungan}.")
+
+    # 4. `--alpha-accept` hanya di lengan yang diuji.
+    pakai = [t for t, v in nilai.items()
+             if float(v.get("--alpha-accept", 0.0) or 0.0) != 0.0]
+    assert pakai == ["h6b_utama"], (
+        f"`--alpha-accept` seharusnya hanya di h6b_utama (bagian dari metode yang "
+        f"diusulkan, bukan milik arsitektur induk), tetapi dipakai {pakai}.")
+
+
 def main():
+    periksa_kesepadanan()
     p = argparse.ArgumentParser()
     p.add_argument("--horizon", type=str, default="30d", choices=["30d", "90d"])
     p.add_argument("--hanya", type=str, default=None, help="jalankan satu lengan saja (nama tag)")
