@@ -24,6 +24,10 @@ Eksekusi_Hipotesis/outputs/*
 !Eksekusi_Hipotesis/outputs/*_eval.json
 !Eksekusi_Hipotesis/outputs/e[0-9]_*.json
 !Eksekusi_Hipotesis/outputs/.gitkeep
+# Log jalannya eksperimen TETAP lokal -- besar, dan isinya sudah teringkas di
+# `*_eval.json`. Hanya .gitkeep yang dilacak supaya foldernya ada setelah clone
+# (perintah `nohup ... > logs/...` gagal tanpa itu).
+Eksekusi_Hipotesis/logs/*
 !Eksekusi_Hipotesis/logs/.gitkeep
 
 # ============ Dokumen & bahan tulisan (TETAP LOKAL) ============
