@@ -608,11 +608,16 @@ class MasterEVPPOInferenceAgent:
     (jendela riwayat tak cocok checkpoint)."""
 
     def __init__(self, policy, sim, forecaster=None, k: int = 3, epsilon: float = 0.0,
-                threshold: float = 0.20, pref_hist_k: int = None):
+                threshold: float = 0.20, pref_hist_k: int = None, rollout_agent_cls=None):
+        # `rollout_agent_cls` (2026-08-23): opsional, dipakai lengan turunan yang butuh
+        # RolloutAgent kustom (mis. `master_ev_ppo_acc.py::MasterEVPPOAccRolloutAgent`,
+        # aliran kritik ke-5 STREAM_ACCURACY) TANPA menyalin ulang kelas ini -- baku
+        # `MasterEVPPORolloutAgent`, perilaku LAMA persis bila tak diisi.
+        RolloutCls = rollout_agent_cls or MasterEVPPORolloutAgent
         pref_feature_mode = bool(getattr(policy, "pref_feature_mode", False))
-        self._roll = MasterEVPPORolloutAgent(policy, sim, RewardCalculatorStub(), forecaster, k=k,
-                                             pref_feature_mode=pref_feature_mode,
-                                             pref_hist_k=pref_hist_k)
+        self._roll = RolloutCls(policy, sim, RewardCalculatorStub(), forecaster, k=k,
+                                pref_feature_mode=pref_feature_mode,
+                                pref_hist_k=pref_hist_k)
         self._roll.epsilon = epsilon
         self._roll.threshold = threshold
 
@@ -641,12 +646,16 @@ class MasterEVPPOTrainer:
                 critic_hidden: int = 128, k: int = 3, n_critics: int = 1,
                 equity_calc=None, policy_cls=MasterEVPPOPolicy, policy_kw=None,
                 pref_hist_k: int = None, gini_mode: str = "dense",
-                cmdp_epsilon: float = None, cmdp_lr_dual: float = 0.0, **ppo_kw):
+                cmdp_epsilon: float = None, cmdp_lr_dual: float = 0.0,
+                rollout_agent_cls=None, **ppo_kw):
         self.dataset_path = dataset_path
         self.rollout_steps = int(rollout_steps)
         self.k = int(k)
         self.equity_calc = equity_calc
         self.pref_hist_k = pref_hist_k
+        # Lihat catatan `rollout_agent_cls` di `MasterEVPPOInferenceAgent.__init__` --
+        # baku `MasterEVPPORolloutAgent`, perilaku LAMA persis bila tak diisi.
+        self.rollout_agent_cls = rollout_agent_cls or MasterEVPPORolloutAgent
         self.rc = reward_calc or RewardCalculator()
         self.verbose = verbose
         self.seed = seed
@@ -722,11 +731,11 @@ class MasterEVPPOTrainer:
         sim = self._fresh_sim()
         self._reset_rc()
         pref_feature_mode = bool(getattr(self.policy, "pref_feature_mode", False))
-        agent = MasterEVPPORolloutAgent(self.policy, sim, self.rc, forecaster, k=self.k,
-                                        equity_calc=self.equity_calc,
-                                        pref_feature_mode=pref_feature_mode,
-                                        pref_hist_k=self.pref_hist_k,
-                                        gini_mode=self.gini_mode)
+        agent = self.rollout_agent_cls(self.policy, sim, self.rc, forecaster, k=self.k,
+                                       equity_calc=self.equity_calc,
+                                       pref_feature_mode=pref_feature_mode,
+                                       pref_hist_k=self.pref_hist_k,
+                                       gini_mode=self.gini_mode)
         step = 0
         for _ in range(n_updates):
             it = self._it_global

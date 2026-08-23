@@ -133,6 +133,90 @@ class VirtualWaitForecaster(ForecasterBase):
                for sid, s in spklus.items()}
 
 
+class CongestionAwareVWF(ForecasterBase):
+    """Perbaikan atas `VirtualWaitForecaster` (Validasi_Generik/LAPORAN_VALIDASI.md,
+    diagnosis 2026-08-22 `_diagnosis_rec_activity_vs_deltaW.py`): `compute_virtual_wait`
+    memang menangkap EV yang SUDAH `TRAVELING` menuju stasiun (state komitmen), tapi
+    buta thd EV yang BELUM spawn namun kemungkinan besar akan direkomendasikan ke
+    stasiun yang sama sebentar lagi -- sinyalnya SUDAH ada (`sim.recent_recs`, rec_activity
+    jendela bergulir, sudah dilihat aktor) tapi tak pernah masuk ke janji yang ditampilkan.
+
+    Terbukti empiris: |Delta W| pada trip patuh melonjak 5,8x (4,39 -> 25,58 menit) saat
+    rec_activity tinggi (>=p75) vs rendah (<=p25), rho=0,359 (p~=0, n=17.657). Ini BUKAN
+    bias arah sederhana (mean Delta W sudah agak konservatif) -- variansnya yang meledak,
+    jadi perbaikannya menambah "EV hantu" (permintaan blm spawn, diproksi rec_activity)
+    ke SIMULASI FIFO yang sama dipakai `compute_virtual_wait`, bukan menggeser rerata
+    dgn konstanta tetap.
+
+    `phantom_weight`: berapa "EV hantu" (dgn durasi = rerata charge time konektor
+    dominan) disuntikkan ke FIFO per satuan rec_activity -- 1.0 berarti tiap rekomendasi
+    baru-baru ini dianggap SAMA beratnya dgn satu EV yang sudah pasti datang."""
+
+    def __init__(self, phantom_weight: float = 0.5):
+        self.phantom_weight = float(phantom_weight)
+
+    def predict(self, spklus: dict, time_now_min: float = 0.0, user=None, soc: float = 50.0, sim=None) -> dict:
+        assert sim is not None, "CongestionAwareVWF butuh `sim` (compute_virtual_wait & recent_recs)"
+        from marl_spklu.env.spklu import mean_charge_time
+        est = {}
+        for sid, s in spklus.items():
+            base = sim.compute_virtual_wait(user, s, time_now_min)
+            rec_act = float(sim.recent_recs.get(sid, 0))
+            n_phantom = self.phantom_weight * rec_act
+            if n_phantom <= 0 or base == 0.0:
+                est[sid] = base
+                continue
+            # Suntikkan n_phantom "EV hantu" (durasi rerata konektor dominan stasiun ini)
+            # ke ANTREAN yang sama -- cap total kapasitas dipertahankan konsisten dgn
+            # compute_virtual_wait (tak menambah kapasitas, hanya menambah demand yg blm
+            # terlihat). Pendekatan linear sederhana: setiap EV hantu menambah beban
+            # sebesar (durasi rerata / kapasitas total) menit ke estimasi dasar --
+            # aproksimasi ringan drpd menjalankan ulang simulasi FIFO penuh dgn entri
+            # tambahan (yg butuh akses internal SPKLU.charging/queues, di luar antarmuka
+            # forecaster ini).
+            cap_total = max(1, sum(s.capacities.values()))
+            avg_dur = mean_charge_time("DC") if s.capacities.get("DC", 0) > 0 else mean_charge_time("AC")
+            est[sid] = base + (n_phantom * avg_dur) / cap_total
+        return est
+
+
+class CongestionAwareVWFv2(ForecasterBase):
+    """Percobaan KEDUA `CongestionAwareVWF` (v1 GAGAL -- lihat README diagnosis: |Delta W|
+    melonjak monoton di semua `phantom_weight`>0, krn `sim.recent_recs` HITUNGAN MENTAH
+    24-jam yang di-reset tiap `step%96==0` -- keputusan tepat setelah reset melihat
+    rec_activity~0 apa pun kondisinya, keputusan di penghujung hari melihat akumulasi
+    penuh sehari; menyuntikkan "EV hantu" sebanding hitungan mentah itu dobel-hitung
+    besar-besaran dgn EV yang sudah `TRAVELING` (sudah tercakup `compute_virtual_wait`).
+
+    v2: ubah jadi LAJU (rec per langkah SEJAK reset terakhir), proyeksikan ke horizon
+    PENDEK (`horizon_steps`, default 2 langkah ~= 30 menit) -- besaran phantom jadi
+    terikat skala waktu yang relevan dgn kompetisi mendatang (bukan akumulasi sehari
+    penuh), mengurangi (tapi TAK MENGHAPUS -- EV yang sudah dihitung `TRAVELING` tetap
+    berkontribusi ke laju ini) dobel-hitung."""
+
+    def __init__(self, phantom_weight: float = 0.5, horizon_steps: int = 2):
+        self.phantom_weight = float(phantom_weight)
+        self.horizon_steps = int(horizon_steps)
+
+    def predict(self, spklus: dict, time_now_min: float = 0.0, user=None, soc: float = 50.0, sim=None) -> dict:
+        assert sim is not None, "CongestionAwareVWFv2 butuh `sim`"
+        from marl_spklu.env.spklu import mean_charge_time
+        steps_since_reset = max(1, sim.current_step % 96)
+        est = {}
+        for sid, s in spklus.items():
+            base = sim.compute_virtual_wait(user, s, time_now_min)
+            rec_act = float(sim.recent_recs.get(sid, 0))
+            rate_per_step = rec_act / steps_since_reset
+            n_phantom = self.phantom_weight * rate_per_step * self.horizon_steps
+            if n_phantom <= 0 or base == 0.0:
+                est[sid] = base
+                continue
+            cap_total = max(1, sum(s.capacities.values()))
+            avg_dur = mean_charge_time("DC") if s.capacities.get("DC", 0) > 0 else mean_charge_time("AC")
+            est[sid] = base + (n_phantom * avg_dur) / cap_total
+        return est
+
+
 class MLPForecaster(nn.Module):
     def __init__(self, input_dim, hidden=64):
         super().__init__()

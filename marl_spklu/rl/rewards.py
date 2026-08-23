@@ -109,7 +109,8 @@ class RewardCalculator:
                  alpha_flock: float = 0.3, prox_lambda: float = 0.1,
                  wait_scale: float = 60.0, use_delta_gini: bool = False,
                  alpha_trust: float = 0.0, alpha_accept: float = 0.0,
-                 alpha_equity: float = 0.0):
+                 alpha_equity: float = 0.0, alpha_acc: float = 0.0,
+                 tau_acc: float = None):
         self.alpha_wait = float(alpha_wait)
         self.beta_prox = float(beta_prox)
         self.alpha_gini = float(alpha_gini)
@@ -152,6 +153,23 @@ class RewardCalculator:
         # eksplisit bila dioptimalkan scr ketat; proksi lokal ini KOMPROMI, bukan
         # pengganti persis).
         self.alpha_equity = float(alpha_equity)
+        # Suku SHAPING akurasi-janji eksplisit (BAKU MATI, alpha_acc=0.0). Diagnosis
+        # 2026-08-23 (`_diagnosis_rec_activity_vs_deltaW.py`): |Delta W| pada trip patuh
+        # melonjak 5,8x saat rec_activity tinggi (25,58 vs 4,39 mnt, rho=0,359-0,46 lintas
+        # 2 percobaan forecaster gagal, `Eksekusi_RL/outputs/kalibrasi_congestion_aware_
+        # vwf.json`) -- MENAMBAH ke janji (forecaster) TERBUKTI memperburuk (2 percobaan
+        # independen), jadi pendekatan yg dicoba di sini BEDA: hukum KEBIJAKAN (bukan
+        # perbaiki forecaster) tiap kali rekomendasinya berujung janji meleset jauh --
+        # mendorong agen menghindari SENDIRI situasi rawan penumpukan (rec_activity
+        # tinggi), bukan menambal gejalanya setelah kejadian.
+        # `tau_acc` None -> pakai DELTAW_TOL_HIGH (marl_spklu/env/user.py) -- ambang PERSIS
+        # yg sama dipakai User.update_trust menghukum trust, supaya suku ini menghukum
+        # TEPAT kondisi yg juga mengikis trust (bukan ambang independen yg tak selaras).
+        self.alpha_acc = float(alpha_acc)
+        if tau_acc is None:
+            from marl_spklu.env.user import DELTAW_TOL_HIGH
+            tau_acc = DELTAW_TOL_HIGH
+        self.tau_acc = float(tau_acc)
         # Delta-gini (bukan level absolut) -- lihat catatan kelas. `_prev_gini` disimpan
         # per-instance (state internal), direset otomatis di keputusan pertama tiap episode
         # (None -> delta pertama = 0, tak ada sinyal palsu di awal).
@@ -291,6 +309,16 @@ class RewardCalculator:
         r_local = float(mean_util) - float(chosen_util)
         r_overshoot = float(recent_rec_count) / float(overshoot_scale)
         return self.alpha_equity * (r_local - r_overshoot)
+
+    def accuracy_reward(self, delta_w_abs: float) -> float:
+        """`-alpha_acc * relu(|Delta W| - tau_acc) / wait_scale` -- BAKU MATI
+        (alpha_acc=0.0). HANYA menghukum (tak pernah menghargai) -- simetris dgn
+        `wait_reward` yg juga hanya-positif, krn janji yg SUDAH akurat (|Delta W|<=tau)
+        tak butuh insentif tambahan (User.update_trust sendiri sudah menghargainya lewat
+        jalur trust). Digerbang `tr.complied` oleh PEMANGGIL (pola sama `wait_reward`/
+        `trust_shaping_reward`) -- hanya trip yg janjinya relevan bagi pengguna."""
+        excess = max(0.0, float(delta_w_abs) - self.tau_acc) / self.wait_scale
+        return -self.alpha_acc * excess
 
     def acceptance_reward(self, complied: bool) -> float:
         """`alpha_accept * (+1 patuh / -1 tolak)` -- BAKU MATI (alpha_accept=0.0).

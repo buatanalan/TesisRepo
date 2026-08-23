@@ -1,0 +1,1214 @@
+5238 IEEE TRANSACTIONS ON CONSUMER ELECTRONICS, VOL. 70, NO. 3, AUGUST 2024
+PDQN: User Preference-Based Charging
+Station Recommendation
+Hai Lin , Member, IEEE,X i a o y uL i,Y u eC a o , Senior Member, IEEE, Houda Labiod, Senior Member, IEEE,
+and Naveed Ahmad , Member, IEEE
+Abstract—With the advent of consumer electronics, Electric
+Vehicles (EVs) are gradually becoming representative carriers
+for the next generation of consumer electronics. EVs are gaining
+market share compared to traditional fuel vehicles. This paper
+works on charging station (CS) recommendation to improve the
+charging experience. However, there is uncertainty that EV users
+follow exactly the CS recommendation from operation system,
+and this thereby degrades the performance of CS recommen-
+dation system. To address this issue, we extend the Markov
+Decision Process (MDP) model by integrating user preference
+(e.g., prefer the nearest CS). Then, we propose a neural network-
+based framework to solve the established model, in which we
+use a Long Short-Term Memory (LSTM) module to capture
+user preference features and an attention module to establish
+the relationship between the preference features and system state
+features. Based on these modules, a user Preference-based Deep
+Q Network (PDQN) is designed to solve the established CS
+recommendation model. Our simulation results demonstrate that
+our proposition can bring better performance in terms of average
+charging time and rewards, by comparing it with the nearest
+mechanism, the minimum queuing mechanism and the DQN
+mechanism without preference.
+Index Terms—Electric vehicles, charging station recommenda-
+tion, user preference, deep reinforcement learning.
+I. I NTRODUCTION
+I
+N THE face of challenges posed by energy shortage and
+climate change, Electric Vehicles (EVs) have been getting
+more attention currently. EVs represent a new generation of
+transportation and a new type of consumer electronics [1].
+They are highly popular in the consumer electronics market
+because of their low price and improved user experience [2].
+The global number of EVs was more than 7 million in
+2019, and in the future, it is expected to increase rapidly to
+Manuscript received 23 February 2024; revised 30 March 2024, 17 April
+2024, and 30 April 2024; accepted 5 June 2024. Date of publication
+12 June 2024; date of current version 11 December 2024. This work was
+supported in part by the Hubei Province Key Research and Development
+Program under Grant 2023BAB022, and in part by the Hubei Province
+International Science and Technology Collaboration Program under Grant
+2022EHB002. (Corresponding author: Yue Cao.)
+Hai Lin, Xiaoyu Li, and Yue Cao are with the Key Laboratory of Aerospace
+Information Security and Trusted Computing, Ministry of Education,
+and the School of Cyber Science and Engineering, Wuhan University,
+Wuhan 430072, China (e-mail: lin.hai@whu.edu.cn; xiaoyu.li@whu.edu.cn;
+cao.yue@whu.edu.cn).
+Houda Labiod is with Huawei Technologies France SAS, 92100 Boulogne-
+Billancourt, France (e-mail: houda.labiod@huawei.com).
+Naveed Ahmad is with the College of Computer and Information
+Sciences, Prince Sultan University, Riyadh 12435, Saudi Arabia
+(e-mail: nahmed@psu.edu.sa).
+Digital Object Identiﬁer 10.1109/TCE.2024.3413044
+130 million in 2030 [3]. As a result, it is required to deal
+with a large number of charging requests sent by EV users
+when EVs are going to run out of battery [4]. However, due to
+long charging cycles, inappropriate selection of an overloaded
+Charging Station (CS) may lead to poor charging efﬁciency
+(e.g., longer waiting time and driving time). Therefore, CS
+recommendation that guides an EV to an appropriate CS
+is critical to improving the user charging experience and
+balancing the charging load on CSs.
+by considering both the system’s current information (CS
+information and EV information) and the prediction of future
+requests. Recommendation modeling plays a crucial role in
+enhancing charging performance. Previous works model the
+CS recommendation problem as game theory [9], linear pro-
+gramming (LP) [10] and Pareto optimization [11],e t c .Y e t ,t h e
+most popular modeling to solve the decision process is based
+on the Markov Decision Process (MDP) model [12]. It makes
+the recommendation for online arrived charging requests by
+taking account of the system’s current information and future
+Previous works on EV charging focus on the overload CSs
+scheduling problem, i.e., determining the appropriate charging
+and discharging time for EVs so that they do not violate
+grid constraints while maintaining acceptable user satisfac-
+tion [5], [6]. Differently, the CS (or charging) recommendation
+problem determines an optimal CS for an EV to achieve the
+objectives, such as charging cost minimization [7],g r i dv i o -
+lation minimization [6], and charging time minimization [8].
+For instance, when an EV is going to run out of battery,
+the nearest CS is desirable to be recommended. However, if
+the chosen CS is overloaded, the user charging experience
+will be degraded. Simply choosing the least loaded CS could
+still lead to inefﬁciency, as it could be far away from the
+user. These types of greedy selections lead to inefﬁciency
+in CS recommendation. To improve the recommendation
+performance, it is important to model the CS recommendation
+events.
+1558-4127
+It is well known that the MDP has the issue of the
+‘curse of dimensionality’. To address this issue in the CS
+recommendation scenario, a multiple-phase MDP is proposed
+to reduce the state space and state transition complexities [13].
+A more general method to address the ‘curse of dimen-
+sionality’ issue is to resort to Deep Reinforcement Learning
+(DRL) [14], [15], such as using Deep Q Network (DQN) to
+ﬁnd the optimal CS [14] and designing a graph DRL to solve
+the CS recommendation problem, which is formulated as a
+sequential decision-making model [15].
+©c 2024 IEEE. Personal use is permitted, but republication/redistribution requires IEEE permission.
+See https://www.ieee.org/publications/rights/index.html for more information.
+LIN et al.: PDQN: USER PREFERENCE-BASED CS RECOMMENDATION 5239
+Fig. 1. CS recommendation scenario.
+These DRL-based CS recommendation works are carried
+out on the assumption that all users follow exactly the system
+recommendation. However, in reality, some users may not
+follow the CS recommended by the system, but the CS they
+prefer, such as a closer CS or a CS with fast charging. This
+feature is called user preference in this paper. User preference
+would introduce uncertainty to the recommendation system,
+since the recommended CSs may not followed by the users.
+If the DRL system does not take into account this uncertainty,
+the system’s performance will degrade. We take an example
+to discuss this phenomenon. In a simple scenario where two
+CSs, CS 1 and CS 2, are located in the area, as shown in
+Fig. 1. Assume that both CSs have one place available for
+charging and a user (u1) who locates between both CSs but
+nearer to CS1 is requesting charging. Without considering user
+preference, the system should recommend u1 to CS1. However,
+if the system can predict that a future user (u2) has a high
+probability of selecting CS 1 (its preferred CS) and arriving at
+CS1 earlier, a recommendation with CS 1 to u1 is no longer a
+good choice. Instead, the system should recommend u1 to CS2
+although this increases the charging time for u1, but minimizes
+the total charging time.
+This example shows that the recommendation performance
+degrades if the system does not take into account user
+preference. Therefore, designing a recommendation model that
+integrates user preference is critical for the recommendation
+system when applied in practice. To address this issue, we
+extend the MDP model by considering user preference in CS
+selection, i.e., establishing a new MDP model by integrating
+user preference. Then, we propose a user preference-based
+Deep Q Network (PDQN) algorithm to solve the established
+model. A challenge raised in our work is to effectively extract
+the preference features and correctly establish the relationship
+between the extracted preference features and the system state
+features.
+The contributions of this paper are summarized as follows:
+• User preference introduces uncertainty to CS rec-
+ommendation system. This uncertainty could degrade
+dramatically recommendation performance if it is not
+taken into account. To address this issue, we formulate
+the CS recommendation problem as an extended MDP
+model, which integrates user preference. This model, by
+taking account of uncertainty, enables the system to select
+optimal CSs for users in terms of overall charging time
+minimization.
+• To solve the extended MDP model, we propose a DQN-
+based algorithm (PDQN). The challenge of the algorithm
+is to extract automatically user preference from users’
+previous actions on CS selection. To do this, a Long
+Short-Term Memory (LSTM) module which can capture
+users’ historic behaviors is introduced to generate auto-
+matically the preference features. Moreover, an attention
+module is designed to establish the relationship between
+the preference features and the system state features, to
+enable the algorithm to output an optimal recommenda-
+tion for users.
+The rest of this article is organized as follows. Section II
+brieﬂy summarizes the related research works. Section III
+describes the extended MDP model for CS recommendation.
+Section IV designs the PDQN algorithm. Section V analyzes
+the performance of our proposition. Section VI concludes our
+work and gives the prospects.
+II. R ELATED WORK
+Many CS recommendation/scheduling works have been
+carried out to solve EV charging and path planning prob-
+lems. These works aim at minimizing the traveling time,
+queuing time, and charging price. To achieve accurate rec-
+ommendation/scheduling, it is important to collect the system
+information, such as EV’s state [16], user’s willingness to
+charge, and CS information. But the key is to design an
+appropriate recommendation/scheduling model and algorithm.
+Game theory-based modeling and machine learning-based
+modeling are two methods that have been widely studied
+previously.
+A. Traditional CS Recommendation
+A typical CS recommendation system is proposed in [17],
+in which four modules are designed: a Power System Control
+Center (PSCC), an Intelligent Transportation System (ITS)
+center, CSs, and EV terminals. The EVs use broadcast data
+from the ITS center, which contains information such as the
+states of the trafﬁc system and the grid, to determine an
+optimal route, so as to minimize the total serving time. This
+system relies on First In First Serve (FIFS), in which an EV
+arrives earlier and receives the charge service earlier. The
+work in [18] designs an Urgency First Charging (UFC) policy,
+which classiﬁes the charging priority based on the urgency of
+upcoming EVs. The priority level is calculated based on the
+EV’s energy demand, and remaining parking time.
+Authorized licensed use limited to: UNIVERSITAS GADJAH MADA. Downloaded on July 28,2026 at 10:36:36 UTC from IEEE Xplore.  Restrictions apply. 
+5240 IEEE TRANSACTIONS ON CONSUMER ELECTRONICS, VOL. 70, NO. 3, AUGUST 2024
+The CS recommendation problem can be usually considered
+as the competition among EVs. Hence, game theory is often
+used for recommendation modeling. The authors in [19] pro-
+pose a charging navigation framework based on a hierarchical
+game approach. It takes account of the impacts of both the
+power system and the transportation system. At the high
+level of the hierarchical model, a non-cooperative game is
+designed to model the competition between CSs. Multiple
+evolutionary games are formulated at the low level to evolve
+CS selection strategies. Similarly, an EV charging navigation
+strategy that takes into account the idle rate and dynamic tariff
+is proposed in [20]. CS recommendation is performed with the
+goal of minimizing the comprehensive cost of charging time
+and dynamic charging price.
+B. DRL-Based CS Recommendation
+The above methods are designed for deterministic environ-
+ment, ignoring unforeseen deviations caused by ﬂuctuating
+trafﬁc conditions and the unpredictable duration of CS queuing
+time. Since the randomness of trafﬁc conditions and charging
+queuing time signiﬁcantly impacts the effectiveness of CS
+recommendation and scheduling, effectively selecting CS is a
+big challenge [21].
+In stochastic environments, decision problems are often
+modeled as MDP problem, which is the basic formulation
+of Reinforcement Learning (RL). In [22], the EV charg-
+ing/discharging scheduling problem is formulated as an MDP
+model with unknown transition probability. The state includes
+electricity price, EV location and State of Charge (SoC), while
+the rewards are deﬁned as charging cost. The work in [23]
+also uses MDP to handle randomness in CS recommendation.
+They deﬁne the system state by including residual electricity
+and parking time, and solve the model by a RL algorithm.
+DRL is considered as a powerful tool to address the
+issue of large state space. DRL embodies a combination of
+the decision-making capabilities of RL and the perceptual
+capabilities of deep learning, enabling it to solve sophistical
+problems of sequential decision-making. The work in [24]
+proposes a system for real-time EV charging navigation based
+on a graph DRL. This system aims at minimizing traveling
+time and charging costs. The work in [25] proposes a modiﬁed
+rainbow-based DRL approach to realize the optimal scheduling
+of CS. The algorithm combines the advantages of several
+techniques, including double DQN, multi-step learning, and
+learning rate decay strategy to improve its performance.
+DRL is capable of solving the large state space issue, even
+though, it is still inefﬁcient to apply vanilla DRL to the
+large action space scenario. Unfortunately, in metropolises,
+the number of CSs could extend into several hundred, which
+leads to a large action space for CS recommendation [26].
+To address this issue, multi-agent DRL is applied to this
+domain. The authors in [27] propose a multi-agent actor-critic
+framework for CS recommendation. In this framework, each
+CS serves as an individual agent and a centralized attentive
+critic is designed to coordinate the recommendation between
+agents. To quantify the inﬂuence of future potential charging
+competition caused by other agents, the authors introduce a
+delayed access strategy to exploit the knowledge of future
+charging competition during training. Different from the above
+multi-agent actor-critic framework, the multi-object framework
+is proposed to solve the multi-agent problem in [28].W i t h
+a continuous action space, the MDP is solved by the twin
+delayed deep deterministic policy gradient algorithm (TD3).
+While ensuring the maximum beneﬁt of the EV A, the multi-
+object framework also ensures minimal ﬂuctuation in the
+micro-grid exchange power.
+C. CS Recommendation Based on User Preference
+Some previous works on CS recommendation have
+taken into account user preference. They take for exam-
+ple convenience [29], price sensitivity [30], and historical
+trajectories [31] as user preference. In [32], the authors
+use quantile regression models to analyze different factors
+impacts on user preference. The study shows that charging
+habit, CS availability, and CS accessibility to subway sta-
+tions are important factors affecting the charging choices.
+Alternatively, the authors in [33] take charging speed, cost,
+network compatibility, and amenities as user preference, and
+use the restricted Boltzmann machine-learning algorithm for
+CS recommendation. User preferences on different criteria
+form multi-dimensional preferences in [34]. This also leads to
+a multi-objective optimization model for CS recommendation,
+which could be solved by NSGA-III algorithm [34].Y e t ,t h e
+authors in [35] think deep-learning based algorithm is powerful
+to handle user preference. Hence, they design a Rectangle
+Actor-Critic (RAC) framework for CS recommendation. The
+results demonstrate that deep-learning algorithm works well
+for user preference consideration.
+However, these works have two limitations. One is to
+assume that the users would inform their preference to the
+system. This assumption limits the applicability of CS recom-
+mendation system. Instead, the system should be capable to
+extract users preference based on their previous CS selections.
+Second, previous works assume that all users always follow
+the recommended CS, but it is not always the case. In practice,
+some users may not follow the recommended CS and choose
+another CS because of user preference. User preference could
+introduce uncertainty into the CS recommendation system.
+To ﬁll these gaps, we aim to characterize automatically user
+preference and use it as a crucial factor in addressing the
+uncertainty of CS recommendation.
+III. CS R ECOMMENDATION PROCESS AND MODEL
+A. CS Recommendation Process
+In our proposition, the CS recommendation system is a
+central sever which collects the necessary information and
+recommends a CS for charging requests (Fig. 2). The collected
+information includes the CS’s location, number of EVs waiting
+in CSs, number of EVs traveling to CSs, type of CS, EV’s
+location and residual electricity. The information about CSs
+are collected via cameras and sensors installed in CSs, while
+the information about EV is sent through APP of in-EV home
+screen. The system’s state is updated by the event trigger, e.g.,
+the arrival/departure of EV to a CS or the charging request
+LIN et al.: PDQN: USER PREFERENCE-BASED CS RECOMMENDATION 5241
+Fig. 2. Flow chart of CS recommendation system.
+of an EV . Our system is designed for the case where the CS
+operator and EV manufacture are the same, and also the case
+where they are different. In the latter case, it only needs to
+install the system APP on the in-EV home screen to get the
+necessary information required by our model [36], [37].T h e
+CS recommendation process is as follows:
+1) when an EV is going to run out of battery, the EV user
+sends a charging request to the recommendation system
+via an APP;
+2) upon receiving a charging request, the recommendation
+system makes a decision based on the state of system
+and sends this decision (recommendation) to the request-
+ing EV;
+3) the EV conﬁrms this decision and drives towards the
+recommended CS.
+B. System State
+As aforementioned, we characterize CS recommendation
+as MDP. The MDP model typically constitutes a 5-tuple
+(K, S, A, P, R). K symbolizes the decision cycle, S represents
+a set of states, A represents the action space (decisions), P
+characterizes the state transition probability and R denotes the
+reward. At each step, a decision is made based on the current
+system state and predictions of its subsequent states. Upon
+making a decision, the system receives rewards and evolves
+to the next state according to the transition probability. This
+process is repeated until a predeﬁned number of iterations is
+reached or the system converges. The sequence of decisions is
+referred as policy π. The objective of the MDP is to determine
+the optimal policy that maximizes the overall rewards. The
+parameters used in this subsection are shown in Table I.
+In our proposal, the system state (st ∈ S, t = 0, 1,... )
+consists of CS information, EV information, and trafﬁc load
+level. The state at step t is deﬁned as a tuple st ≜(ζt, vt, kt).
+ζt = (cs1,t, cs2,t,..., csn,t) is the state of n CSs at time t.
+csi,t ={ ci, typei, qui, owi} deﬁnes the state of the CS i at time
+t, where ci ∈ [1, maxc
+i ] represents the capacity of CS i (maxc
+i
+represents the max capacity of CS i). typei indicates the CS
+type, e.g., fast charging CS. qui denotes the number of EVs
+waiting for charging at the CS i. owi represents the number of
+EVs that have been recommended previously but are still on
+the way to the CS i. vt represents the sub-state of the requesting
+EV , which is a two-tuple (lt, et). lt ∈{ l1, l2, l3,..., lm}
+denotes the location where the EV is requesting charging.
+et ∈{ 1, 2, 3,..., emax} denotes the EV’s residual energy level
+repenting SoC. Finally, kt ∈{ 1, 2, 3} represents the trafﬁc load
+TABLE I
+PARAMETER SETTING 1
+level at time t, where 1 denotes the light level of trafﬁc load,
+2 denotes the moderate level of trafﬁc load and 3 denotes the
+heavy level of trafﬁc load.
+C. Action and Transition Probability
+The recommendation system takes an action for each state
+st. We deﬁne the action set as A ={ a1, a2,..., an}, where ai
+denotes the decision of recommending the CS i to a requesting
+EV . According to the current state st = (ζt, vt, kt), take action
+at at st to reach the next state st+1 = (ζt+1, vt+1, kt+1).T h e
+probability P(st+1|st, at) is transition probability from st to
+st+1 by the agent taking an action at. At each state, the
+user selects an action and receives rewards. Then, the system
+evolves to the next state.
+D. User’s Preference
+The recommendation system selects a CS for a requesting
+user, but the user may not follow the recommendation and
+select his preferred CS (e.g., a CS with which he is more
+familiar), instead of the recommended CS. We denote ˆa as the
+action (the recommended CS) selected by the system, while ˇa
+as the user’s preferred action (preferred CS).
+The user selects a ﬁnal action by taking account of both
+actions. Namely, the ﬁnal decision is made based on both
+the recommended action and preferred action. We deﬁne the
+probability of taking the recommendation action and preferred
+action as ˆP and ˇP respectively. Then, the actual taking action
+is deﬁned as a:
+a =
+{
+ˆa w.p. ˆP
+ˇa w.p. ˇP (1)
+If we consider the system as a function f , then at state s,t h e
+system obtains the action ˆa by considering user’s preference
+p as:
+aˆ = f(s, p) (2)
+5242 IEEE TRANSACTIONS ON CONSUMER ELECTRONICS, VOL. 70, NO. 3, AUGUST 2024
+The user’s preference function is denoted as fp. This can be
+deﬁned as for example that a user prefers to go to the nearest
+CS. At state s, the user’s preferred action ˇa is determined by:
+ˇa = fp(s) (3)
+We aim to ﬁnd an optimal policy π∗ : (s, p) → a which can
+determine a best action a∗ when a user requests charging for
+its vehicle at state s and with his preference p. According to
+equations (1), (2) and (3), the policy π is determined by both
+the system function and the preference function. We deﬁne
+π ≜/Gamma1(f, fp) and have:
+π(s, p) = a (4)
+In our work, the optimal policy π∗ minimizes the total
+overall charging time. It is deﬁned as the time interval from
+when the user requests charging to the time when EV charging
+is ﬁnished. This time interval includes traveling time (τtr),
+queuing time (τqu), and charging time (τch). Therefore, when
+a user with preference p takes action a at state s, the received
+reward is calculated as:
+ra(s, p) = 1
+τtr + τqu + τch
+(5)
+We deﬁne Rπ (s, p) as the expected total rewards at state s
+with the preference p under the policy π.
+Rπ (s, p) = ra(s, p) +
+∑
+s′∈S,p′∈P
+λpt
+(
+s′, p′|s, a
+)
+Rπ (
+s′, p′)
+(6)
+where a = π(s, p), s′is the next state, λ (<1) is a constant dis-
+count factor and pt is transition probability. The parameter p′
+represents the preference of the next user which is independent
+of (s, a), so the equation can be rewritten as:
+Rπ(s, p) = ra(s, p) +
+∑
+s′∈S,p′∈P
+λpt
+(
+s′|s, a
+)
+pt
+(
+p′)
+Rπ (
+s′, p′)
+(7)
+Our objective is to derive a policy, so as to maximize the
+expected total rewards for each state under each preference.
+π∗ = arg max
+π
+Rπ (s, p), ∀ (s, p) (8)
+As aforementioned, π is determined by function f and
+function fp, where fp is predeﬁned. For instance, some users
+prefer the nearest CS, so for these users, fp outputs the nearest
+CS as the action ˇa. Therefore, π only depends on the function
+f , and so equation (8) can be re-written as:
+f∗ = arg max
+f
+Rπ(s, p), ∀ (s, p) (9)
+In the above equation, the preference is deﬁned as an
+input parameter. We could deﬁne different values for different
+preferences, e.g., ‘1’ represents the preference of the nearest
+CS, ‘2’ represents the preference ofthe minimum queuing time
+CS, and so on. However, according to our experiences, this
+deﬁnition can not achieve good performance. Then, we let
+the system extract the preference based on two parameters
+by itself: the recommended action ˆa and the ﬁnal selected
+action a. We believe the relationship between these two actions
+indicates the preference of a user. A simple example is that
+Fig. 3. CS recommendation framework.
+if the recommended action is always the same as the selected
+action, it implies that the related users have no preference for
+CS and they always follow the recommended CS. Therefore,
+we deﬁne φ : (ˆa, a) → p, and equation (9) is then written as:
+(
+f∗,φ ∗)
+= arg max
+f,φ
+Rπ (
+s, ˆa, a
+)
+∀,( s, p) (10)
+In the next section, we use PDQN algorithm to ﬁnd the
+optimal (f∗,φ ∗).
+IV . PDQN A LGORITHM
+In our work, we use PDQN to solve the established model.
+To do this, we ﬁrst establish a framework for our system.
+A. Framework and PDQN Networks
+We deﬁne our CS recommendation framework as shown
+in Fig. 3.T h e preference extraction module represents the
+function φ. It takes the actions ˆa and a as input and outputs
+the preference p.T h e system function module that represents
+the function f taking the input of the current state s and a user’s
+preference p, and outputs the rewards (Rπ function deﬁned in
+equation (7)) for each possible action a ∈ A. The module then
+recommends the action ˆa which has the highest probability.
+The selection module will select an action between the
+action ˆa and his preferred action ˇa which is determined using
+the preference function by taking account of the current state s.
+In the CS recommendation framework, the preference
+extraction module plays a crucial role. The user preference
+determines the ﬁnal chosen CS. Therefore, it can be derived
+from the user previous selections of CS. This is why in our
+preference extraction module, the recommended action ˆa and
+the ﬁnal selected action a serve as input to the preference
+extraction module. Since user privacy should be protected in
+recommendation system [38], [39],w eh a v ew o r k e do nt h e
+privacy issue in our previous work [40]. In PDQN, with the
+preference extraction module, user preference is not leaked to
+the system, so we also achieve to protect user privacy to some
+extents.
+However, only based on the individual pair (ˆa, a),i ti s
+difﬁcult to derive the accurate preference feature. We believe
+that this feature also lies in users’ successive selections.
+In consequence, we need to extract the features from the
+users’ successive selections. Since LSTM can extract both the
+features of one input and the features along the sequence of
+LIN et al.: PDQN: USER PREFERENCE-BASED CS RECOMMENDATION 5243
+Fig. 4. PDQN networks of framework.
+input as well, we use this network as the preference extraction
+module. It is possible to design one LSTM for all types of
+users. However, it cannot achieve good performance according
+to experience [41]. This is why, we assign one LSTM for one
+user type (as shown in Fig. 3). The network is then switched
+to the corresponding LSTM according to the user sample.
+For normal DRL, the input to deep network is just the
+system state, while in our framework, both the state and
+preference (feature) serve as the inputs. A simple way to
+establish the correlation between the state and preference is
+to concatenate both the state vector and preference vector, but
+this cannot establish well the relationship between preference
+features and system state features. To address this issue, we
+introduce an attention module in our system function module.
+In this module, we use the attention approach to approximate
+the feature distribution and gain the relationship weights,
+which can be learned adaptively to combine system state and
+preference features. After generating the combined feature of
+state and preference, it serves as an input to the fully connected
+neural network, where we set six layers for this network and
+each layer has 128 neurons. Moreover, a residual network
+is deﬁned in this module. Each residual block contains two
+fully connected layers. Residual networks can prevent gradient
+disappearance and network degradation problems in deep
+neural networks and allow our PDQN networks to perform
+well.
+B. Algorithm
+To recommend an optimal action, we need to train the two
+neural networks deﬁned in our recommendation framework,
+namely the preference extraction network and the system
+function network. We denote θf ,θφ as the network parameters
+for preference extraction and system function networks. The
+training procedure tunes the two parameters to the optimal
+(θ∗
+f ,θ ∗
+φ), which represent the optimal functions (f∗,φ ∗).
+Similar to the DQN, PDQN deﬁnes two networks (as shown in
+Fig. 4), the Main network and the target network. The former
+is the main network to recommend an optimal action and the
+latter is used for training.
+The target action-value y is calculated using (11) with the
+target network.
+y = ra(s, p) + η max
+a′
+Q
+(
+s′, p′; a′)
+(11)
+Algorithm 1 PDQN Algorithm
+Input: input PDQN with random parameters (θf ,θφ),
+target network parameters (¯θf , ¯θφ)=(θf ,θφ),
+replay memory D
+Output: output ﬁnal action a
+1 for each charging request do
+2 Determine the current state s and the user type tp;
+3 Generate the recommendation action ˆa and the
+preferred action ˇa;
+4 Select the ﬁnal action a according to (1);
+5 Receiving the immediate rewards r;
+6 Determine the next state s′;
+7 for each t=1,T do
+8 Generate the recommendation action ˆa′and select
+a′ from s′ using target network;
+9 Store sample (s, ˆa, a, tp, r, s′, ˆa′, a′, tp′) in
+experience replay buffer;
+10 Extract preference p, p′ from φ( ˆa, a, tp) and
+φ( ˆa′, a′, tp′);
+11 Calculate y according to (11) based on target
+network;
+12 Perform a gradient descent based on the loss
+function (12) and update PDQN parameters
+(θf ,θφ);
+13 Update target network every L steps, ¯θ = θ;
+14 end
+15 end
+where s′, p′, a′ represent the next state, the next preference,
+the next action. Then, the squared error loss function (12) is
+used for gradient decent.
+L
+(
+θf ,θφ
+)
+= E
+[(
+Qθf ,θφ (s, p; a) − y
+)2]
+(12)
+During the training phase, by interacting with the environ-
+ment, the experience samples (s, ˆa, a, tp, r, s′, ˆa′, a′, tp′) are
+generated and stored in the experience replay buffer. PDQN
+algorithm is shown in Algorithm 1.
+V. P ERFORMANCE EVA L UAT I O N
+In this section, we analyze the performance of our propo-
+sition by comparing it with three other CS recommendation
+mechanisms, i.e., the nearest mechanism that selects the
+closest CS for every requesting EV , the minimum queuing
+mechanism that selects the CS that brings the minimum queu-
+ing time (τqu), and a deep learning based mechanism similar
+to [14] that the system only considers the state information
+but no user preference information. We refer it as the DQN
+mechanism in our simulation.
+We simulate a 1000*800 area Z and ten CSs are randomly
+positioned within this area. The area Z is divided by a
+V oronoi diagram [13], which includes ten regions denoted
+as R1, R2,..., R10. Ten CSs are placed in ten regions, such
+as CS1 is positioned at R1, and so on. In this simulation,
+we deﬁne ﬁve types of preference (i.e., ﬁve types of users),
+including the preference for the nearest CS, the preference for
+5244 IEEE TRANSACTIONS ON CONSUMER ELECTRONICS, VOL. 70, NO. 3, AUGUST 2024
+TABLE II
+PREFERENCE SETTING 2
+TABLE III
+PARAMETER SETTING 3
+TABLE IV
+PARAMETER SETTING 4
+minimum queuing time, the preference for special CS operator,
+the preference for fast charging CS, and non-preference users
+who always follow the recommendation. Moreover, each type
+of user is further divided into three sub-types according to the
+selection probabilities as illustrated in Table II. In fact, this is
+the implementation of the fp of equation (3) in our simulation
+experiment. For instance, the type nearest is divided into three
+sub-types which select the nearest CS with probability 10%,
+20%, 30%. Namely, users follow the recommended CS with
+90%, 80%, 70% probability respectively.
+Table III presents the parameter settings. The parameter
+μd represents the expected traveling time to a CS within
+the same region. If an EV drives to an adjacent CS, the
+expected travel time is 2 μd, while driving to a next CS,
+the expected travel time is 3 μd, and so on. The μc repre-
+sents the expected charging time per unit electricity and μfc
+represents the expected charging time for fast charging per
+unit electricity (μfc calculated as 0 .2*μc). We deﬁne three
+trafﬁc load levels: heavy (k = 3), moderate (k = 2), and light
+(k = 1) levels. We denote μa,1 .5μa, and 2μa as the expected
+charging request arrival interval for heavy, moderate, and
+light levels respectively. The residual energy (SoC) determines
+the charging time. For simplicity reasons, we discretize the
+residual energy to ﬁve levels (se in Table IV). pe represents
+the residual energy level probability when a user requests
+charging. τch is denoted as the charging duration for each level,
+which is uniformly distributed in the interval deﬁned in the
+table.
+A. Performance Analysis
+In this subsection, we analyze the performance of our
+proposition. First, we analyze its computational complexity
+by comparing it with DQN mechanism. Since we bring
+Fig. 5. Computational complexity analysis.
+LSTM and attention module into neural network, the number
+of network parameters is larger than DQN (Fig. 5), which
+makes PDQN model have higher computational complexity.
+However, this increased computation is trivial and PDQN can
+well grant the requirement of recommendation latency. As
+shown in Fig. 5, by training 40,000 EV charging requests, the
+PDQN model spends 1233.5s and the DQN mechanism spends
+939.6s, increasing the computation by about 30%. This is
+totally acceptable, since the training can be done ofﬂine. Then,
+we process10,000 charging requests online. PDQN and DQN
+incur 22.46ms and 20.8ms per request on average, respectively.
+The increased latency is almost negligible.
+In the following, we analyze the performance of our
+proposition by comparing it to the three aforementioned
+mechanisms. Here, we analyze two criteria, the average reward
+per request and the average charging time (τtr +τqu +τch) per
+request. First, we ﬁx μd, μc and pˇa to 5, 11 minutes and 0.6
+respectively, and vary μa from 6 to 17 minutes.
+Fig. 6(a) shows the comparison results of the average reward
+per charging request. We observe that the average reward
+increases with the increase of μa for all mechanisms. The
+increase of μa implies a decrease of the charging request
+rate (fewer charging requests), so the charging load on all
+CSs is reduced. This makes EVs’ queuing time decrease,
+which in turn brings less overall charging time, and so the
+average reward increases. We also observe that our proposition
+outperforms the others, especially when the value of μa is low
+(i.e., high charging request arrival rate).
+Unlike the nearest mechanism and the minimum queuing
+mechanism that only takes account of the current request
+without considering the future requests, our mechanism can
+intelligently recommend CS for users by predicting future
+arrivals. In consequence, our proposition performs much better
+than those two mechanisms. Since the DQN mechanism is also
+an intelligent-based mechanism. It also outperforms the nearest
+mechanism and the minimum queuing mechanism. However,
+the DQN mechanism does not consider users’ preferences, and
+so its prediction could be deviated. This makes it perform
+worse than our proposition.
+Fig. 6(b) describes the performance of the overall average
+charging time by varying μa. Since the overall charging time
+is inversely proportional to the rewards, we observe that the
+overall charging time decreases with the increase of μa as
+LIN et al.: PDQN: USER PREFERENCE-BASED CS RECOMMENDATION 5245
+Fig. 6. Rewards and charging time analysis by varying μa.
+Fig. 7. Variance analysis.
+expected. With the small value of μa (high charging load),
+the three other mechanisms perform better than the nearest
+mechanism. The nearest mechanism always recommends the
+nearest CS. This strategy leads to long queuing time when the
+CSs are overloaded.
+An interesting observation here is that, with μa<7, the
+nearest mechanism not only has higher rewards than DQN
+and minimum queuing mechanism, but has larger overall
+charging time as well. It is true that individual reward is
+inversely propositional to the overall charging time. However,
+by considering the average value, a mechanism could bring bad
+performance for both criteria. We take an example: assuming
+with the nearest mechanism, user A and user B have 1 unit
+reward and 100 unit rewards respectively, while the minimum
+queuing mechanism brings 50 unit rewards for both user A and
+B. In this case, the nearest mechanism brings higher rewards,
+but also longer overall charging time ((1/1+1/100)>(1/50+
+1/50)). This analysis demonstrates if a mechanism brings high
+As
+value for both average reward and average charging time, it
+must have high variance. This is demonstrated in Fig. 7, where
+the nearest mechanism has the largest variance (note: to make
+the ﬁgure concise, the value of the nearest mechanism has
+been divided by 50.)
+μa increases, the queuing time of the four mechanisms
+decreases. The overall charging time of the nearest mechanism
+decreases dramatically. This also demonstrates that the CS load
+has small impact on the nearest mechanism. The overall charg-
+ing time of the minimum queuing mechanism also decreases
+and approaches the DQN. When the charging load is high,
+the mechanism could recommend a faraway CS for the users,
+leading to a long driving time. When the load decreases, all
+CSs become available (no queuing time) and so the mechanism
+will recommend the nearest one for users. In consequence, the
+increase of μa not only brings the decrease of the queuing
+time, but also the driving time as well, which makes the
+minimum queuing mechanism exhibit similar behaviors to the
+DQN.
+Thanks to the intelligence of our mechanism and the DQN
+mechanism, they perform much better than the two others.
+However, we can observe that all mechanisms bring almost
+the same performance when μa>14. The reason is that most
+CSs become available when μa>14. In this case, the best
+recommended CS is the nearest CS. Therefore, all mechanisms
+recommend the nearest CS for users.
+Now, we ﬁx μa to 10 minutes and analyze how the
+parameter μd impacts the performance. Fig. 8(a) shows that
+the average reward by varying μd from 3 to 14 minutes. We
+observe that the average reward decreases for all mechanisms
+as μd increases. The average reward is inversely proportional
+to the overall charging time which is the summation of
+the traveling time, the queuing time, and the charging time.
+The increase of μd makes the traveling time increased, so
+the average reward decreases.
+It is noteworthy that the minimum queuing mechanism
+decreases much more than the others, because this mech-
+anism usually takes a long traveling distance to reach the
+recommended CS. The increase of μd makes the traveling
+time increased dramatically, leading to a sharp decrease in the
+average reward. When μd continues to increase (μd≥7), the
+minimum queuing mechanism becomes even worse than the
+nearest mechanism.
+On the contrary, the nearest mechanism’s rewards decrease
+smoothly with the increase of μd, simply because it always
+recommends the users to the nearest CSs. Again, we observe
+that our proposition performs the best among all mechanisms.
+When the traveling time increases, our mechanism will
+5246 IEEE TRANSACTIONS ON CONSUMER ELECTRONICS, VOL. 70, NO. 3, AUGUST 2024
+Fig. 8. Rewards and charging time analysis by varying μd.
+Fig. 9. Rewards and charging time analysis by varying μc.
+recommend the nearer CS, even though it may have a heavier
+load than a faraway CS. Moreover, by considering the users’
+preferences, our mechanism can make precise predictions
+about each CS’s load in the future. Therefore, it achieves better
+performance in terms of the average reward than all other
+mechanisms.
+Fig. 8(b) shows the results of the overall charging time
+vs. μd. As expected, all mechanisms increase their charging
+time when μd increases, while our mechanism still brings the
+best performance thanks to its intelligent features. Then, the
+minimum queuing mechanism and the nearest mechanism have
+the opposite behaviors. The former’s charging time increases
+signiﬁcantly, while the latter stays almost unchanged with the
+increase of μd. We have explained above that the minimum
+queuing mechanism could recommend a faraway CS, so
+the increase of traveling time makes the overall charging
+time increased dramatically. As for the nearest mechanism, it
+always recommends the nearest CS, so it is affected slightly
+by the increase of traveling time.
+Fig. 9(a) shows the reward performance by varying μc (ﬁx
+μa and μd to 10 and 5 min). The increase of μc brings the
+increase of charging time, which in turn increases the queuing
+time for other EVs. This makes all mechanisms decrease the
+rewards when μc increases. At a small value of μc,t h eC S s ’
+availability is high. Hence, recommending the nearest CS is a
+good choice. This is why the nearest mechanism performs well
+when μc≤7. Our mechanism performs even slightly better than
+the nearest mechanism, because it can distribute EVs evenly
+among CSs by considering users’ preferences.
+As μc increases, the performance of the nearest mecha-
+nism degrades dramatically. Recommending all users to their
+nearest CS could easily overload a CS, thus leading to long
+queuing and charging time. In contrast, the two intelligent
+mechanisms recommend users to a less load CS by considering
+future charging requests. They perform better and better with
+the increase of μc. By considering users’ preferences, our
+mechanism recommends an appropriate CS for a user if the
+user has a preferred CS. Moreover, the decision made by our
+mechanism also takes account of future arrival of charging
+requests with users’ preferences. All these features make our
+mechanism outperform the others for all μc.
+Fig. 9(b) shows the overall charging time vs.μc. We observe
+that μc has small impact on all mechanisms except the nearest
+mechanism. As explained above, the increase of μc leads to
+the increase of charging time and queuing time. If all EVs
+are recommended to the nearest CS, this increase can easily
+LIN et al.: PDQN: USER PREFERENCE-BASED CS RECOMMENDATION 5247
+Fig. 10. Rewards and charging time analysis by varying pˇa.
+overload CSs. Therefore, the nearest mechanism increases the
+overall charging time dramatically with μc. As for the mini-
+mum queuing mechanism, it selects a CS with the least waiting
+time, so the increase of charging time will not be accumulated.
+In consequence, the minimum queuing mechanism’s overall
+charging time increases smoothly with μc. Our mechanism
+and the DQN mechanism perform similarly to the minimum
+queuing mechanism. This implies that they select a CS with
+the least waiting time for charging. By taking account of users’
+preferences, our mechanism always performs the best.
+In summary, the two intelligent mechanisms outperform the
+other non-intelligent mechanisms, because they take account
+of the current and future states of the whole system. That is,
+if a CS is overloaded or will be overloaded, the intelligent
+mechanisms would probably not recommend this CS for the
+current charging request. The minimum queuing mechanism
+can only take account of the current state of CSs but no future
+states. This makes it work better than the nearest mechanism,
+but worse than two intelligent mechanisms. By considering
+the users’ preferences, our mechanism makes more accurate
+predictions of the future states, which makes our mechanism
+perform the best for all scenarios.
+B. Analysis of User Preference
+In this subsection, we investigate how users’ preferences
+impact performance. We vary the parameter pˇa from 0.1 to
+0.9 to study the performance in terms of the average reward
+and the overall charging time. The value of pˇa determines the
+probability that a user selects his preferred CS. For example,
+if pˇa is 0.1, there is a 10% probability for the user to select
+his or her preferred CS instead of the recommended CS.
+Fig. 10(a) shows the comparison performance in terms of
+average reward. With the increase of pˇa, i.e., more users do
+not follow the recommendation, the rewards of both the nearest
+mechanism and the minimum queuing mechanism increase
+instead. This is because not following the recommendation
+makes the charging requests distributed more evenly on all
+CSs. We observe that the probabilitypˇa signiﬁcantly affects the
+nearest mechanism. Whenpˇa>0.3, the nearest mechanism brings
+more and more rewards compared to the minimum queuing
+mechanism. This implies that when the charging requests are
+uniformly distributed, it is better to select the nearest CS for
+charging.
+In contrast, our proposition and the DQN mechanism’s
+rewards decrease with pˇa, simply because both mechanisms
+make less accurate predictions on the system state when more
+users do not follow the recommendation. However, both mech-
+anisms still outperform two other non-intelligent mechanisms,
+even when most of the users (90% in the ﬁgure) selects the
+CSs with their own preference. As for our proposition, by
+taking account of user preference, it can make predictions on
+users’ selection of the CS. As a result, it performs much better
+than the DQN mechanism.
+Fig. 10(b) shows the average overall charging time by
+varying pˇa. We observe the opposite phenomenon compared
+to Fig. 10(a), i.e., charging time of two non-intelligent mech-
+anisms decreases with the increase of pˇa, while the two
+intelligent mechanisms increase the charging time instead. We
+have explained above that at a low value of pˇa, the nearest
+mechanism could easily overload some CSs, and so it degrades
+the performance. When pˇa increases, the charging requests
+will be distributed more evenly among all CSs. Therefore, the
+nearest and the minimum queuing mechanisms decrease the
+charging time. This decrease is not due to the load of CSs,
+but rather the decrease of traveling time. In other words, the
+queuing mechanism may recommend a faraway CS to users,
+which could lead to a long traveling time. If the users follow
+their preferences, the traveling time could be simply decreased.
+We observe that the gap between two intelligent mecha-
+nisms increases ﬁrst and then decreases. That is, when the
+value of pˇa increases, our mechanism becomes better and bet-
+ter compared to DQN. The gap becomes largest whenpˇa is 0.6.
+Afterwards, our mechanism’s charging time increases sharply,
+so the gap decreases. The reason is, with small pˇa,m o s tu s e r s
+follow the recommendation, there is small difference between
+the two mechanisms. With the increase of pˇa, our mechanism
+brings better performance thanks to its consideration of user
+preference. As pˇa continues to increase, most users follow their
+preference, which makes all mechanisms have little effect on
+users’ selection.
+In the following, we analyze the performance in a scenario
+where a part of users select the CSs for charging directly, i.e.,
+5248 IEEE TRANSACTIONS ON CONSUMER ELECTRONICS, VOL. 70, NO. 3, AUGUST 2024
+Fig. 11. Rewards and charging time analysis by varying pw.
+without informing the recommendation system. We introduce
+pw to represent the probability that users select CSs without
+recommendation system. For example, if pw is set to 0.25,
+there are 25% of users who select their CSs without recom-
+mendation system, while the remaining 75% of users send
+the charging requests to the recommendation system. In this
+simulation, we ﬁx pˇa to 0.6 and vary pw from 0.0 to 0.5 to
+study the performance.
+Fig. 11(a) shows the comparison performance in terms of
+average rewards. When pw increases, i.e., more users select
+their preferred CSs without recommendation system, both
+the nearest and minimum queuing mechanisms bring more
+rewards. The reason is similar to the pˇa scenario. That is, the
+charging requests are distributed more evenly among all CSs
+when more users select CSs without recommendation system.
+When pw>0.25, the nearest mechanism performs better than
+the minimum queuing mechanism. This implies if the charging
+requests tend to be uniformly distributed, selecting the nearest
+CS has advantage over the minimum queuing CS.
+We also observe that two intelligent mechanisms stay
+almost unchanged when pw is varied. This demonstrates that
+the intelligent mechanisms can learn dynamically from the
+environment. Namely, even though both mechanisms are not
+informed of charging events by several users, they still can
+learn this kind of perturbation from the CSs’ states. This
+feature makes them perform much better than non-intelligent
+mechanisms.
+Fig. 11(b) shows the average overall charging time vs.
+pw. As expected, both non-intelligent mechanisms decrease
+their charging time with the increase of pw and the nearest
+mechanism decreases much more sharply. This demonstrates
+again that when the request load tends to be evenly distributed,
+it is better to select the nearest CS. Together with Figure 11(a),
+we observe when 0.25 <pw<0.5, the nearest mechanism’s
+reward and charging time are larger than the minimum queuing
+mechanism. We have explained it previously, i.e., the large
+variance leads to this phenomenon.
+a number of users do not inform their charging events to the
+system. This enables them to bring less overall charging time
+than the non-intelligent mechanisms. By taking into account
+user preferences, our mechanism can bring the least overall
+Since the two intelligent mechanisms can learn the per-
+turbations from the environment, they can predict future
+requests and the transition of the system state, even though
+charging time.
+In summary, the two non-intelligent mechanisms perform
+better when the users follow their preference instead of
+the directly CSs without the recommendation system. This
+is because, we assign different preference for users, which
+makes the charging load distributed more evenly when more
+users just select their preferred CSs. On the contrary, the
+performance of our mechanism and DQN mechanism degrades
+with the increase of pˇa. These two mechanisms can distribute
+intelligently the charging load according to the CSs’ current
+state and the prediction on the future requests. However, this
+estimation on the system state and the prediction of future
+arrival become less accurate when more and more users select
+their preferred CS. Finally, these two intelligent mechanisms
+stay almost unchanged with the change of pw, because they
+can learn dynamically the perturbations from the charging
+recommendation.
+VI. C ONCLUSION
+Our work focuses on the CS recommendation in the
+scenario where user preference leads to uncertainty in the
+recommendation system. To address the uncertainty issue,
+we extend the MDP model by taking into account user
+preference. Then, we design the PDQN algorithm to solve the
+model. In this algorithm, we introduce a LSTM module to
+capture users’ preferences automatically. This design brings
+intelligence into the recommendation system and makes our
+work applicable in practice. However, this mechanism may
+not capture accurately user preference if the training data
+is not enough. The simulation results demonstrate that, by
+taking into account user preference, our proposition can handle
+the uncertainty and so outperforms other mechanisms. Since
+user privacy must be protected when the recommendation
+system is implemented in practice, we will jointly analyze the
+uncertainty and privacy issues in our future works. Moreover,
+LIN et al.: PDQN: USER PREFERENCE-BASED CS RECOMMENDATION 5249
+user preference not only exists in CS recommendation, but
+also exists in other recommendation systems, such as online
+car-hailing recommendation, and computing service recom-
+mendation. We believe that our work can be applied in these
+domains, and this will be our future work.
+REFERENCES
+[1] R. Wang, S. Jiang, D. Ma, Q. Sun, H. Zhang, and P. Wang, “The energy
+management of multiport energy router in smart home,” IEEE Trans.
+Consum. Electron., vol. 68, no. 4, pp. 344–353, Nov. 2022.
+[2] J.-H. Syu, J. C.-W. Lin, G. Srivastava, and K. Yu, “A comprehen-
+sive survey on artiﬁcial intelligence empowered edge computing on
+consumer electronics,” IEEE Trans. Consum. Electron. , vol. 69, no. 4,
+pp. 1023–1034, Nov. 2023.
+[3] J. T. J. Burd, E. A. Moore, H. Ezzat, R. Kirchain, and R. Roth,
+“Improvements in electric vehicle battery technology inﬂuence vehi-
+cle lightweighting and material substitution decisions,” Appl. Energy ,
+vol. 283, Feb. 2021, Art. no. 116269.
+[4] M. R. Khalid, I. A. Khan, S. Hameed, M. S. J. Asghar, and J. Ro,
+“A comprehensive review on structural topologies, power levels, energy
+storage systems, and standards for electric vehicle charging stations and
+their impacts on grid,” IEEE Access, vol. 9, pp. 128069–128094, 2021.
+[5] X. Li et al., “Electric vehicle behavior modeling and applications in
+vehicle-grid integration: An overview,” Energy, vol. 268, Apr. 2023,
+Art. no. 126647.
+[6] N. Kumar, V . Saxena, B. Singh, and B. K. Panigrahi, “Power quality
+improved grid-interfaced PV-assisted onboard EV charging infrastruc-
+ture for smart households consumers,” IEEE Trans. Consum. Electron. ,
+vol. 69, no. 4, pp. 1091–1100, Nov. 2023.
+[7] M. Moschella, P. Ferraro, E. Crisostomi, and R. Shorten, “Decentralized
+assignment of electric vehicles at charging stations based on personalized
+cost functions and distributed ledger technologies,”IEEE Internet Things
+J., vol. 8, no. 14, pp. 11112–11122, Jul. 2021.
+[8] S. Karakati ˇc, “Optimizing nonlinear charging times of electric vehicle
+routing with genetic algorithm,” Expert Syst. Appl., vol. 164, Feb. 2021,
+Art. no. 114039.
+[9] T. Guo, P. You, and Z. Yang, “Recommendation of geographic dis-
+tributed charging stations for electric vehicles: A game theoretical
+approach,” in Proc. IEEE Power Energy Soc. General Meeting , 2017,
+pp. 1–5.
+[10] L. Ni, B. Sun, X. Tan, and D. H. K. Tsang, “Online price-based
+vehicle-to-station recommendations for EV battery swapping,” in Proc.
+IEEE Int. Conf. Commun., Control, Comput. Technol. Smart Grids
+(SmartGridComm), 2018, pp. 1–6.
+[11] G. Wang, Y . Zhang, Z. Fang, S. Wang, F. Zhang, and D. Zhang,
+“FairCharge: A data-driven fairness-aware charging recommendation
+system for large-scale electric taxi ﬂeets,” Proc. ACM Interact., Mobile,
+Wearable Ubiquitous Technol., vol. 4, no. 1, pp. 1–25, Mar. 2020.
+[12] Y . Wu, J. Zhang, A. Ravey, D. Chrenko, and A. Miraoui, “Real-time
+energy management of photovoltaic-assisted electric vehicle charging
+station by Markov decision process,” J. Power Sources , vol. 476,
+Nov. 2020, Art. no. 228504.
+[13] H. Lin, X. Lin, H. Labiod, and L. Chen, “Toward multiple-phase MDP
+model for charging station recommendation,”IEEE Trans. Intell. Transp.
+Syst., vol. 23, no. 8, pp. 10583–10595, Aug. 2022.
+[14] M. Khalid, L. Wang, K. Wang, N. Aslam, C. Pan, and Y . Cao, “Deep
+reinforcement learning-based long-range autonomous valet parking for
+smart cities,” Sustain. Cities Soc. , vol. 89, Feb. 2023, Art. no. 104311.
+[15] P. Xu et al., “Real-time fast charging station recommendation for
+electric vehicles in coupled power-transportation networks: A graph
+reinforcement learning method,” Int. J. Electr. Power Energy Syst. ,
+vol. 141, Oct. 2022, Art. no. 108030.
+[16] X. Li, Y . Cao, F. Yan, Y . Li, W. Zhao, and Y . Wang, “Towards
+user-friendly energy supplement service considering battery degradation
+cost,” Energy, vol. 249, Jun. 2022, Art. no. 123716.
+[17] Q. Guo, S. Xin, H. Sun, Z. Li, and B. Zhang, “Rapid-charging
+navigation of electric vehicles based on real-time power systems and
+trafﬁc data,” IEEE Trans. Smart Grid, vol. 5, no. 4, pp. 1969–1979, Jul.
+2014.
+[18] S. Liu, X. Xia, Y . Cao, Q. Ni, X. Zhang, and L. Xu, “Reservation-
+based EV charging recommendation concerning charging urgency
+policy,” Sustain. Cities Soc. , vol. 74, Nov. 2021, Art. no. 103150.
+[19] J. Tan and L. Wang, “Real-time charging navigation of electric vehicles
+to fast charging stations: A hierarchical game approach,” IEEE Trans.
+Smart Grid , vol. 8, no. 2, pp. 846–856, Mar. 2017.
+[20] J. Zhong, J. Liu, and X. Zhang, “Charging navigation strategy for
+electric vehicles considering empty-loading ratio and dynamic electricity
+price,” Sustain. Energy, Grids Netw., vol. 34, Jun. 2023, Art. no. 100987.
+[21] S. Pareek, A. Sujil, S. Ratra, and R. Kumar, “Electric vehicle charging
+station challenges and opportunities: A future perspective,” in Proc.
+Int. Conf. Emerg. Trends Commun., Control Comput. (ICONC) , 2020,
+pp. 1–6.
+[22] Y . An, Y . Gao, N. Wu, J. Zhu, H. Li, and J. Yang, “Optimal scheduling
+of electric vehicle charging operations considering real-time trafﬁc
+condition and travel distance,” Expert Syst. Appl. , vol. 213, Mar. 2023,
+Art. no. 118941.
+[23] S. Wang, S. Bi, and Y . A. Zhang, “Reinforcement learning for real-time
+pricing and scheduling control in EV charging stations,” IEEE Trans.
+Ind. Informat., vol. 17, no. 2, pp. 849–859, Feb. 2021.
+[24] Q. Xing, Y . Xu, Z. Chen, Z. Zhang, and Z. Shi, “A graph reinforcement
+learning-based decision-making platform for real-time charging naviga-
+tion of urban electric vehicles,” IEEE Trans. Ind. Informat. , vol. 19,
+no. 3, pp. 3284–3295, Mar. 2023.
+[25] R. Wang, Z. Chen, Q. Xing, Z. Zhang, and T. Zhang, “A modiﬁed
+rainbow-based deep reinforcement learning method for optimal schedul-
+ing of charging station,”Sustainability, vol. 14, no. 3, p. 1884, Feb. 2022.
+[26] L. Canese et al., “Multi-agent reinforcement learning: A review of
+challenges and applications,” Appl. Sci. , vol. 11, no. 11, p. 4948, May
+2021.
+[27] W. Zhang et al., “Intelligent electric vehicle charging recommendation
+based on multi-agent reinforcement learning,” in Proc. Web Conf., 2021,
+pp. 1856–1867.
+[28] F. Cui, X. Lin, R. Zhang, and Q. Yang, “Multi-objective optimal schedul-
+ing of charging stations based on deep reinforcement learning,” Front.
+Energy Res., vol. 10, Jan. 2023, Art. no. 1042882.
+[29] A. Kumar, R. Kumar, and A. Aggarwal, “S2RC: A multi-objective route
+planning and charging slot reservation approach for electric vehicles
+considering state of trafﬁc and charging station,” J. King Saud Univ.
+Comput. Inf. Sci. , vol. 34, no. 5, pp. 2192–2206, May 2022.
+[30] C. Huang, M. Shi, H. Wang, and Y . Jia, “Optimal charging site
+recommendation and scheduling for electric vehicles considering user
+price sensitivity,” in Proc. IEEE PES Innov. Smart Grid Technol. Asia
+(ISGT Asia), 2022, pp. 449–453.
+[31] Z. Tan, L. Liu, J. Wu, and Y . Zhou, “A charging station recommendation
+method based on link prediction for cruising electric taxis,” in Proc.
+IEEE 25th Int. Conf. Comput. Support. Cooperative Work Design
+(CSCWD), 2022, pp. 127–132.
+[32] Y . Guo, X. Qian, T. Lei, S. Guo, and L. Gong, “Modeling the
+preference of electric shared mobility drivers in choosing charging
+stations,” Transp. Res. Part D, Transport Environ., vol. 110, Sep. 2022,
+Art. no. 103399.
+[33] A. Ibrahim et al., “A recommendation system for electric vehicles
+users based on restricted boltzmann machine and waterwheel plant
+algorithms,” IEEE Access, vol. 11, pp. 145111–145136, 2023.
+[34] X. Zuo, J. Bi, Y . Wang, and Y . Du, “A charging guidance optimization
+model for electric vehicle travel by considering multi-dimensional
+preferences of users,” World Electric Veh. J., vol. 14, no. 7, p. 171, Jun.
+2023.
+[35] C. Li, Z. Dong, N. Fisher, and D. Zhu, “Coupling user preference
+with external rewards to enable driver-centered and resource-aware EV
+charging recommendation,” in Proc. Joint Eur. Conf. Mach. Learn.
+Knowl. Discov. Databases, 2022, pp. 3–19.
+[36] A. Brown, J. Cappellucci, A. Heinrich, and E. Cost, “Electric vehicle
+charging infrastructure trends from the alternative fueling station locator:
+Third quarter 2023,” U.S. Dept. Energy, Nat. Renew. Energy Lab.
+(NREL), Golden, CO, USA, Rep. NREL/TP-5400-88223, 2024.
+[37] S. S. G. Acharige, M. E. Haque, M. T. Arif, N. Hosseinzadeh,
+K. N. Hasan, and A. M. T. Oo, “Review of electric vehicle
+charging technologies, standards, architectures, and converter conﬁgura-
+tions,” IEEE Access, vol. 11, pp. 41218–41255, 2023.
+[38] U. I. Atmaca, S. Biswas, C. Maple, and C. Palamidessi, “A
+privacy-preserving querying mechanism with high utility for elec-
+tric vehicles,” IEEE Open J. Veh. Technol. , vol. 5, pp. 262–277,
+Jan. 2024.
+[39] A. Almarshoodi, J. Keenan, I. Campbell, T. Hassan, M. I. Ibrahem, and
+M. M. Fouda, “Security and privacy preservation for future vehicular
+transportation systems: A survey,” in Proc. IEEE 12th Int. Conf.
+Commun. Syst. Netw. Technol. (CSNT) , 2023, pp. 728–734.
+5250 IEEE TRANSACTIONS ON CONSUMER ELECTRONICS, VOL. 70, NO. 3, AUGUST 2024
+[40] D. Wang, Y . Cao, K.-K. R. Choo, Z. Yang, Z. Sun, and H. Cruickshank,
+“Secure battery swapping: A reservation scheme with conditional
+privacy-preserving bidirectional heterogeneous aggregate signcryption
+and incentive mechanism,” IEEE Trans. Veh. Technol., vol. 72, no. 11,
+pp. 14087–14102, Nov. 2023.
+[41] B. Lindemann, B. Maschler, N. Sahlab, and M. Weyrich, “A
+survey on anomaly detection for technical systems using LSTM
+networks,” Comput. Ind., vol. 131, Oct. 2021, Art. no. 103498.
+Hai Lin (Member, IEEE) received the B.S. degree
+from the Department of Thermal Engineering,
+Huazhong Sciences and Technologies University,
+Wuhan, China, in 1999, the M.S. degree in computer
+science from the University of Pierre and Marie
+Curie, Paris, France, in 2005, and the Ph.D. degree
+from Institute Telecom-Telecom Paris-Tech, Paris, in
+2008. He was a Postdoctoral Researcher with France
+Telecom. He was a Researcher with ZTE Europe.
+Since 2012, he has been with Wuhan University,
+Wuhan, where he is currently an Associate Professor
+with the School of Cyber Science and Engineering. His research interests
+include Internet of Things, edge computing, sensor networks, and future
+networks.
+Xiaoyu Li received the B.S. degree in information
+security from Xidian University, Xi’an, China, in
+2021. He is currently pursuing the M.S. degree
+in cyberspace security with the School of Cyber
+Science and Engineering, Wuhan University. His
+research interests include reinforcement learning,
+trusted computing, and machine learning.
+Yue Cao (Senior Member, IEEE) received the
+Ph.D. degree from the Institute for Communication
+Systems formerly known as the Centre for
+Communication Systems Research, University of
+Surrey, Guildford, U.K., in 2013.
+Further to the Ph.D. study, he had conducted a
+Research Fellow with the University of Surrey, and
+an Academic Faculty with Northumbria University,
+Newcastle upon Tyne, U.K.; Lancaster University,
+Lancaster, U.K.; and Beihang University, Beijing,
+China. He is currently a Professor with the School
+of Cyber Science and Engineering, Wuhan University, Wuhan, China. His
+multidisciplinary research interest focuses on the theme of ITS, including
+cyber security, wireless network, and service optimization.
+Prof. Cao has been also the Fellow of the British Computer Society, the
+Royal Society of Arts, and the Higher Education Academy.
+Houda Labiod is a Full Professor with the
+Department INFRES (Computer Science and
+Network Department), Telecom Paris, France.
+She recently joined Huawei Technologies R&D
+Paris Research Centre. She was the Head of the
+Research Group Cybersecurity for Communication
+and Networking, Telecom Paris from 2015 to 2018.
+She is a Founder of IFIP NTMS Conference. She
+published six books and more than 250 research
+articles in these areas. She was a Co-Leader of
+the Chair C3S on Cybersecurity for connected and
+autonomous vehicles with French partners Renault, Valéo, Thalès, Nokia, and
+Wavestone for four years. Her current research interests include security in
+new generation communication networks (6G, NGI), security in cooperative
+ITS, and cooperation in wireless and autonomous networks. She served as
+an associate editor and a member of the editorial board for several journals.
+Naveed Ahmad (Member, IEEE) received the
+degree in computer science from the Department of
+Computer Science, University of Peshawar, Pakistan,
+in 2007, and the Ph.D. degree in computer sci-
+ence from the Centre for Communication System
+Research, University of Surrey, U.K., in 2013.
+He is currently an Associate Professor with the
+College of Computer and Information Sciences,
+Prince Sultan University, Saudi Arabia. Prior to his
+current position, he was an Assistant Professor with
+the Department of Computer Science, University
+of Peshawar. He worked in the area of cyber security, privacy, blockchain
+technology, and penetration testing.

@@ -14,9 +14,10 @@ import torch
 import common
 from marl_spklu.rl.master_ev_ppo_policy import (MasterEVPPOTrainer, MasterEVPPOPolicy,
                                                 MasterEVPPOPrefPolicy, MasterEVPPOInferenceAgent)
+from marl_spklu.rl.master_ev_ppo_acc import MasterEVPPOAccRolloutAgent, STREAM_ACCURACY
 from marl_spklu.rl.rewards import RewardCalculator
 from marl_spklu.agents.greedy_agent import GreedyAgent
-from scipy.stats import wilcoxon
+from scipy.stats import wilcoxon, spearmanr
 
 T0 = time.time()
 def elapsed():
@@ -115,6 +116,19 @@ p.add_argument("--forecaster", type=str, default="formula", choices=["formula", 
                    "aktor, sim.compute_virtual_wait; diagnosis event-trust menemukan celah "
                    "besar antara keduanya sbg penyebab dominan erosi trust RL). >0 WAJIB tag "
                    "terpisah, lihat di bawah.")
+p.add_argument("--alpha-acc", type=float, default=0.0,
+              help="bobot suku shaping AKURASI-JANJI eksplisit (RewardCalculator."
+                   "accuracy_reward, STREAM_ACCURACY, BAKU MATI=0.0). Diagnosis "
+                   "2026-08-23 (_diagnosis_rec_activity_vs_deltaW.py): |Delta W| trip "
+                   "patuh melonjak 5,8x saat rec_activity tinggi -- 2 percobaan "
+                   "memperbaiki FORECASTER gagal (lihat kalibrasi_congestion_aware_vwf."
+                   "json), jadi suku ini menghukum KEBIJAKAN, bukan janji. WAJIB "
+                   "--n-critics 5 (rollout_agent_cls otomatis dialihkan ke "
+                   "MasterEVPPOAccRolloutAgent). >0 WAJIB tag terpisah.")
+p.add_argument("--tau-acc", type=float, default=None,
+              help="ambang |Delta W| (menit) sebelum accuracy_reward mulai menghukum -- "
+                   "baku None -> DELTAW_TOL_HIGH (marl_spklu/env/user.py), ambang PERSIS "
+                   "yg sama dipakai User.update_trust menghukum trust.")
 p.add_argument("--pref-hist-k", type=int, default=None,
               help="ABLASI: panjang jendela riwayat P (baku None=PDQN_HIST_K=10, sama "
                    "dgn lengan +P lain & PDQN diskrit). Diperkecil (mis. 5, disamakan "
@@ -123,6 +137,9 @@ p.add_argument("--pref-hist-k", type=int, default=None,
 args = p.parse_args()
 
 assert not (args.pref_feature_mode and not args.pref), "--pref-feature-mode butuh --pref"
+assert args.alpha_acc == 0.0 or args.n_critics == 5, (
+    "--alpha-acc>0 butuh --n-critics 5 (STREAM_ACCURACY, lihat master_ev_ppo_acc.py)")
+ROLLOUT_AGENT_CLS = MasterEVPPOAccRolloutAgent if args.alpha_acc != 0.0 else None
 POLICY_CLS = MasterEVPPOPrefPolicy if args.pref else MasterEVPPOPolicy
 POLICY_KW = dict(pref_feature_mode=args.pref_feature_mode) if args.pref else dict()
 if args.no_hist:
@@ -158,9 +175,10 @@ _hist_suffix = "_nohist" if args.no_hist else ""
 _prefk_suffix = "" if args.pref_hist_k is None else f"_prefk{args.pref_hist_k}"
 _gini_mode_suffix = "" if args.gini_mode == "dense" else f"_{args.gini_mode}"
 _cmdp_suffix = "" if args.cmdp_lr_dual == 0.0 else f"_cmdpE{args.cmdp_epsilon:g}lr{args.cmdp_lr_dual:g}"
+_acc_suffix = "" if args.alpha_acc == 0.0 else f"_accW{args.alpha_acc:g}"
 _suffix = (("_pref_feat" if args.pref_feature_mode else ("_pref" if args.pref else ""))
           + _hist_suffix + _prefk_suffix + _trust_suffix + _accept_suffix + _equity_suffix
-          + _gini_mode_suffix + _cmdp_suffix
+          + _acc_suffix + _gini_mode_suffix + _cmdp_suffix
           + _fc_suffix + _rw_suffix + _critics_suffix + _beta_suffix + _sigma_suffix
           + _horizon_suffix)
 TAG_ARM = "master_ev_ppo" + _suffix
@@ -181,9 +199,11 @@ def make_reward_calc():
     if args.reward_preset == "seimbang4x":
         return RewardCalculator.seimbang4x(alpha_trust=args.alpha_trust,
                                            alpha_accept=args.alpha_accept,
-                                           alpha_equity=args.alpha_equity)
+                                           alpha_equity=args.alpha_equity,
+                                           alpha_acc=args.alpha_acc, tau_acc=args.tau_acc)
     return RewardCalculator(alpha_trust=args.alpha_trust, alpha_accept=args.alpha_accept,
-                            alpha_equity=args.alpha_equity)
+                            alpha_equity=args.alpha_equity,
+                            alpha_acc=args.alpha_acc, tau_acc=args.tau_acc)
 
 
 def train_one(seed, tag):
@@ -193,7 +213,8 @@ def train_one(seed, tag):
                             policy_cls=POLICY_CLS, policy_kw=POLICY_KW,
                             pref_hist_k=args.pref_hist_k, beta_mode=args.beta_mode,
                             beta_sigma=args.beta_sigma, gini_mode=args.gini_mode,
-                            cmdp_epsilon=args.cmdp_epsilon, cmdp_lr_dual=args.cmdp_lr_dual)
+                            cmdp_epsilon=args.cmdp_epsilon, cmdp_lr_dual=args.cmdp_lr_dual,
+                            rollout_agent_cls=ROLLOUT_AGENT_CLS)
     policy = tr.train(make_forecaster(), n_updates=args.n_updates)
     ckpt = os.path.join(common.OUTDIR, f"{tag}_actor_seed{seed}.pt")
     torch.save(policy.state_dict(), ckpt)
@@ -215,11 +236,72 @@ def eval_policy_gini(ckpt_path, dataset_path, n_eval_seed, k):
         sim = common.fresh_sim(dataset_path)
         random.seed(s); np.random.seed(s)
         agent = MasterEVPPOInferenceAgent(pol, sim, make_forecaster(), k=k,
-                                          pref_hist_k=args.pref_hist_k)
+                                          pref_hist_k=args.pref_hist_k,
+                                          rollout_agent_cls=ROLLOUT_AGENT_CLS)
         sim.run(max_steps=sim.max_steps, agent=agent)
         served = np.array([sp.total_served for sp in sim.spklus.values()], float)
         ginis.append(common.gini(served))
     return ginis
+
+
+# ---------------------------------------------------------------------------
+# DIAGNOSIS akurasi-janji (2026-08-23): rho(rec_activity, |Delta W|) + perbandingan
+# kuartil, PERSIS metodologi `_diagnosis_rec_activity_vs_deltaW.py` -- dibangun LANGSUNG
+# ke pipeline ini (bukan skrip ad-hoc terpisah) supaya SETIAP checkpoint yang dilatih
+# di sini otomatis punya angka pembanding yang sama, tanpa perlu diulang manual.
+# Acuan H1a (`eq1_vwf_seimbang4x_K4_gap_sig1`, forecaster=vwf): rho=0,359, |DW|
+# rendah=4,39 mnt, |DW| tinggi=25,58 mnt, rasio=5,83x (n=17.657, 5 seed).
+# ---------------------------------------------------------------------------
+def diagnose_accuracy(ckpt_path, dataset_path, n_diag_seed, k):
+    from marl_spklu.rl.master_ev_ppo_policy import MasterEVPPORolloutAgent
+    sim0 = common.fresh_sim(dataset_path)
+    pol = load_policy(ckpt_path, len(sim0.spklus))
+    RolloutCls = ROLLOUT_AGENT_CLS or MasterEVPPORolloutAgent
+
+    side, records = {}, []
+    orig_decide = RolloutCls.on_decision
+    def patched_decide(self, user, chosen_spklu_id, recs, feasible_spklus):
+        if self._pending is not None:
+            side[id(self._pending[0])] = self._pending[5]
+        return orig_decide(self, user, chosen_spklu_id, recs, feasible_spklus)
+    RolloutCls.on_decision = patched_decide
+
+    orig_complete = RolloutCls.on_charge_complete
+    def patched_complete(self, user):
+        tr = self._user_trip_tr.get(user.user_id)
+        if tr is not None and tr.complied:
+            rrc = side.pop(id(tr), None)
+            if rrc is not None:
+                records.append((rrc, user.wait_time - tr.disp_estwait))
+        return orig_complete(self, user)
+    RolloutCls.on_charge_complete = patched_complete
+
+    for s in range(n_diag_seed):
+        sim = common.fresh_sim(dataset_path)
+        random.seed(s); np.random.seed(s)
+        agent = MasterEVPPOInferenceAgent(pol, sim, make_forecaster(), k=k,
+                                          pref_hist_k=args.pref_hist_k,
+                                          rollout_agent_cls=ROLLOUT_AGENT_CLS)
+        sim.run(max_steps=sim.max_steps, agent=agent)
+
+    RolloutCls.on_decision = orig_decide
+    RolloutCls.on_charge_complete = orig_complete
+
+    if not records:
+        return dict(n=0)
+    rrc = np.array([r[0] for r in records], dtype=float)
+    dw = np.array([r[1] for r in records], dtype=float)
+    adw = np.abs(dw)
+    rho, p_rho = spearmanr(rrc, adw)
+    p25, p75 = np.percentile(rrc, [25, 75])
+    low, high = adw[rrc <= p25], adw[rrc >= p75]
+    return dict(n=len(records), rho=float(rho), p_rho=float(p_rho),
+               deltaW_abs_mean=float(adw.mean()), deltaW_abs_median=float(np.median(adw)),
+               deltaW_abs_low_rec_activity=float(low.mean()) if len(low) else None,
+               deltaW_abs_high_rec_activity=float(high.mean()) if len(high) else None,
+               ratio_high_low=float(high.mean() / max(low.mean(), 1e-9)) if len(low) and len(high) else None,
+               frac_deltaW_over10_low=float((low > 10).mean()) if len(low) else None,
+               frac_deltaW_over10_high=float((high > 10).mean()) if len(high) else None)
 
 
 def eval_baseline_gini(dataset_path, agent_factory, n_eval_seed):
@@ -288,18 +370,37 @@ print(f"[{elapsed()}] MasterEV-PPO={np.mean(ginis_policy):.4f}  greedy_queue={np
 print(f"[{elapsed()}] p_vs_gq={w_gq.pvalue:.4f} d={d_gq:+.3f}  "
      f"p_vs_gu={w_gu.pvalue:.4f} d={d_gu:+.3f}  spread_antar_seed={spread:.4f}", flush=True)
 
+# Diagnosis akurasi-janji (rec_activity vs |Delta W|) -- checkpoint seed MEDIAN (sama
+# yg dipakai ginis_policy di atas), n_diag_seed sama dgn n_eval_seed utk data cukup.
+median_seed = sorted(per_seed.keys(), key=lambda sd: np.mean(per_seed[sd]))[len(per_seed) // 2]
+median_ckpt = next(r["ckpt"] for r in results if r["seed"] == median_seed)
+print(f"[{elapsed()}] === Diagnosis akurasi-janji (seed={median_seed}, "
+     f"{args.n_eval_seed} seed) ===", flush=True)
+diag = diagnose_accuracy(median_ckpt, DATASET, args.n_eval_seed, args.k)
+if diag.get("n", 0) > 0:
+    print(f"[{elapsed()}] n={diag['n']} rho(rec_act,|DW|)={diag['rho']:+.4f} (p={diag['p_rho']:.1e}) "
+         f"|DW| rendah={diag['deltaW_abs_low_rec_activity']:.2f} tinggi="
+         f"{diag['deltaW_abs_high_rec_activity']:.2f} rasio={diag['ratio_high_low']:.2f}x "
+         f"(acuan H1a: rho=+0,359 rendah=4,39 tinggi=25,58 rasio=5,83x)", flush=True)
+else:
+    print(f"[{elapsed()}] diagnosis: 0 trip patuh terekam (cek k/forecaster)", flush=True)
+
 common.save_json(dict(
     gini_policy=ginis_policy, gini_greedy_queue=gq, gini_greedy_util=gu,
     mean_policy=float(np.mean(ginis_policy)), mean_gq=float(np.mean(gq)), mean_gu=float(np.mean(gu)),
     p_vs_gq=float(w_gq.pvalue), p_vs_gu=float(w_gu.pvalue),
     cohens_d_vs_gq=d_gq, cohens_d_vs_gu=d_gu, spread_antar_seed=spread,
     per_seed_means={str(k): float(np.mean(v)) for k, v in per_seed.items()},
+    diagnosis_akurasi_janji=diag,
+    diagnosis_acuan_H1a=dict(rho=0.359, deltaW_abs_low_rec_activity=4.39,
+                             deltaW_abs_high_rec_activity=25.58, ratio_high_low=5.83,
+                             sumber="master_ev_ppo_eq1_vwf_seimbang4x_K4_gap_sig1, n=17657"),
     config=dict(n_train_seed=args.n_train_seed, n_eval_seed=args.n_eval_seed,
                n_updates=args.n_updates, rollout_steps=args.rollout_steps, k=args.k,
                n_critics=args.n_critics, pref=args.pref,
                pref_feature_mode=args.pref_feature_mode, horizon=args.horizon,
                alpha_trust=args.alpha_trust, alpha_accept=args.alpha_accept,
-               alpha_equity=args.alpha_equity,
+               alpha_equity=args.alpha_equity, alpha_acc=args.alpha_acc, tau_acc=args.tau_acc,
                forecaster=args.forecaster, beta_mode=args.beta_mode,
                beta_sigma=args.beta_sigma, reward_preset=args.reward_preset,
                gini_mode=args.gini_mode, cmdp_epsilon=args.cmdp_epsilon,
