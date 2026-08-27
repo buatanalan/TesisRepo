@@ -1,0 +1,247 @@
+{
+  "tanggal": "20260827",
+  "horizon": "30d",
+  "toleransi": {
+    "gini": 1.02,
+    "acc": 0.95
+  },
+  "berkas": {
+    "h6b_utama|0.3": "h6b_utama__it03_90d_20260827_eval.json",
+    "h6b_utama|0.5": "h6b_utama__it05_90d_20260827_eval.json",
+    "h6b_utama|0.7": "h6b_utama__it07_90d_20260827_eval.json",
+    "h1a_pemerataan|0.3": "h1a_pemerataan__it03_90d_20260827_eval.json",
+    "h1a_pemerataan|0.5": "h1a_pemerataan__it05_90d_20260827_eval.json",
+    "h1a_pemerataan|0.7": "h1a_pemerataan__it07_20260823_eval.json",
+    "h2a_selera|0.3": "h2a_selera__it03_20260823_eval.json",
+    "h2a_selera|0.5": "h2a_selera__it05_20260823_eval.json",
+    "h2a_selera|0.7": "h2a_selera__it07_20260823_eval.json",
+    "h1a_pemerataan_dgr|0.3": "h1a_pemerataan_dgr__it03_20260823_eval.json",
+    "h1a_pemerataan_dgr|0.5": "h1a_pemerataan_dgr__it05_20260823_eval.json",
+    "h1a_pemerataan_dgr|0.7": "h1a_pemerataan_dgr__it07_20260823_eval.json"
+  },
+  "h6b": {
+    "lulus": false,
+    "per_tingkat": {
+      "0.3": {
+        "gini_vs_asal": false,
+        "terima_vs_asal": true,
+        "nyata_vs_greedy": false,
+        "p_vs_greedy_util": 0.013671875,
+        "lulus": false
+      },
+      "0.5": {
+        "gini_vs_asal": false,
+        "terima_vs_asal": true,
+        "nyata_vs_greedy": false,
+        "p_vs_greedy_util": 0.001953125,
+        "lulus": false
+      },
+      "0.7": {
+        "gini_vs_asal": false,
+        "terima_vs_asal": true,
+        "nyata_vs_greedy": false,
+        "p_vs_greedy_util": 0.001953125,
+        "lulus": false
+      }
+    }
+  },
+  "h2b": {
+    "h2b": false,
+    "per_tingkat": {
+      "0.3": {
+        "d": 1.272825744744605,
+        "gini": 0.1145647836549937,
+        "trust": 0.31158627487626284
+      },
+      "0.5": {
+        "d": 5.804936195435138,
+        "gini": 0.1550251627125504,
+        "trust": 0.42333357579363123
+      },
+      "0.7": {
+        "d": 16.144107318351978,
+        "gini": 0.20694859258074008,
+        "trust": 0.5125087753727278
+      }
+    }
+  },
+  "sebaran_trust": {
+    "0.3": {
+      "trust": 0.31158627487626284,
+      "trust_p10": 0.07767545901398418,
+      "trust_p50": 0.29999999999999993,
+      "trust_p90": 0.5624999999999933,
+      "trust_frac_bawah_03": 0.37188922610015174
+    },
+    "0.5": {
+      "trust": 0.42333357579363123,
+      "trust_p10": 0.10509764961421586,
+      "trust_p50": 0.5,
+      "trust_p90": 0.6874999999999934,
+      "trust_frac_bawah_03": 0.33072837632776936
+    },
+    "0.7": {
+      "trust": 0.5125087753727278,
+      "trust_p10": 0.10116054960007033,
+      "trust_p50": 0.7,
+      "trust_p90": 0.8124999999999993,
+      "trust_frac_bawah_03": 0.31991654021244303
+    },
+    "ks_p": 1.0825088224469026e-05
+  },
+  "klaim_revisi_pascahoc": {
+    "pola_konsisten": false,
+    "catatan": "PASCA-HOC -- dirumuskan setelah data 30 hari terlihat; bukan hipotesis pra-daftar. Konfirmasi independen menunggu uji 90 hari.",
+    "per_tingkat": {
+      "0.3": {
+        "gini": {
+          "penyatuan": 0.1145647836549937,
+          "koordinasi": 0.0656965796189285,
+          "selisih": 0.048868204036065205,
+          "p": 0.001953125,
+          "unggul": "koord-saja",
+          "nyata": true
+        },
+        "acc": {
+          "penyatuan": 0.8849959760354669,
+          "koordinasi": 0.7830968548857775,
+          "selisih": 0.10189912114968935,
+          "p": 0.001953125,
+          "unggul": "penyatuan",
+          "nyata": true
+        },
+        "wait": {
+          "penyatuan": 108.30902879239936,
+          "koordinasi": 122.51658433717958,
+          "selisih": -14.20755554478022,
+          "p": 0.009765625,
+          "unggul": "penyatuan",
+          "nyata": true
+        },
+        "trust": {
+          "penyatuan": 0.31158627487626284,
+          "koordinasi": 0.3214905507228422,
+          "selisih": -0.00990427584657938,
+          "p": 0.001953125,
+          "unggul": "koord-saja",
+          "nyata": true
+        }
+      },
+      "0.5": {
+        "gini": {
+          "penyatuan": 0.1550251627125504,
+          "koordinasi": 0.05991318169158947,
+          "selisih": 0.09511198102096094,
+          "p": 0.001953125,
+          "unggul": "koord-saja",
+          "nyata": true
+        },
+        "acc": {
+          "penyatuan": 0.9106007023471638,
+          "koordinasi": 0.8384302324812799,
+          "selisih": 0.07217046986588393,
+          "p": 0.001953125,
+          "unggul": "penyatuan",
+          "nyata": true
+        },
+        "wait": {
+          "penyatuan": 96.83237845367341,
+          "koordinasi": 116.96946396020537,
+          "selisih": -20.13708550653196,
+          "p": 0.001953125,
+          "unggul": "penyatuan",
+          "nyata": true
+        },
+        "trust": {
+          "penyatuan": 0.42333357579363123,
+          "koordinasi": 0.41736935599599734,
+          "selisih": 0.005964219797633896,
+          "p": 0.02734375,
+          "unggul": "penyatuan",
+          "nyata": true
+        }
+      },
+      "0.7": {
+        "gini": {
+          "penyatuan": 0.20694859258074008,
+          "koordinasi": 0.0706337503331134,
+          "selisih": 0.1363148422476267,
+          "p": 0.001953125,
+          "unggul": "koord-saja",
+          "nyata": true
+        },
+        "acc": {
+          "penyatuan": 0.9573714543936293,
+          "koordinasi": 0.789600448005976,
+          "selisih": 0.1677710063876533,
+          "p": 0.001953125,
+          "unggul": "penyatuan",
+          "nyata": true
+        },
+        "wait": {
+          "penyatuan": 128.85910904717275,
+          "koordinasi": 62.681285072410944,
+          "selisih": 66.17782397476181,
+          "p": 0.001953125,
+          "unggul": "koord-saja",
+          "nyata": true
+        },
+        "trust": {
+          "penyatuan": 0.5125087753727278,
+          "koordinasi": 0.651705169551366,
+          "selisih": -0.13919639417863827,
+          "p": 0.001953125,
+          "unggul": "koord-saja",
+          "nyata": true
+        }
+      }
+    }
+  },
+  "kesetiaan_dgr": {
+    "per_tingkat": {
+      "0.3": {
+        "tanpa": 0.0656965796189285,
+        "dengan": 0.06710534836648524,
+        "selisih": 0.0014087687475567434,
+        "p": 0.845703125,
+        "menolong": false,
+        "vs_penyatuan": {
+          "penyatuan": 0.1145647836549937,
+          "koordinasi_dgr": 0.06710534836648524,
+          "selisih": 0.04745943528850846,
+          "p": 0.001953125,
+          "koordinasi_menang": true
+        }
+      },
+      "0.5": {
+        "tanpa": 0.05991318169158947,
+        "dengan": 0.06502310614694073,
+        "selisih": 0.0051099244553512654,
+        "p": 0.275390625,
+        "menolong": false,
+        "vs_penyatuan": {
+          "penyatuan": 0.1550251627125504,
+          "koordinasi_dgr": 0.06502310614694073,
+          "selisih": 0.09000205656560967,
+          "p": 0.001953125,
+          "koordinasi_menang": true
+        }
+      },
+      "0.7": {
+        "tanpa": 0.0706337503331134,
+        "dengan": 0.06437972430684591,
+        "selisih": -0.006254026026267484,
+        "p": 0.064453125,
+        "menolong": false,
+        "vs_penyatuan": {
+          "penyatuan": 0.20694859258074008,
+          "koordinasi_dgr": 0.06437972430684591,
+          "selisih": 0.14256886827389417,
+          "p": 0.001953125,
+          "koordinasi_menang": true
+        }
+      }
+    },
+    "penolakan_h6b_bertahan": true
+  }
+}
