@@ -101,6 +101,12 @@ p.add_argument("--cmdp-lr-dual", type=float, default=0.0,
                    ">0 -> alpha_gini MULAI DARI 0 (KKT), diperbarui tiap chunk "
                    "`alpha_gini += lr*(gini_terukur-epsilon)`, clip >=0. >0 WAJIB "
                    "tag terpisah & --cmdp-epsilon eksplisit.")
+p.add_argument("--use-station-attn", action="store_true",
+              help="Self-attention SATU-KEPALA antar-stasiun jalur AKTOR (2026-08-23, "
+                   "BAKU MATI) -- StationSelfAttention, N baris masuk N baris keluar "
+                   "(beda dari AttentionPooling kritik yg meringkas ke 1 vektor). "
+                   "Gerbang nol-awal (spt pref_gate) -- aman dinyalakan pada checkpoint "
+                   "baru tanpa mengganggu perilaku awal.")
 p.add_argument("--reward-preset", type=str, default="raw", choices=["raw", "seimbang4x"],
               help="'raw' (BAKU -- konstruktor RewardCalculator() MENTAH, alpha_wait=1.0 "
                    "alpha_gini=0.5 use_delta_gini=False -- TAK PERNAH dikalibrasi utk rezim "
@@ -152,6 +158,8 @@ POLICY_CLS = MasterEVPPOPrefPolicy if args.pref else MasterEVPPOPolicy
 POLICY_KW = dict(pref_feature_mode=args.pref_feature_mode) if args.pref else dict()
 if args.no_hist:
     POLICY_KW["use_hist"] = False
+if args.use_station_attn:
+    POLICY_KW["use_station_attn"] = True
 
 _DATASET_4X = os.path.join(common.ROOT, "scenario_dataset_klaster12_4x.json")
 if args.dataset == "4x":
@@ -184,9 +192,10 @@ _prefk_suffix = "" if args.pref_hist_k is None else f"_prefk{args.pref_hist_k}"
 _gini_mode_suffix = "" if args.gini_mode == "dense" else f"_{args.gini_mode}"
 _cmdp_suffix = "" if args.cmdp_lr_dual == 0.0 else f"_cmdpE{args.cmdp_epsilon:g}lr{args.cmdp_lr_dual:g}"
 _acc_suffix = "" if args.alpha_acc == 0.0 else f"_accW{args.alpha_acc:g}"
+_stattn_suffix = "_stattn" if args.use_station_attn else ""
 _suffix = (("_pref_feat" if args.pref_feature_mode else ("_pref" if args.pref else ""))
           + _hist_suffix + _prefk_suffix + _trust_suffix + _accept_suffix + _equity_suffix
-          + _acc_suffix + _gini_mode_suffix + _cmdp_suffix
+          + _acc_suffix + _gini_mode_suffix + _cmdp_suffix + _stattn_suffix
           + _fc_suffix + _rw_suffix + _critics_suffix + _beta_suffix + _sigma_suffix
           + _horizon_suffix)
 TAG_ARM = "master_ev_ppo" + _suffix

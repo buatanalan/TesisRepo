@@ -75,6 +75,42 @@ STREAM_GLOBAL3 = 2  # Gini + anti-herding (identik STREAM_GLOBAL, indeks beda kr
 STREAM_EQUITY = 3
 
 
+class StationSelfAttention(nn.Module):
+    """Self-attention SATU-KEPALA antar-stasiun (2026-08-23) -- BEDA dari
+    `AttentionPooling`: N baris masuk, N baris KELUAR (bukan diringkas jadi satu
+    vektor) -- cocok utk jalur AKTOR yg tetap butuh logit per-stasiun setelahnya.
+    Tiap baris "melihat" semua baris lain (query/key/value SEMUA diproyeksikan dari
+    embedding StationEncoder yg sama) sebelum diteruskan ke `disc_head`.
+
+    Permutation-EQUIVARIANT (skor dihitung dari ISI embedding, bukan posisi baris) --
+    BEDA dari pendekatan konkatenasi+Linear besar yg dipertimbangkan & DITOLAK
+    (lihat diskusi arsitektur): itu akan mengunci bentuk jaringan ke N tetap &
+    menghidupkan lagi sensitivitas urutan yg justru dihindari StationEncoder.
+
+    TANPA masking kelayakan di sini (sama pola `AttentionPooling` kritik) -- stasiun
+    tak-layak tetap ikut serta dlm perhitungan atensi embedding; kelayakan baru
+    diterapkan belakangan di `act()`/`evaluate()` pada level logit (NEG_INF mask)."""
+
+    def __init__(self, dim: int, d_attn: int = None):
+        super().__init__()
+        d_attn = d_attn or dim
+        self.q_proj = nn.Linear(dim, d_attn)
+        self.k_proj = nn.Linear(dim, d_attn)
+        self.v_proj = nn.Linear(dim, d_attn)
+        self.out_proj = nn.Linear(d_attn, dim)
+        self.d_attn = int(d_attn)
+
+    def forward(self, emb):
+        """emb: (B,N,dim) -> (B,N,dim), tiap baris kini terinformasi baris lain."""
+        q = self.q_proj(emb)                                                # (B,N,d)
+        k = self.k_proj(emb)                                                # (B,N,d)
+        v = self.v_proj(emb)                                                # (B,N,d)
+        scores = torch.einsum("bnd,bmd->bnm", q, k) / (self.d_attn ** 0.5)  # (B,N,N)
+        weights = torch.softmax(scores, dim=-1)                             # (B,N,N)
+        attended = torch.einsum("bnm,bmd->bnd", weights, v)                 # (B,N,d)
+        return self.out_proj(attended)                                     # (B,N,dim)
+
+
 class MasterEVPPOPolicy(nn.Module):
     """Aktor per-PERMINTAAN (`station_encoder`+`disc_head`) + kritik V(s) "buta-aksi"
     ber-atensi (`AttentionPooling`, sama kelas dipakai `MasterStationPPOPolicy`).
@@ -93,12 +129,20 @@ class MasterEVPPOPolicy(nn.Module):
     dipelajari, bukan lagi noise laten murni."""
 
     def __init__(self, n_spklu: int, hidden: int = 64, critic_hidden: int = 128,
-                n_critics: int = 1, hist_hidden: int = HIST_HIDDEN, use_hist: bool = True):
+                n_critics: int = 1, hist_hidden: int = HIST_HIDDEN, use_hist: bool = True,
+                use_station_attn: bool = False):
         super().__init__()
         self.n_spklu = int(n_spklu)
         self.n_critics = int(n_critics)
         self.scalar_dim = 0   # state EV sudah masuk tiap baris kandidat, tak perlu blok skalar
         self.hist_hidden = int(hist_hidden)
+        # Self-attention antar-stasiun jalur AKTOR (2026-08-23, BAKU MATI) -- lihat
+        # `StationSelfAttention`. Gerbang nol-awal (pola sama `pref_gate` di bawah)
+        # supaya tak mengganggu perilaku LAMA saat dinyalakan pada checkpoint baru.
+        self.use_station_attn = bool(use_station_attn)
+        if self.use_station_attn:
+            self.station_attn = StationSelfAttention(hidden)
+            self.station_attn_gate = nn.Parameter(torch.tensor(0.0))
         # `use_hist=False` (2026-08-21, ABLASI): matikan kontribusi c_t (`hist_lstm`)
         # TANPA mengubah bentuk jaringan (module tetap ada, dim tak berubah, checkpoint
         # tetap kompatibel) -- utk mengisolasi dugaan bahwa `hist_lstm` & `pref_lstm`
@@ -148,6 +192,8 @@ class MasterEVPPOPolicy(nn.Module):
         _, station_feats = self._split_station_block(obs, STATION_FEAT_DIM_MASTER_EV, 0)
 
         emb = self.station_encoder(station_feats, c_t)
+        if self.use_station_attn:
+            emb = emb + self.station_attn_gate * self.station_attn(emb)
         logits = self.disc_head(emb).squeeze(-1)             # (B,N)
 
         c_emb = self.critic_station_encoder(station_feats, c_t)
@@ -265,9 +311,9 @@ class MasterEVPPOPrefPolicy(MasterEVPPOPolicy):
     def __init__(self, n_spklu: int, hidden: int = 64, critic_hidden: int = 128,
                 n_critics: int = 1, pref_d_lstm: int = PREF_D_LSTM, pref_d_attn: int = PREF_D_ATTN,
                 pref_feature_mode: bool = False, use_preference: bool = True,
-                use_hist: bool = True):
+                use_hist: bool = True, use_station_attn: bool = False):
         super().__init__(n_spklu, hidden=hidden, critic_hidden=critic_hidden, n_critics=n_critics,
-                         use_hist=use_hist)
+                         use_hist=use_hist, use_station_attn=use_station_attn)
         self.pref_feature_mode = bool(pref_feature_mode)
         self.use_preference = bool(use_preference)
         self.pref_d_attn = int(pref_d_attn)
@@ -322,6 +368,8 @@ class MasterEVPPOPrefPolicy(MasterEVPPOPolicy):
 
         context = torch.cat([c_t, attended_pref], dim=-1)
         emb = self.station_encoder(station_feats, context)
+        if self.use_station_attn:
+            emb = emb + self.station_attn_gate * self.station_attn(emb)
         logits = self.disc_head(emb).squeeze(-1)
 
         c_emb = self.critic_station_encoder(station_feats, context)
