@@ -829,6 +829,13 @@ class MasterEVPPOTrainer:
                        "n_pending": len(pending), "trust_mean": float(trusts.mean())}
                 if self.cmdp_lr_dual > 0.0:
                     info["lambda_gini"] = float(self.rc.alpha_gini)
+                # Diagnosis osilasi StationSelfAttention (2026-08-24): gerbang TAK
+                # PERNAH dicatat per-iterasi sebelumnya (hanya tersisa di checkpoint
+                # akhir) -- perlu dikorelasikan dgn grad_norm/gini utk uji dugaan
+                # dua mekanisme adaptif (gerbang atensi + beta DGR) saling mengganggu.
+                if getattr(self.policy, "use_station_attn", False):
+                    info["station_attn_gate"] = float(
+                        self.policy.station_attn_gate.detach().cpu())
                 rec = {"iter": it, **info, **stats}
                 self.history.append(rec)
                 if self.verbose:
