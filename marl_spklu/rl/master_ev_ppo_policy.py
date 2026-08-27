@@ -149,7 +149,17 @@ class MasterEVPPOPolicy(nn.Module):
         self.use_station_attn = bool(use_station_attn)
         if self.use_station_attn:
             self.station_attn = StationSelfAttention(hidden, d_attn=station_attn_dim)
-            self.station_attn_gate = nn.Parameter(torch.tensor(0.0))
+            # REGULARISASI (2026-08-24, diagnosis osilasi): gerbang skalar BEBAS TANDA
+            # sebelumnya terbukti konvergen ke tanda BERBEDA antar-seed (positif di
+            # 2/3 seed, negatif di 1/3, korelasi thd gini pun berlawanan tanda
+            # antar-seed -- lihat diagnosis retrain_station_attn.sh) -- sinyal atensi
+            # tak cukup kuat utk konvergen konsisten, jaringan "menebak" tanda scr
+            # arbitrer dari inisialisasi acak. Diganti sigmoid(raw) in (0,1) -- gerbang
+            # HANYA bisa menambah kontribusi atensi (tak pernah membalik tandanya),
+            # menghapus satu derajat kebebasan yg jadi sumber inkonsistensi.
+            # raw=-5.0 -> sigmoid~0.0067, nyaris nol di awal (pola sama semangat
+            # "gerbang nol-awal" GTrXL, TAK PERSIS nol krn sigmoid tak pernah capai 0).
+            self.station_attn_gate_raw = nn.Parameter(torch.tensor(-5.0))
         # `use_hist=False` (2026-08-21, ABLASI): matikan kontribusi c_t (`hist_lstm`)
         # TANPA mengubah bentuk jaringan (module tetap ada, dim tak berubah, checkpoint
         # tetap kompatibel) -- utk mengisolasi dugaan bahwa `hist_lstm` & `pref_lstm`
@@ -171,6 +181,13 @@ class MasterEVPPOPolicy(nn.Module):
             nn.Linear(critic_hidden, critic_hidden), nn.ReLU(),
             nn.Linear(critic_hidden, self.n_critics),
         )
+
+    @property
+    def station_attn_gate(self):
+        """sigmoid(station_attn_gate_raw) in (0,1) -- lihat catatan __init__ soal
+        kenapa dibatasi tak-bertanda-negatif. Properti (bukan Parameter langsung)
+        supaya kode pemanggil (forward/logging) tak perlu tahu ada transformasi."""
+        return torch.sigmoid(self.station_attn_gate_raw)
 
     def _encode_hist(self, hist):
         """hist: (B,K,HIST_FEAT_DIM) -> c_t: (B,hist_hidden). IDENTIK
