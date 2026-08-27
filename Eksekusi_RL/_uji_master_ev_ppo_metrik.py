@@ -51,6 +51,10 @@ _is_nohist = "nohist" in TAG_ARM
 # ditambahkan ke state_dict) -- WAJIB cocok dgn saat latih, kalau tidak
 # load_state_dict RuntimeError "Unexpected key(s)" (lihat commit StationSelfAttention).
 _is_stattn = "stattn" in TAG_ARM
+# `stattnd<N>`: dimensi Q/K/V/out StationSelfAttention -- MENGUBAH bentuk bobot
+# (Linear(N,N) bukan Linear(hidden,hidden)), WAJIB cocok spt N_CRITICS/pref_feature_mode.
+_m_stattn_dim = re.search(r"stattnd(\d+)", TAG_ARM)
+STATION_ATTN_DIM = int(_m_stattn_dim.group(1)) if _m_stattn_dim else None
 # `prefk<N>`: panjang jendela riwayat P -- TAK mengubah bentuk jaringan (LSTM terima
 # urutan berapa pun) shg mismatch TAK memicu RuntimeError, harus benar sejak awal
 # (sama kelas risiko `nohist`). None (tak ada akhiran) -> baku PDQN_HIST_K=10.
@@ -66,6 +70,8 @@ if _is_nohist:
     POLICY_KW["use_hist"] = False
 if _is_stattn:
     POLICY_KW["use_station_attn"] = True
+    if STATION_ATTN_DIM is not None:
+        POLICY_KW["station_attn_dim"] = STATION_ATTN_DIM
 FORECASTER_CLS = K.VW if _is_vwf else FormulaForecaster
 K.DS = os.path.join(common.ROOT, K.HORIZON[TAG])
 K_REC = 3

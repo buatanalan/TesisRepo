@@ -130,7 +130,7 @@ class MasterEVPPOPolicy(nn.Module):
 
     def __init__(self, n_spklu: int, hidden: int = 64, critic_hidden: int = 128,
                 n_critics: int = 1, hist_hidden: int = HIST_HIDDEN, use_hist: bool = True,
-                use_station_attn: bool = False):
+                use_station_attn: bool = False, station_attn_dim: int = None):
         super().__init__()
         self.n_spklu = int(n_spklu)
         self.n_critics = int(n_critics)
@@ -139,9 +139,16 @@ class MasterEVPPOPolicy(nn.Module):
         # Self-attention antar-stasiun jalur AKTOR (2026-08-23, BAKU MATI) -- lihat
         # `StationSelfAttention`. Gerbang nol-awal (pola sama `pref_gate` di bawah)
         # supaya tak mengganggu perilaku LAMA saat dinyalakan pada checkpoint baru.
+        # `station_attn_dim` (2026-08-23, DIAGNOSIS ukuran): default None -> ikut
+        # `hidden` (spt semula), TAPI ini membuat 4 proyeksi Linear(hidden,hidden)
+        # berjumlah ~3x parameter StationEncoder itu sendiri (16.640 vs 5.888 pada
+        # hidden=64 -- lihat diagnosis retrain_station_attn.sh 30d/90d, volatilitas
+        # gini & kolaps determinisme seed 1 diduga krn kapasitas jauh melebihi
+        # anggaran latih 300-chunk yg SAMA dgn baseline tanpa atensi). Kecilkan
+        # eksplisit (mis. 16) utk uji apakah instabilitas mereda.
         self.use_station_attn = bool(use_station_attn)
         if self.use_station_attn:
-            self.station_attn = StationSelfAttention(hidden)
+            self.station_attn = StationSelfAttention(hidden, d_attn=station_attn_dim)
             self.station_attn_gate = nn.Parameter(torch.tensor(0.0))
         # `use_hist=False` (2026-08-21, ABLASI): matikan kontribusi c_t (`hist_lstm`)
         # TANPA mengubah bentuk jaringan (module tetap ada, dim tak berubah, checkpoint
@@ -311,9 +318,11 @@ class MasterEVPPOPrefPolicy(MasterEVPPOPolicy):
     def __init__(self, n_spklu: int, hidden: int = 64, critic_hidden: int = 128,
                 n_critics: int = 1, pref_d_lstm: int = PREF_D_LSTM, pref_d_attn: int = PREF_D_ATTN,
                 pref_feature_mode: bool = False, use_preference: bool = True,
-                use_hist: bool = True, use_station_attn: bool = False):
+                use_hist: bool = True, use_station_attn: bool = False,
+                station_attn_dim: int = None):
         super().__init__(n_spklu, hidden=hidden, critic_hidden=critic_hidden, n_critics=n_critics,
-                         use_hist=use_hist, use_station_attn=use_station_attn)
+                         use_hist=use_hist, use_station_attn=use_station_attn,
+                         station_attn_dim=station_attn_dim)
         self.pref_feature_mode = bool(pref_feature_mode)
         self.use_preference = bool(use_preference)
         self.pref_d_attn = int(pref_d_attn)

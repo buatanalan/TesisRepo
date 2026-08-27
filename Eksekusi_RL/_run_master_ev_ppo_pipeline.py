@@ -107,6 +107,14 @@ p.add_argument("--use-station-attn", action="store_true",
                    "(beda dari AttentionPooling kritik yg meringkas ke 1 vektor). "
                    "Gerbang nol-awal (spt pref_gate) -- aman dinyalakan pada checkpoint "
                    "baru tanpa mengganggu perilaku awal.")
+p.add_argument("--station-attn-dim", type=int, default=None,
+              help="Dimensi proyeksi Q/K/V/out StationSelfAttention (BAKU None -> ikut "
+                   "--hidden, biasanya 64 -> 4 proyeksi Linear(64,64) = 16.640 parameter, "
+                   "hampir 3x StationEncoder itu sendiri 5.888. DIDUGA penyebab "
+                   "volatilitas gini & kolaps determinisme pada eksperimen pertama "
+                   "(anggaran 300-chunk sama dgn baseline, tapi kapasitas jauh lebih "
+                   "besar). Kecilkan eksplisit (mis. 16) utk uji dugaan ini. Hanya "
+                   "berlaku bila --use-station-attn diberikan.")
 p.add_argument("--reward-preset", type=str, default="raw", choices=["raw", "seimbang4x"],
               help="'raw' (BAKU -- konstruktor RewardCalculator() MENTAH, alpha_wait=1.0 "
                    "alpha_gini=0.5 use_delta_gini=False -- TAK PERNAH dikalibrasi utk rezim "
@@ -160,6 +168,8 @@ if args.no_hist:
     POLICY_KW["use_hist"] = False
 if args.use_station_attn:
     POLICY_KW["use_station_attn"] = True
+    if args.station_attn_dim is not None:
+        POLICY_KW["station_attn_dim"] = args.station_attn_dim
 
 _DATASET_4X = os.path.join(common.ROOT, "scenario_dataset_klaster12_4x.json")
 if args.dataset == "4x":
@@ -192,7 +202,8 @@ _prefk_suffix = "" if args.pref_hist_k is None else f"_prefk{args.pref_hist_k}"
 _gini_mode_suffix = "" if args.gini_mode == "dense" else f"_{args.gini_mode}"
 _cmdp_suffix = "" if args.cmdp_lr_dual == 0.0 else f"_cmdpE{args.cmdp_epsilon:g}lr{args.cmdp_lr_dual:g}"
 _acc_suffix = "" if args.alpha_acc == 0.0 else f"_accW{args.alpha_acc:g}"
-_stattn_suffix = "_stattn" if args.use_station_attn else ""
+_stattn_suffix = (("_stattn" + (f"d{args.station_attn_dim}" if args.station_attn_dim is not None else ""))
+                  if args.use_station_attn else "")
 _suffix = (("_pref_feat" if args.pref_feature_mode else ("_pref" if args.pref else ""))
           + _hist_suffix + _prefk_suffix + _trust_suffix + _accept_suffix + _equity_suffix
           + _acc_suffix + _gini_mode_suffix + _cmdp_suffix + _stattn_suffix
