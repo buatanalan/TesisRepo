@@ -10,6 +10,11 @@ PIPE=Eksekusi_RL/_run_master_ev_ppo_pipeline.py
 DS90=scenario_dataset_klaster12_4x_90d.json
 COMMON="--no-hist --n-critics 3 --forecaster vwf --reward-preset seimbang4x --beta-mode gap_ratio --beta-sigma 1.0 --use-station-attn"
 
+# PENTING (2026-08-24): tag SAMA dgn run sebelumnya (sebelum station_attn_gate
+# dicatat per-iterasi). Pipeline resume via training_results.json yg sudah ada --
+# hapus dulu supaya BENAR-BENAR retrain, bukan reuse checkpoint lama tanpa log gerbang.
+rm -f Eksekusi_RL/outputs/master_ev_ppo_nohist_stattn_vwf_seimbang4x_K3_gap_sig1*
+
 echo "=== 1. station-attn 30d ==="
 $PY $PIPE $COMMON
 
