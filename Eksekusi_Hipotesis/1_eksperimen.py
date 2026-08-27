@@ -108,6 +108,19 @@ LENGAN = [
     ("h1a_pemerataan_dgr",
      ["--no-hist", "--n-critics", "3", "--beta-mode", "gap_ratio", "--beta-sigma", "1.0"],
      "koordinasi saja + DGR (MASTER setia)"),
+    # `h6b_utama` di atas MEWARISI cacat yang sama dgn `h1a_pemerataan` sblm
+    # diperbaiki: `beta_mode="fixed"` terbawa sbg bawaan, DGR TAK PERNAH genuinely
+    # aktif pada lengan penyatuan itu sendiri (2026-08-23). Vonis resmi "H6b DITOLAK"
+    # (h6b_utama < h1a_pemerataan pada Gini) membandingkan DUA lengan yg SAMA-SAMA
+    # tanpa DGR -- adil pada saat itu, tapi begitu `h1a_pemerataan_dgr` terbukti
+    # menang lebih jauh drpd greedy, muncul pertanyaan simetris yg belum terjawab:
+    # apakah `h6b_utama` JUGA membaik dgn DGR genuine? Kalau ya, vonis H6b perlu
+    # diuji ulang thd `h1a_pemerataan_dgr` (bukan `h1a_pemerataan` polos) sbg
+    # pembanding yg adil. Ini lengan PEMBEDA penelitian (bukan `h1a` murni MASTER) --
+    # `h6b_utama_dgr` mewarisi kesetiaan yg sama tanpa mengubah esensi penyatuan.
+    ("h6b_utama_dgr",
+     PAKET_PREFERENSI + ["--no-hist", "--n-critics", "3", "--beta-mode", "gap_ratio", "--beta-sigma", "1.0"],
+     "penyatuan + penyeimbang + DGR (kesetiaan simetris thd h1a_pemerataan_dgr)"),
 ]
 
 
@@ -188,6 +201,20 @@ def periksa_kesepadanan():
     assert "--beta-mode" not in a and "--beta-mode" in b, (
         "Pasangan DGR terbalik: `h1a_pemerataan` harus TANPA --beta-mode (bawaan "
         "'fixed'), `h1a_pemerataan_dgr` harus DENGAN 'gap_ratio'.")
+
+    # 6. Pasangan DGR simetris utk lengan PENYATUAN (h6b) -- sama syarat dgn #5,
+    #    tapi utk h6b_utama/h6b_utama_dgr. Tanpa ini, "kesetiaan MASTER" hanya
+    #    diverifikasi sepihak (koordinasi-saja), bukan pd lengan yg jadi pembeda
+    #    penelitian sesungguhnya.
+    c = [khas for t, khas, _ in LENGAN if t == "h6b_utama"][0]
+    e = [khas for t, khas, _ in LENGAN if t == "h6b_utama_dgr"][0]
+    assert buang(c) == buang(e), (
+        f"Pasangan DGR tak sepadan: di luar pengaturan beta, `h6b_utama` "
+        f"{buang(c)} berbeda dari `h6b_utama_dgr` {buang(e)}. Selisih keduanya "
+        f"tak akan bisa diatribusikan ke DGR.")
+    assert "--beta-mode" not in c and "--beta-mode" in e, (
+        "Pasangan DGR terbalik: `h6b_utama` harus TANPA --beta-mode (bawaan "
+        "'fixed'), `h6b_utama_dgr` harus DENGAN 'gap_ratio'.")
 
 
 def main():
