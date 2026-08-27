@@ -47,6 +47,10 @@ N_CRITICS = int(_m_critics.group(1)) if _m_critics else 1
 # krn selama training kontribusinya dinolkan) diam-diam ikut mencemari forward() --
 # TIDAK memicu RuntimeError spt mismatch dim, jadi harus benar sejak awal.
 _is_nohist = "nohist" in TAG_ARM
+# `stattn`: MENGUBAH bentuk jaringan (nn.Module baru station_attn.*/station_attn_gate
+# ditambahkan ke state_dict) -- WAJIB cocok dgn saat latih, kalau tidak
+# load_state_dict RuntimeError "Unexpected key(s)" (lihat commit StationSelfAttention).
+_is_stattn = "stattn" in TAG_ARM
 # `prefk<N>`: panjang jendela riwayat P -- TAK mengubah bentuk jaringan (LSTM terima
 # urutan berapa pun) shg mismatch TAK memicu RuntimeError, harus benar sejak awal
 # (sama kelas risiko `nohist`). None (tak ada akhiran) -> baku PDQN_HIST_K=10.
@@ -60,6 +64,8 @@ POLICY_KW = dict(pref_feature_mode=True) if _is_pref_feat else dict()
 POLICY_KW["n_critics"] = N_CRITICS
 if _is_nohist:
     POLICY_KW["use_hist"] = False
+if _is_stattn:
+    POLICY_KW["use_station_attn"] = True
 FORECASTER_CLS = K.VW if _is_vwf else FormulaForecaster
 K.DS = os.path.join(common.ROOT, K.HORIZON[TAG])
 K_REC = 3
