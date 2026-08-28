@@ -138,8 +138,18 @@ class MasterPureRolloutAgent(RLRolloutAgent):
         mask = self._feasible_mask(feasible_ids)
 
         obs_t = torch.as_tensor(joint_obs, dtype=torch.float32).unsqueeze(0)
+        mask_t = torch.as_tensor(mask, dtype=torch.bool).unsqueeze(0)
+        # Modul P (opsional, 2026-08-29 Master-Hybrid): _use_pref/_build_pref_hist
+        # DIWARISI RLRolloutAgent.__init__ (auto-deteksi hasattr(actor,'pref_lstm')) --
+        # aktor LAMA (`MasterPureActor`, tanpa pref_lstm) tak terpengaruh, tetap
+        # dipanggil obs-saja spt semula (kompatibel mundur penuh).
         with torch.no_grad():
-            bids = self.actor(obs_t).squeeze(0).numpy()
+            if self._use_pref:
+                pref_hist = self._build_pref_hist(user)
+                pref_hist_t = torch.as_tensor(pref_hist, dtype=torch.float32).unsqueeze(0)
+                bids = self.actor(obs_t, mask_t, pref_hist_t).squeeze(0).numpy()
+            else:
+                bids = self.actor(obs_t).squeeze(0).numpy()
         raw_bids = bids.copy()
         if self.noise_std > 0:
             bids = bids + self._sample_noise()   # tanpa clip -- bid abstrak, bukan waktu
@@ -272,7 +282,11 @@ class MasterPureTrainer:
                 updates_per_chunk: int = 20, equity_calc=None,
                 delay_minutes: float = 30.0, hidden: int = 64,
                 beta_mode: str = "gap_ratio", beta_sigma: float = 0.2,
-                n_critics: int = None, stream_select: int = None, specialists: list = None):
+                n_critics: int = None, stream_select: int = None, specialists: list = None,
+                actor_cls=None, actor_kwargs: dict = None):
+        """`actor_cls`/`actor_kwargs` (2026-08-29, Master-Hybrid): opsional, ganti
+        `MasterPureActor` baku dgn kelas lain (mis. `MasterHybridDDPGActor`, modul
+        P+attention) -- TAMBAHAN murni, BAKU `None` = perilaku lama TAK BERUBAH."""
         assert mode in ("pretrain_specialist", "dgr"), f"mode={mode!r} tak dikenal"
         self.mode = mode
         self.dataset_path = dataset_path
@@ -321,8 +335,18 @@ class MasterPureTrainer:
         self._slot_log = _SlotRawLog(maxlen=self.rollout_steps + self.delay_steps + 4)
 
         self.N = len(sim0.spklus)
-        self.actor = MasterPureActor(STATION_FEAT_DIM_MASTER, hidden=hidden)
-        self.actor_target = MasterPureActor(STATION_FEAT_DIM_MASTER, hidden=hidden)
+        if actor_cls is None:
+            self.actor = MasterPureActor(STATION_FEAT_DIM_MASTER, hidden=hidden)
+            self.actor_target = MasterPureActor(STATION_FEAT_DIM_MASTER, hidden=hidden)
+        else:
+            # Kelas baru (mis. MasterHybridDDPGActor): argumen pertama n_spklu, BUKAN
+            # station_feat_dim spt `MasterPureActor` -- signature BERBEDA sengaja.
+            # BUG (2026-08-29, ditemukan smoke-test): actor_target SEBELUMNYA tetap
+            # hardcode MasterPureActor -- state_dict actor_cls baru tak cocok
+            # dimuat ke situ (RuntimeError key mismatch). actor_target WAJIB kelas
+            # SAMA persis dgn actor.
+            self.actor = actor_cls(self.N, **(actor_kwargs or {}))
+            self.actor_target = actor_cls(self.N, **(actor_kwargs or {}))
         self.actor_target.load_state_dict(self.actor.state_dict())
         self.actor_target.eval()
 
