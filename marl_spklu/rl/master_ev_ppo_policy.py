@@ -513,6 +513,46 @@ class MasterEVPPOPrefPolicy(MasterEVPPOPolicy):
         return logits, value
 
 
+class MasterEVPPOPrefPolicySmall(MasterEVPPOPrefPolicy):
+    """`MasterEVPPOPrefPolicy` (h6b_utama) dgn HYPERPARAMETER lebih kecil -- SAMA
+    persis arsitekturnya (tak ada modul dihapus/ditambah/digabung), cuma lebar tiap
+    lapisan diperkecil ~separuh. TIDAK menyentuh `critic_station_encoder`/
+    `station_encoder` yg TERPISAH (beda dari opsi 'gabung encoder aktor+kritik' yg
+    DITOLAK user 2026-08-28 -- CTDE murni tetap dijaga penuh).
+
+    Baku diperkecil (vs baku h6b_utama):
+      hidden        64 -> 32   (station_encoder & disc_head/concat_head/station_attn)
+      critic_hidden 128 -> 64  (critic_station_encoder & critic_head/critic_heads)
+      pref_d_lstm   16 -> 8    (pref_lstm)
+      pref_d_attn   16 -> 8    (pref_attn, JUGA context_dim station_encoder krn
+                                context = concat(c_t, attended_pref))
+
+    Motivasi: diagnosis ukuran (2026-08-28) menunjukkan `critic_station_encoder`
+    (44%) & `critic_head`/`station_attn` (~25-34% masing2) mendominasi total
+    parameter (49.670 baku) -- jauh melebihi anggaran latih yg SAMA (300 chunk)
+    dgn arsitektur lain yg jauh lebih kecil (mis. h1a_pemerataan tanpa modul P).
+    Uji apakah memperkecil SELURUH lebar (bukan cuma satu modul spt station_attn_dim
+    sebelumnya) memperbaiki stabilitas seed (n_kolaps) yg jadi masalah berulang di
+    h6b_utama, dgn cara paling sederhana & risiko paling kecil (skala turun, BUKAN
+    ubah struktur -- lih. diskusi arsitektur 2026-08-28)."""
+
+    def __init__(self, n_spklu: int, hidden: int = 32, critic_hidden: int = 64,
+                n_critics: int = 1, pref_d_lstm: int = 8, pref_d_attn: int = 8,
+                pref_feature_mode: bool = False, use_preference: bool = True,
+                use_hist: bool = True, use_station_attn: bool = False,
+                station_attn_dim: int = None, use_concat_head: bool = False,
+                concat_attn_dim: int = 8, concat_mlp_hidden: int = 32,
+                separate_critic_heads: bool = False, critic_head_small: int = 32):
+        super().__init__(n_spklu, hidden=hidden, critic_hidden=critic_hidden,
+                         n_critics=n_critics, pref_d_lstm=pref_d_lstm, pref_d_attn=pref_d_attn,
+                         pref_feature_mode=pref_feature_mode, use_preference=use_preference,
+                         use_hist=use_hist, use_station_attn=use_station_attn,
+                         station_attn_dim=station_attn_dim, use_concat_head=use_concat_head,
+                         concat_attn_dim=concat_attn_dim, concat_mlp_hidden=concat_mlp_hidden,
+                         separate_critic_heads=separate_critic_heads,
+                         critic_head_small=critic_head_small)
+
+
 class MasterEV3Transition:
     """Duplikat `rollout.py::Transition`, HANYA beda `reward_streams` berukuran 3
     (bukan `N_REWARD_STREAMS`=2 bersama) -- lihat catatan `STREAM_WAIT/PROX/GLOBAL3`

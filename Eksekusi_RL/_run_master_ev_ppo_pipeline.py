@@ -13,7 +13,8 @@ import numpy as np
 import torch
 import common
 from marl_spklu.rl.master_ev_ppo_policy import (MasterEVPPOTrainer, MasterEVPPOPolicy,
-                                                MasterEVPPOPrefPolicy, MasterEVPPOInferenceAgent)
+                                                MasterEVPPOPrefPolicy, MasterEVPPOPrefPolicySmall,
+                                                MasterEVPPOInferenceAgent)
 from marl_spklu.rl.master_ev_ppo_acc import MasterEVPPOAccRolloutAgent, STREAM_ACCURACY
 from marl_spklu.rl.rewards import RewardCalculator
 from marl_spklu.agents.greedy_agent import GreedyAgent
@@ -52,6 +53,16 @@ p.add_argument("--pref", action="store_true",
 p.add_argument("--pref-feature-mode", action="store_true",
               help="riwayat preferensi sbg vektor fitur (bukan one-hot identitas) -- "
                    "hanya berlaku bila --pref diberikan")
+p.add_argument("--pref-small", action="store_true",
+              help="MasterEVPPOPrefPolicySmall (2026-08-28) -- SAMA arsitektur h6b_utama, "
+                   "hyperparameter diperkecil ~separuh (hidden 64->32, critic_hidden "
+                   "128->64, pref_d_lstm/pref_d_attn 16->8) -> total param 30,7% baku "
+                   "(15.238 vs 49.670). Diagnosis ukuran (2026-08-28) menduga kapasitas "
+                   "berlebih (relatif thd anggaran latih 300-chunk yg SAMA dgn arsitektur "
+                   "jauh lebih kecil) berkontribusi thd n_kolaps seed berulang di "
+                   "h6b_utama. TIDAK mengubah struktur (encoder aktor/kritik TETAP "
+                   "terpisah, CTDE penuh terjaga) -- murni skala. Hanya berlaku bila "
+                   "--pref diberikan.")
 p.add_argument("--no-hist", action="store_true",
               help="ABLASI: matikan kontribusi hist_lstm (c_t) -- utk isolasi dugaan "
                    "hist_lstm & pref_lstm saling mengganggu (satu-satunya hasil P yg "
@@ -188,7 +199,8 @@ assert not (args.pref_feature_mode and not args.pref), "--pref-feature-mode butu
 assert args.alpha_acc == 0.0 or args.n_critics == 5, (
     "--alpha-acc>0 butuh --n-critics 5 (STREAM_ACCURACY, lihat master_ev_ppo_acc.py)")
 ROLLOUT_AGENT_CLS = MasterEVPPOAccRolloutAgent if args.alpha_acc != 0.0 else None
-POLICY_CLS = MasterEVPPOPrefPolicy if args.pref else MasterEVPPOPolicy
+POLICY_CLS = ((MasterEVPPOPrefPolicySmall if args.pref_small else MasterEVPPOPrefPolicy)
+             if args.pref else MasterEVPPOPolicy)
 POLICY_KW = dict(pref_feature_mode=args.pref_feature_mode) if args.pref else dict()
 if args.no_hist:
     POLICY_KW["use_hist"] = False
@@ -240,7 +252,9 @@ _stattn_suffix = (("_stattn" + (f"d{args.station_attn_dim}" if args.station_attn
 _concat_suffix = (f"_concatA{args.concat_attn_dim}H{args.concat_mlp_hidden}"
                   if args.use_concat_head else "")
 _sepcrit_suffix = (f"_sepcritH{args.critic_head_small}" if args.separate_critic_heads else "")
+_small_suffix = "_small" if args.pref_small else ""
 _suffix = (("_pref_feat" if args.pref_feature_mode else ("_pref" if args.pref else ""))
+          + _small_suffix
           + _hist_suffix + _prefk_suffix + _trust_suffix + _accept_suffix + _equity_suffix
           + _acc_suffix + _gini_mode_suffix + _cmdp_suffix + _stattn_suffix + _concat_suffix
           + _sepcrit_suffix
