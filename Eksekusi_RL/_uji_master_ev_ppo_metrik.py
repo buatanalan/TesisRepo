@@ -55,6 +55,12 @@ _is_stattn = "stattn" in TAG_ARM
 # (Linear(N,N) bukan Linear(hidden,hidden)), WAJIB cocok spt N_CRITICS/pref_feature_mode.
 _m_stattn_dim = re.search(r"stattnd(\d+)", TAG_ARM)
 STATION_ATTN_DIM = int(_m_stattn_dim.group(1)) if _m_stattn_dim else None
+# `concatA<N>H<M>`: StationConcatDecisionHead -- MENGUBAH bentuk bobot (menggantikan
+# disc_head sepenuhnya), WAJIB cocok spt stattn di atas.
+_m_concat = re.search(r"_concatA(\d+)H(\d+)", TAG_ARM)
+CONCAT_ATTN_DIM = int(_m_concat.group(1)) if _m_concat else None
+CONCAT_MLP_HIDDEN = int(_m_concat.group(2)) if _m_concat else None
+_is_concat = _m_concat is not None
 # `prefk<N>`: panjang jendela riwayat P -- TAK mengubah bentuk jaringan (LSTM terima
 # urutan berapa pun) shg mismatch TAK memicu RuntimeError, harus benar sejak awal
 # (sama kelas risiko `nohist`). None (tak ada akhiran) -> baku PDQN_HIST_K=10.
@@ -72,6 +78,10 @@ if _is_stattn:
     POLICY_KW["use_station_attn"] = True
     if STATION_ATTN_DIM is not None:
         POLICY_KW["station_attn_dim"] = STATION_ATTN_DIM
+if _is_concat:
+    POLICY_KW["use_concat_head"] = True
+    POLICY_KW["concat_attn_dim"] = CONCAT_ATTN_DIM
+    POLICY_KW["concat_mlp_hidden"] = CONCAT_MLP_HIDDEN
 FORECASTER_CLS = K.VW if _is_vwf else FormulaForecaster
 K.DS = os.path.join(common.ROOT, K.HORIZON[TAG])
 K_REC = 3

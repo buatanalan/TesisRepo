@@ -111,6 +111,58 @@ class StationSelfAttention(nn.Module):
         return self.out_proj(attended)                                     # (B,N,dim)
 
 
+class StationConcatDecisionHead(nn.Module):
+    """ALTERNATIF thd `StationSelfAttention`+`disc_head` residual biasa (2026-08-24,
+    DIREVISI setelah *concat* posisional murni TERBUKTI kolaps -- gini melonjak
+    monoton 0,40->0,65 dlm 20 chunk smoke-test, MLP belajar bias per-POSISI keluaran,
+    bukan per-KUALITAS stasiun -- lihat riwayat commit).
+
+    Desain baru: self-attention keluaran KECIL per-stasiun (`attn_dim`) TETAP ada
+    (kesadaran lintas-stasiun), tapi bagian "digabung ke satu MLP besar" diganti
+    `AttentionPooling` (RINGKASAN GLOBAL, permutation-invariant -- BUKAN konkatenasi
+    posisional) yang di-broadcast kembali ke tiap baris, digabung (concat) dgn
+    embedding stasiun ITU SENDIRI, lalu MLP NONLINEAR (GELU, bukan ReLU) yg BOBOTNYA
+    DIBAGI (shared) antar-stasiun menghasilkan logit-nya masing-masing.
+
+    Ini memulihkan jaminan struktural yg hilang di desain lama: logit stasiun i
+    SELALU turunan dari embedding stasiun i sendiri (+ konteks global) -- MLP tak
+    bisa lagi belajar "logit posisi i besar" terlepas dari isi stasiun i, krn bobot
+    MLP dibagi rata ke semua posisi (equivariant lagi, sama semangat StationEncoder).
+
+    'Mulai kecil' (attn_dim & mlp_hidden default rendah) dipertahankan dari
+    diagnosis parameter-terlalu-besar StationSelfAttention sebelumnya."""
+
+    def __init__(self, n_spklu: int, station_dim: int, attn_dim: int = 8, mlp_hidden: int = 32):
+        super().__init__()
+        self.n_spklu = int(n_spklu)
+        self.attn_dim = int(attn_dim)
+        self.q_proj = nn.Linear(station_dim, attn_dim)
+        self.k_proj = nn.Linear(station_dim, attn_dim)
+        self.v_proj = nn.Linear(station_dim, attn_dim)
+        self.pool = AttentionPooling(attn_dim)
+        # Nonlinear GELU (bukan ReLU) sesuai permintaan -- MLP dibagi bobotnya antar
+        # baris (nn.Linear otomatis broadcast ke dim-N, sama pola StationEncoder).
+        self.mlp = nn.Sequential(
+            nn.Linear(attn_dim * 2, mlp_hidden), nn.GELU(),
+            nn.Linear(mlp_hidden, mlp_hidden), nn.GELU(),
+            nn.Linear(mlp_hidden, 1),
+        )
+
+    def forward(self, emb):
+        """emb: (B,N,station_dim) -> (B,N) logit."""
+        B, N, _ = emb.shape
+        q = self.q_proj(emb)                                                # (B,N,d)
+        k = self.k_proj(emb)                                                # (B,N,d)
+        v = self.v_proj(emb)                                                # (B,N,d)
+        scores = torch.einsum("bnd,bmd->bnm", q, k) / (self.attn_dim ** 0.5)  # (B,N,N)
+        weights = torch.softmax(scores, dim=-1)
+        attended = torch.einsum("bnm,bmd->bnd", weights, v)                 # (B,N,d)
+        global_ctx = self.pool(attended)                                    # (B,d) ringkasan SELURUH stasiun
+        global_ctx_exp = global_ctx.unsqueeze(1).expand(-1, N, -1)          # (B,N,d) broadcast
+        combined = torch.cat([attended, global_ctx_exp], dim=-1)            # (B,N,2d)
+        return self.mlp(combined).squeeze(-1)                               # (B,N)
+
+
 class MasterEVPPOPolicy(nn.Module):
     """Aktor per-PERMINTAAN (`station_encoder`+`disc_head`) + kritik V(s) "buta-aksi"
     ber-atensi (`AttentionPooling`, sama kelas dipakai `MasterStationPPOPolicy`).
@@ -130,12 +182,21 @@ class MasterEVPPOPolicy(nn.Module):
 
     def __init__(self, n_spklu: int, hidden: int = 64, critic_hidden: int = 128,
                 n_critics: int = 1, hist_hidden: int = HIST_HIDDEN, use_hist: bool = True,
-                use_station_attn: bool = False, station_attn_dim: int = None):
+                use_station_attn: bool = False, station_attn_dim: int = None,
+                use_concat_head: bool = False, concat_attn_dim: int = 8,
+                concat_mlp_hidden: int = 32):
         super().__init__()
         self.n_spklu = int(n_spklu)
         self.n_critics = int(n_critics)
         self.scalar_dim = 0   # state EV sudah masuk tiap baris kandidat, tak perlu blok skalar
         self.hist_hidden = int(hist_hidden)
+        # ALTERNATIF thd station_attn+disc_head residual (2026-08-24) -- lihat
+        # `StationConcatDecisionHead`. Mutually exclusive dgn use_station_attn (kalau
+        # keduanya True, concat_head yg dipakai -- lihat forward()).
+        self.use_concat_head = bool(use_concat_head)
+        if self.use_concat_head:
+            self.concat_head = StationConcatDecisionHead(
+                self.n_spklu, hidden, attn_dim=concat_attn_dim, mlp_hidden=concat_mlp_hidden)
         # Self-attention antar-stasiun jalur AKTOR (2026-08-23, BAKU MATI) -- lihat
         # `StationSelfAttention`. Gerbang nol-awal (pola sama `pref_gate` di bawah)
         # supaya tak mengganggu perilaku LAMA saat dinyalakan pada checkpoint baru.
@@ -221,9 +282,12 @@ class MasterEVPPOPolicy(nn.Module):
         _, station_feats = self._split_station_block(obs, STATION_FEAT_DIM_MASTER_EV, 0)
 
         emb = self.station_encoder(station_feats, c_t)
-        if self.use_station_attn:
-            emb = emb + self.station_attn_gate * self.station_attn(emb)
-        logits = self.disc_head(emb).squeeze(-1)             # (B,N)
+        if self.use_concat_head:
+            logits = self.concat_head(emb)                     # (B,N) langsung
+        else:
+            if self.use_station_attn:
+                emb = emb + self.station_attn_gate * self.station_attn(emb)
+            logits = self.disc_head(emb).squeeze(-1)             # (B,N)
 
         c_emb = self.critic_station_encoder(station_feats, c_t)
         pooled = self.critic_pool(c_emb)
@@ -341,10 +405,12 @@ class MasterEVPPOPrefPolicy(MasterEVPPOPolicy):
                 n_critics: int = 1, pref_d_lstm: int = PREF_D_LSTM, pref_d_attn: int = PREF_D_ATTN,
                 pref_feature_mode: bool = False, use_preference: bool = True,
                 use_hist: bool = True, use_station_attn: bool = False,
-                station_attn_dim: int = None):
+                station_attn_dim: int = None, use_concat_head: bool = False,
+                concat_attn_dim: int = 8, concat_mlp_hidden: int = 32):
         super().__init__(n_spklu, hidden=hidden, critic_hidden=critic_hidden, n_critics=n_critics,
                          use_hist=use_hist, use_station_attn=use_station_attn,
-                         station_attn_dim=station_attn_dim)
+                         station_attn_dim=station_attn_dim, use_concat_head=use_concat_head,
+                         concat_attn_dim=concat_attn_dim, concat_mlp_hidden=concat_mlp_hidden)
         self.pref_feature_mode = bool(pref_feature_mode)
         self.use_preference = bool(use_preference)
         self.pref_d_attn = int(pref_d_attn)
@@ -399,9 +465,12 @@ class MasterEVPPOPrefPolicy(MasterEVPPOPolicy):
 
         context = torch.cat([c_t, attended_pref], dim=-1)
         emb = self.station_encoder(station_feats, context)
-        if self.use_station_attn:
-            emb = emb + self.station_attn_gate * self.station_attn(emb)
-        logits = self.disc_head(emb).squeeze(-1)
+        if self.use_concat_head:
+            logits = self.concat_head(emb)
+        else:
+            if self.use_station_attn:
+                emb = emb + self.station_attn_gate * self.station_attn(emb)
+            logits = self.disc_head(emb).squeeze(-1)
 
         c_emb = self.critic_station_encoder(station_feats, context)
         pooled = self.critic_pool(c_emb)

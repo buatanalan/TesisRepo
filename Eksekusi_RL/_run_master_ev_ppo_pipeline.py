@@ -115,6 +115,20 @@ p.add_argument("--station-attn-dim", type=int, default=None,
                    "(anggaran 300-chunk sama dgn baseline, tapi kapasitas jauh lebih "
                    "besar). Kecilkan eksplisit (mis. 16) utk uji dugaan ini. Hanya "
                    "berlaku bila --use-station-attn diberikan.")
+p.add_argument("--use-concat-head", action="store_true",
+              help="ALTERNATIF thd --use-station-attn (2026-08-24) -- self-attention "
+                   "keluaran KECIL per-stasiun (--concat-attn-dim) digepengkan lintas-N "
+                   "(konkatenasi, BUKAN equivariant-permutasi murni -- dibenarkan krn N "
+                   "TETAP/beku sepanjang penelitian ini, rezim Klaster12) -> MLP kecil "
+                   "(--concat-mlp-hidden) -> N logit langsung. Mutually exclusive dgn "
+                   "--use-station-attn (concat_head menang bila keduanya diberikan).")
+p.add_argument("--concat-attn-dim", type=int, default=8,
+              help="Dimensi Q/K/V StationConcatDecisionHead (BAKU 8, sengaja kecil -- "
+                   "lihat diagnosis ukuran StationSelfAttention sebelumnya). Hanya "
+                   "berlaku bila --use-concat-head diberikan.")
+p.add_argument("--concat-mlp-hidden", type=int, default=32,
+              help="Lebar lapisan tersembunyi MLP StationConcatDecisionHead (BAKU 32, "
+                   "sengaja kecil). Hanya berlaku bila --use-concat-head diberikan.")
 p.add_argument("--reward-preset", type=str, default="raw", choices=["raw", "seimbang4x"],
               help="'raw' (BAKU -- konstruktor RewardCalculator() MENTAH, alpha_wait=1.0 "
                    "alpha_gini=0.5 use_delta_gini=False -- TAK PERNAH dikalibrasi utk rezim "
@@ -170,6 +184,10 @@ if args.use_station_attn:
     POLICY_KW["use_station_attn"] = True
     if args.station_attn_dim is not None:
         POLICY_KW["station_attn_dim"] = args.station_attn_dim
+if args.use_concat_head:
+    POLICY_KW["use_concat_head"] = True
+    POLICY_KW["concat_attn_dim"] = args.concat_attn_dim
+    POLICY_KW["concat_mlp_hidden"] = args.concat_mlp_hidden
 
 _DATASET_4X = os.path.join(common.ROOT, "scenario_dataset_klaster12_4x.json")
 if args.dataset == "4x":
@@ -204,9 +222,11 @@ _cmdp_suffix = "" if args.cmdp_lr_dual == 0.0 else f"_cmdpE{args.cmdp_epsilon:g}
 _acc_suffix = "" if args.alpha_acc == 0.0 else f"_accW{args.alpha_acc:g}"
 _stattn_suffix = (("_stattn" + (f"d{args.station_attn_dim}" if args.station_attn_dim is not None else ""))
                   if args.use_station_attn else "")
+_concat_suffix = (f"_concatA{args.concat_attn_dim}H{args.concat_mlp_hidden}"
+                  if args.use_concat_head else "")
 _suffix = (("_pref_feat" if args.pref_feature_mode else ("_pref" if args.pref else ""))
           + _hist_suffix + _prefk_suffix + _trust_suffix + _accept_suffix + _equity_suffix
-          + _acc_suffix + _gini_mode_suffix + _cmdp_suffix + _stattn_suffix
+          + _acc_suffix + _gini_mode_suffix + _cmdp_suffix + _stattn_suffix + _concat_suffix
           + _fc_suffix + _rw_suffix + _critics_suffix + _beta_suffix + _sigma_suffix
           + _horizon_suffix)
 TAG_ARM = "master_ev_ppo" + _suffix
