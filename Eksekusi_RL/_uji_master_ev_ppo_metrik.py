@@ -61,6 +61,12 @@ _m_concat = re.search(r"_concatA(\d+)H(\d+)", TAG_ARM)
 CONCAT_ATTN_DIM = int(_m_concat.group(1)) if _m_concat else None
 CONCAT_MLP_HIDDEN = int(_m_concat.group(2)) if _m_concat else None
 _is_concat = _m_concat is not None
+# `sepcritH<N>`: head kritik kecil TERPISAH per-aliran DGR (2026-08-28) -- MENGUBAH
+# bentuk bobot (critic_heads.* ModuleList menggantikan critic_head tunggal), WAJIB
+# cocok spt stattn/concat di atas.
+_m_sepcrit = re.search(r"_sepcritH(\d+)", TAG_ARM)
+CRITIC_HEAD_SMALL = int(_m_sepcrit.group(1)) if _m_sepcrit else None
+_is_sepcrit = _m_sepcrit is not None
 # `prefk<N>`: panjang jendela riwayat P -- TAK mengubah bentuk jaringan (LSTM terima
 # urutan berapa pun) shg mismatch TAK memicu RuntimeError, harus benar sejak awal
 # (sama kelas risiko `nohist`). None (tak ada akhiran) -> baku PDQN_HIST_K=10.
@@ -82,6 +88,9 @@ if _is_concat:
     POLICY_KW["use_concat_head"] = True
     POLICY_KW["concat_attn_dim"] = CONCAT_ATTN_DIM
     POLICY_KW["concat_mlp_hidden"] = CONCAT_MLP_HIDDEN
+if _is_sepcrit:
+    POLICY_KW["separate_critic_heads"] = True
+    POLICY_KW["critic_head_small"] = CRITIC_HEAD_SMALL
 FORECASTER_CLS = K.VW if _is_vwf else FormulaForecaster
 K.DS = os.path.join(common.ROOT, K.HORIZON[TAG])
 K_REC = 3

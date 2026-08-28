@@ -184,7 +184,8 @@ class MasterEVPPOPolicy(nn.Module):
                 n_critics: int = 1, hist_hidden: int = HIST_HIDDEN, use_hist: bool = True,
                 use_station_attn: bool = False, station_attn_dim: int = None,
                 use_concat_head: bool = False, concat_attn_dim: int = 8,
-                concat_mlp_hidden: int = 32):
+                concat_mlp_hidden: int = 32, separate_critic_heads: bool = False,
+                critic_head_small: int = 32):
         super().__init__()
         self.n_spklu = int(n_spklu)
         self.n_critics = int(n_critics)
@@ -243,10 +244,41 @@ class MasterEVPPOPolicy(nn.Module):
         self.critic_station_encoder = StationEncoder(STATION_FEAT_DIM_MASTER_EV, self.hist_hidden,
                                                       critic_hidden)
         self.critic_pool = AttentionPooling(critic_hidden)
-        self.critic_head = nn.Sequential(
-            nn.Linear(critic_hidden, critic_hidden), nn.ReLU(),
-            nn.Linear(critic_hidden, self.n_critics),
-        )
+        # DGR (n_critics>1) via head KECIL TERPISAH per-aliran (2026-08-28) --
+        # `STREAM_EQUITY` (n_critics=4) sudah lebih dulu dipisah dari STREAM_GLOBAL3
+        # krn 1 head kritik dipakai bersama antar-suku yg tujuannya berlainan terbukti
+        # saling melemahkan (lihat catatan di atas). Ini generalisasi pola itu ke
+        # SELURUH aliran (WAIT/PROX/GLOBAL3, bukan cuma EQUITY vs GLOBAL3): tiap
+        # aliran dapat MLP kecilnya sendiri (Linear->ReLU->Linear(1)), TAK berbagi
+        # bobot dgn aliran lain -- hanya `critic_station_encoder`+`critic_pool`
+        # (representasi & pooling stasiun) yg tetap dibagi. `critic_head_small`
+        # sengaja kecil (baku 32, jauh di bawah critic_hidden=128) -- pola sama
+        # `StationConcatDecisionHead` (mulai kecil, lihat diskusi arsitektur).
+        # BAKU MATI (separate_critic_heads=False) -- checkpoint lama (critic_head
+        # tunggal) tetap kompatibel selama tak diaktifkan.
+        self.separate_critic_heads = bool(separate_critic_heads)
+        if self.separate_critic_heads:
+            self.critic_heads = nn.ModuleList([
+                nn.Sequential(
+                    nn.Linear(critic_hidden, critic_head_small), nn.ReLU(),
+                    nn.Linear(critic_head_small, 1),
+                )
+                for _ in range(self.n_critics)
+            ])
+        else:
+            self.critic_head = nn.Sequential(
+                nn.Linear(critic_hidden, critic_hidden), nn.ReLU(),
+                nn.Linear(critic_hidden, self.n_critics),
+            )
+
+    def _critic_value(self, pooled):
+        """pooled: (B,critic_hidden) -> value (B,n_critics). Titik tunggal panggilan
+        kepala kritik, dipakai baik jalur `forward()` dasar maupun `MasterEVPPOPrefPolicy`
+        -- supaya `separate_critic_heads` otomatis berlaku di kedua kelas tanpa
+        menduplikasi percabangan di masing-masing forward()."""
+        if self.separate_critic_heads:
+            return torch.cat([head(pooled) for head in self.critic_heads], dim=-1)
+        return self.critic_head(pooled)
 
     @property
     def station_attn_gate(self):
@@ -291,7 +323,7 @@ class MasterEVPPOPolicy(nn.Module):
 
         c_emb = self.critic_station_encoder(station_feats, c_t)
         pooled = self.critic_pool(c_emb)
-        value = self.critic_head(pooled)                     # (B,n_critics)
+        value = self._critic_value(pooled)                   # (B,n_critics)
         return logits, value
 
     def _fwd(self, obs, hist, critic_obs, pref_hist):
@@ -406,11 +438,14 @@ class MasterEVPPOPrefPolicy(MasterEVPPOPolicy):
                 pref_feature_mode: bool = False, use_preference: bool = True,
                 use_hist: bool = True, use_station_attn: bool = False,
                 station_attn_dim: int = None, use_concat_head: bool = False,
-                concat_attn_dim: int = 8, concat_mlp_hidden: int = 32):
+                concat_attn_dim: int = 8, concat_mlp_hidden: int = 32,
+                separate_critic_heads: bool = False, critic_head_small: int = 32):
         super().__init__(n_spklu, hidden=hidden, critic_hidden=critic_hidden, n_critics=n_critics,
                          use_hist=use_hist, use_station_attn=use_station_attn,
                          station_attn_dim=station_attn_dim, use_concat_head=use_concat_head,
-                         concat_attn_dim=concat_attn_dim, concat_mlp_hidden=concat_mlp_hidden)
+                         concat_attn_dim=concat_attn_dim, concat_mlp_hidden=concat_mlp_hidden,
+                         separate_critic_heads=separate_critic_heads,
+                         critic_head_small=critic_head_small)
         self.pref_feature_mode = bool(pref_feature_mode)
         self.use_preference = bool(use_preference)
         self.pref_d_attn = int(pref_d_attn)
@@ -474,7 +509,7 @@ class MasterEVPPOPrefPolicy(MasterEVPPOPolicy):
 
         c_emb = self.critic_station_encoder(station_feats, context)
         pooled = self.critic_pool(c_emb)
-        value = self.critic_head(pooled)
+        value = self._critic_value(pooled)
         return logits, value
 
 
