@@ -56,7 +56,7 @@ p.add_argument("--pref-feature-mode", action="store_true",
 p.add_argument("--pref-small", action="store_true",
               help="MasterEVPPOPrefPolicySmall (2026-08-28) -- SAMA arsitektur h6b_utama, "
                    "hyperparameter diperkecil ~separuh (hidden 64->32, critic_hidden "
-                   "128->64, pref_d_lstm/pref_d_attn 16->8) -> total param 30,7% baku "
+                   "128->64, pref_d_lstm/pref_d_attn 16->8) -> total param 30,7%% baku "
                    "(15.238 vs 49.670). Diagnosis ukuran (2026-08-28) menduga kapasitas "
                    "berlebih (relatif thd anggaran latih 300-chunk yg SAMA dgn arsitektur "
                    "jauh lebih kecil) berkontribusi thd n_kolaps seed berulang di "
