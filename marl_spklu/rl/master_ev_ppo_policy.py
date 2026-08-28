@@ -157,9 +157,14 @@ class MasterEVPPOPolicy(nn.Module):
             # arbitrer dari inisialisasi acak. Diganti sigmoid(raw) in (0,1) -- gerbang
             # HANYA bisa menambah kontribusi atensi (tak pernah membalik tandanya),
             # menghapus satu derajat kebebasan yg jadi sumber inkonsistensi.
-            # raw=-5.0 -> sigmoid~0.0067, nyaris nol di awal (pola sama semangat
-            # "gerbang nol-awal" GTrXL, TAK PERSIS nol krn sigmoid tak pernah capai 0).
-            self.station_attn_gate_raw = nn.Parameter(torch.tensor(-5.0))
+            # raw=-5.0 (upaya pertama) TERBUKTI TERJEBAK (2026-08-24): turunan sigmoid
+            # di titik itu ~0,0067 -- gradien yg sampai ke parameter ini terlalu kecil,
+            # raw cuma bergerak ~0,2-0,5 dari -5,0 sepanjang 300 chunk (dicek balik via
+            # logit(gate) dari training_results.json) -- gerbang tak sempat mencari
+            # nilai optimalnya, bukan "memutuskan" kecil. Diganti raw=-2.0
+            # (sigmoid~0,12, turunan~0,105 -- 16x lebih responsif) -- tetap dekat nol
+            # (semangat "gerbang nol-awal" GTrXL terjaga) tapi tak macet.
+            self.station_attn_gate_raw = nn.Parameter(torch.tensor(-2.0))
         # `use_hist=False` (2026-08-21, ABLASI): matikan kontribusi c_t (`hist_lstm`)
         # TANPA mengubah bentuk jaringan (module tetap ada, dim tak berubah, checkpoint
         # tetap kompatibel) -- utk mengisolasi dugaan bahwa `hist_lstm` & `pref_lstm`
