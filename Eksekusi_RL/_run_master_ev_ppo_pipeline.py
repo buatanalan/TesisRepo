@@ -129,6 +129,18 @@ p.add_argument("--concat-attn-dim", type=int, default=8,
 p.add_argument("--concat-mlp-hidden", type=int, default=32,
               help="Lebar lapisan tersembunyi MLP StationConcatDecisionHead (BAKU 32, "
                    "sengaja kecil). Hanya berlaku bila --use-concat-head diberikan.")
+p.add_argument("--separate-critic-heads", action="store_true",
+              help="DGR (n_critics>1) via head KECIL TERPISAH per-aliran (2026-08-28), "
+                   "bukan 1 MLP bersama dgn Linear akhir K-cabang -- generalisasi pola "
+                   "STREAM_EQUITY (sudah lebih dulu dipisah krn 1 head bersama antar-suku "
+                   "berlainan tujuan terbukti saling melemahkan) ke SELURUH aliran. "
+                   "`critic_station_encoder`+`critic_pool` (representasi & pooling stasiun) "
+                   "TETAP dibagi -- hanya kepala akhir yg dipecah. BAKU MATI, checkpoint "
+                   "lama (critic_head tunggal) tetap kompatibel selama tak diaktifkan.")
+p.add_argument("--critic-head-small", type=int, default=32,
+              help="Lebar lapisan tersembunyi tiap head kritik kecil (BAKU 32, sengaja "
+                   "kecil spt StationConcatDecisionHead). Hanya berlaku bila "
+                   "--separate-critic-heads diberikan.")
 p.add_argument("--reward-preset", type=str, default="raw", choices=["raw", "seimbang4x"],
               help="'raw' (BAKU -- konstruktor RewardCalculator() MENTAH, alpha_wait=1.0 "
                    "alpha_gini=0.5 use_delta_gini=False -- TAK PERNAH dikalibrasi utk rezim "
@@ -188,6 +200,9 @@ if args.use_concat_head:
     POLICY_KW["use_concat_head"] = True
     POLICY_KW["concat_attn_dim"] = args.concat_attn_dim
     POLICY_KW["concat_mlp_hidden"] = args.concat_mlp_hidden
+if args.separate_critic_heads:
+    POLICY_KW["separate_critic_heads"] = True
+    POLICY_KW["critic_head_small"] = args.critic_head_small
 
 _DATASET_4X = os.path.join(common.ROOT, "scenario_dataset_klaster12_4x.json")
 if args.dataset == "4x":
@@ -224,9 +239,11 @@ _stattn_suffix = (("_stattn" + (f"d{args.station_attn_dim}" if args.station_attn
                   if args.use_station_attn else "")
 _concat_suffix = (f"_concatA{args.concat_attn_dim}H{args.concat_mlp_hidden}"
                   if args.use_concat_head else "")
+_sepcrit_suffix = (f"_sepcritH{args.critic_head_small}" if args.separate_critic_heads else "")
 _suffix = (("_pref_feat" if args.pref_feature_mode else ("_pref" if args.pref else ""))
           + _hist_suffix + _prefk_suffix + _trust_suffix + _accept_suffix + _equity_suffix
           + _acc_suffix + _gini_mode_suffix + _cmdp_suffix + _stattn_suffix + _concat_suffix
+          + _sepcrit_suffix
           + _fc_suffix + _rw_suffix + _critics_suffix + _beta_suffix + _sigma_suffix
           + _horizon_suffix)
 TAG_ARM = "master_ev_ppo" + _suffix
