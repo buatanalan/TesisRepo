@@ -180,6 +180,14 @@ p.add_argument("--tau-acc", type=float, default=None,
               help="ambang |Delta W| (menit) sebelum accuracy_reward mulai menghukum -- "
                    "baku None -> DELTAW_TOL_HIGH (marl_spklu/env/user.py), ambang PERSIS "
                    "yg sama dipakai User.update_trust menghukum trust.")
+p.add_argument("--skip-greedy-eval", action="store_true",
+              help="LEWATI evaluasi greedy_queue/greedy_util (2x n_eval_seed simulasi "
+                   "penuh) -- greedy TAK berubah antar-eksperimen arsitektur (lih. "
+                   "uji_greedy_metrik_30d/90d.json yg sudah ada), jadi menghitung ulang "
+                   "tiap retrain buang waktu. Pemilihan seed MEDIAN (`pick_median`) TETAP "
+                   "jalan penuh (pakai gini kebijakan sendiri, tak bergantung greedy) -- "
+                   "yang dilewati HANYA uji Wilcoxon/Cohen's d vs greedy & pencetakan "
+                   "ringkasannya (disimpan sbg null di eval_results.json).")
 p.add_argument("--overwrite", action="store_true",
               help="WAJIB diberikan bila `eval_results.json` yang SUDAH ADA untuk tag "
                    "ini punya `n_updates` LEBIH BESAR dari run ini (mis. hasil serius "
@@ -443,21 +451,29 @@ for seed in range(args.n_train_seed):
     common.save_json(results, results_path)
 print(f"[{elapsed()}] Pelatihan selesai ({len(results)} seed)", flush=True)
 
-print(f"[{elapsed()}] === Evaluasi vs greedy_queue/greedy_util ({args.n_eval_seed} seed) ===", flush=True)
-gq = eval_baseline_gini(DATASET, lambda: GreedyAgent(mode="queue"), args.n_eval_seed)
-gu = eval_baseline_gini(DATASET, lambda: GreedyAgent(mode="utilization"), args.n_eval_seed)
 ginis_policy, per_seed = pick_median(results, DATASET, args.n_eval_seed, args.k)
 spread = float(max(np.mean(v) for v in per_seed.values())
               - min(np.mean(v) for v in per_seed.values()))
-w_gq = wilcoxon(ginis_policy, gq)
-w_gu = wilcoxon(ginis_policy, gu)
-d_gq = cohens_d(ginis_policy, gq)
-d_gu = cohens_d(ginis_policy, gu)
-
-print(f"[{elapsed()}] MasterEV-PPO={np.mean(ginis_policy):.4f}  greedy_queue={np.mean(gq):.4f}  "
-     f"greedy_util={np.mean(gu):.4f}", flush=True)
-print(f"[{elapsed()}] p_vs_gq={w_gq.pvalue:.4f} d={d_gq:+.3f}  "
-     f"p_vs_gu={w_gu.pvalue:.4f} d={d_gu:+.3f}  spread_antar_seed={spread:.4f}", flush=True)
+if args.skip_greedy_eval:
+    print(f"[{elapsed()}] === Evaluasi vs greedy DILEWATI (--skip-greedy-eval) ===", flush=True)
+    gq = gu = None
+    w_gq = w_gu = None
+    d_gq = d_gu = None
+    print(f"[{elapsed()}] MasterEV-PPO={np.mean(ginis_policy):.4f}  spread_antar_seed={spread:.4f}",
+         flush=True)
+else:
+    print(f"[{elapsed()}] === Evaluasi vs greedy_queue/greedy_util ({args.n_eval_seed} seed) ===",
+         flush=True)
+    gq = eval_baseline_gini(DATASET, lambda: GreedyAgent(mode="queue"), args.n_eval_seed)
+    gu = eval_baseline_gini(DATASET, lambda: GreedyAgent(mode="utilization"), args.n_eval_seed)
+    w_gq = wilcoxon(ginis_policy, gq)
+    w_gu = wilcoxon(ginis_policy, gu)
+    d_gq = cohens_d(ginis_policy, gq)
+    d_gu = cohens_d(ginis_policy, gu)
+    print(f"[{elapsed()}] MasterEV-PPO={np.mean(ginis_policy):.4f}  greedy_queue={np.mean(gq):.4f}  "
+         f"greedy_util={np.mean(gu):.4f}", flush=True)
+    print(f"[{elapsed()}] p_vs_gq={w_gq.pvalue:.4f} d={d_gq:+.3f}  "
+         f"p_vs_gu={w_gu.pvalue:.4f} d={d_gu:+.3f}  spread_antar_seed={spread:.4f}", flush=True)
 
 # Diagnosis akurasi-janji (rec_activity vs |Delta W|) -- checkpoint seed MEDIAN (sama
 # yg dipakai ginis_policy di atas), n_diag_seed sama dgn n_eval_seed utk data cukup.
@@ -490,8 +506,11 @@ if os.path.exists(_eval_out_path) and not args.overwrite:
 
 common.save_json(dict(
     gini_policy=ginis_policy, gini_greedy_queue=gq, gini_greedy_util=gu,
-    mean_policy=float(np.mean(ginis_policy)), mean_gq=float(np.mean(gq)), mean_gu=float(np.mean(gu)),
-    p_vs_gq=float(w_gq.pvalue), p_vs_gu=float(w_gu.pvalue),
+    mean_policy=float(np.mean(ginis_policy)),
+    mean_gq=(float(np.mean(gq)) if gq is not None else None),
+    mean_gu=(float(np.mean(gu)) if gu is not None else None),
+    p_vs_gq=(float(w_gq.pvalue) if w_gq is not None else None),
+    p_vs_gu=(float(w_gu.pvalue) if w_gu is not None else None),
     cohens_d_vs_gq=d_gq, cohens_d_vs_gu=d_gu, spread_antar_seed=spread,
     per_seed_means={str(k): float(np.mean(v)) for k, v in per_seed.items()},
     diagnosis_akurasi_janji=diag,

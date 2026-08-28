@@ -12,7 +12,7 @@ set -e
 PY=.venv/bin/python
 PIPE=Eksekusi_RL/_run_master_ev_ppo_pipeline.py
 DS90=scenario_dataset_klaster12_4x_90d.json
-COMMON="--pref --pref-feature-mode --alpha-accept 1.0 --no-hist --n-critics 3 --beta-mode gap_ratio --beta-sigma 1.0 --reward-preset seimbang4x --forecaster vwf --use-station-attn --separate-critic-heads --critic-head-small 32"
+COMMON="--pref --pref-feature-mode --alpha-accept 1.0 --no-hist --n-critics 3 --beta-mode gap_ratio --beta-sigma 1.0 --reward-preset seimbang4x --forecaster vwf --skip-greedy-eval --use-station-attn --separate-critic-heads --critic-head-small 32"
 
 echo "=== 1. h6b-stattn-sepcrit 30d ==="
 $PY $PIPE $COMMON
