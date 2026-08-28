@@ -40,12 +40,20 @@ class MasterPurePPOTransition:
         self.complied = False; self.disp_estwait = 0.0; self.wait_default = 0.0
         self.resolved = False; self.pushed = False; self.flock_penalty = 0.0
         self.I_raw = None
+        # Diisi rollout agent dari `trainer.stream_select` SEBELUM transisi dipakai --
+        # `compute_gae` (ppo.py) memanggil `reward_vec(K)` TANPA argumen tambahan, jadi
+        # pemilihan aliran (mode pretrain_specialist) WAJIB tersimpan di transisi sendiri,
+        # bukan lewat parameter panggilan (beda dari `MasterPureTransition` versi DDPG
+        # yg update-nya ditulis manual, bukan lewat `compute_gae` generik).
+        self.stream_select = None
 
     @property
     def reward(self) -> float:
         return float(self.reward_streams.sum())
 
     def reward_vec(self, n_critics: int) -> np.ndarray:
+        if self.stream_select is not None:
+            return np.array([self.reward_streams[self.stream_select]], dtype=np.float64)
         if n_critics == 1:
             return np.array([self.reward_streams.sum()], dtype=np.float64)
         if n_critics != N_REWARD_STREAMS:
@@ -62,10 +70,12 @@ class MasterPurePPORolloutAgent(RLRolloutAgent):
     TERTINGGI (argmax, §3.1) -- sama arah versi DDPG."""
 
     def __init__(self, actor, critic, sim, reward_calc, forecaster=None, k: int = 3,
-                equity_calc=None):
+                equity_calc=None, stream_select=None):
         super().__init__(actor, sim, reward_calc, forecaster, k=k, equity_calc=equity_calc)
         self.actor = actor
         self.critic = critic
+        # mode="pretrain_specialist": 0 (wait) / 1 (gini); mode="dgr": None (K=2 penuh).
+        self.stream_select = stream_select
 
     def get_recommendation(self, feasible_spklus: dict):
         user = self.sim._current_spawn_user
@@ -112,6 +122,7 @@ class MasterPurePPORolloutAgent(RLRolloutAgent):
         tr = MasterPurePPOTransition(joint_obs, mask, bids, logp,
                                      value.squeeze(0).numpy().astype(np.float64),
                                      self.sim.current_step, primary_idx)
+        tr.stream_select = self.stream_select
         tr.disp_estwait = primary_disp
         tr.wait_default = float(self.sim.compute_virtual_wait(
             user, self.sim.spklus[self.sids[default_idx]], time_now)
@@ -166,11 +177,22 @@ class MasterPurePPOInferenceAgent:
 
 
 class MasterPurePPOTrainer:
-    """SATU mode (bukan pretrain_specialist/dgr spt DDPG -- lih. docstring modul).
-    K=2 (wait,gini) sejak awal, gap-ratio berbasis return (running-max, pola
-    `ppo.py::_compute_beta`)."""
+    """Dua mode (2026-08-28, ditambahkan setelah diskusi -- semula SATU, lih. riwayat):
 
-    def __init__(self, dataset_path, rollout_steps: int = 96, gamma: float = 0.99,
+    `mode="pretrain_specialist"` (`stream_select` WAJIB 0/1): melatih SATU pasang
+        aktor+kritik objektif-tunggal (K=1) sampai konvergen. `train()` mengembalikan
+        `(actor, critic, r_star)` -- `r_star` = rerata RETURN (bukan Q per-state,
+        TAK bisa direplikasi utk V(s), lih. docstring modul) selama 20% chunk TERAKHIR,
+        dipakai sbg acuan TETAP `R*` Pers.13-adaptasi di `mode="dgr"`.
+
+    `mode="dgr"` (`specialist_r_star` WAJIB diisi -- list 2 float hasil mode di atas):
+        K=2 (wait,gini), gap-ratio thd `R*` TETAP (BUKAN running-max spt versi lama
+        SATU-mode) -- `_ret_best` diinisialisasi dari `specialist_r_star` & TAK
+        diperbarui lagi selama training (properti acuan pra-latih convergent,
+        pola sama semangat Pers.13 meski via return bukan per-state Q)."""
+
+    def __init__(self, dataset_path, mode: str = "dgr", stream_select: int = None,
+                specialist_r_star: list = None, rollout_steps: int = 96, gamma: float = 0.99,
                 lam: float = 0.95, lr: float = 5e-4, clip: float = 0.2, epochs: int = 10,
                 minibatch: int = 32, ent_coef: float = 0.01, vf_coef: float = 0.5,
                 max_grad_norm: float = 0.5, target_kl: float = 0.03,
@@ -178,6 +200,8 @@ class MasterPurePPOTrainer:
                 beta_mode: str = "gap_ratio", beta_sigma: float = 0.2,
                 reward_calc=None, seed: int = 0, verbose: bool = True,
                 equity_calc=None, max_step_gap: int = 4):
+        assert mode in ("pretrain_specialist", "dgr"), f"mode={mode!r} tak dikenal"
+        self.mode = mode
         self.dataset_path = dataset_path
         self.equity_calc = equity_calc
         self.rollout_steps = int(rollout_steps)
@@ -186,10 +210,26 @@ class MasterPurePPOTrainer:
         self.ent_coef = float(ent_coef); self.vf_coef = float(vf_coef)
         self.max_grad_norm = float(max_grad_norm); self.target_kl = target_kl
         self.max_step_gap = max_step_gap
-        self.n_critics = N_REWARD_STREAMS   # 2: wait(individual)+gini(global), tetap
+
+        if mode == "pretrain_specialist":
+            assert stream_select in (0, 1), (
+                "mode='pretrain_specialist' WAJIB --stream-select 0 (wait) atau 1 (gini)")
+            self.stream_select = int(stream_select)
+            self.n_critics = 1
+            self._ret_best = np.full(1, -np.inf, dtype=np.float64)   # running-max, spesialis SENDIRI
+            self._fixed_ret_best = False
+        else:
+            assert specialist_r_star is not None and len(specialist_r_star) == 2, (
+                "mode='dgr' WAJIB --specialist-r-star: [r_star_wait, r_star_gini] "
+                "hasil mode='pretrain_specialist' (stream 0 & 1)")
+            self.stream_select = None
+            self.n_critics = N_REWARD_STREAMS   # 2
+            self._ret_best = np.array(specialist_r_star, dtype=np.float64)   # TETAP, bukan running-max
+            self._fixed_ret_best = True
+
         self.beta_mode = str(beta_mode); self.beta_sigma = float(beta_sigma)
-        self._ret_best = np.full(self.n_critics, -np.inf, dtype=np.float64)
         self._last_beta = np.full(self.n_critics, 1.0 / self.n_critics, dtype=np.float64)
+        self._last_ret_mean = np.zeros(self.n_critics, dtype=np.float64)
         self.rc = reward_calc or RewardCalculator()
         self.verbose = verbose
         self.seed = seed
@@ -276,12 +316,19 @@ class MasterPurePPOTrainer:
         return ready
 
     def _compute_beta(self, returns):
-        """Gap-ratio berbasis RETURN (running-max proksi R*_optimal) -- pola IDENTIK
-        `ppo.py::PPOTrainer._compute_beta`. Satu-satunya adaptasi DGR yg koheren utk
-        V(s) (lih. docstring modul: Pers.13 asli butuh Q bersyarat-aksi, tak berlaku)."""
+        """Gap-ratio berbasis RETURN -- adaptasi Pers.13 yg koheren utk V(s) (lih.
+        docstring modul: Pers.13 asli butuh Q bersyarat-aksi, tak berlaku).
+
+        mode='pretrain_specialist': `_ret_best` running-max DARI DIRINYA SENDIRI
+        (spesialis belum py acuan eksternal, sama pola `ppo.py::_compute_beta`).
+        mode='dgr': `_ret_best` TETAP (`_fixed_ret_best=True`) -- diisi `specialist_
+        r_star` di __init__, TAK diperbarui lagi (acuan pra-latih convergent, bukan
+        running-max training gabungan)."""
         K = self.n_critics
         ret_mean = np.asarray(returns, dtype=np.float64).mean(axis=0)
-        self._ret_best = np.maximum(self._ret_best, ret_mean)
+        self._last_ret_mean = ret_mean   # dipakai train() menghitung r_star pretrain
+        if not self._fixed_ret_best:
+            self._ret_best = np.maximum(self._ret_best, ret_mean)
         if self.beta_mode != "gap_ratio":
             return np.full(K, 1.0 / K, dtype=np.float64)
         gap = (self._ret_best - ret_mean) / (np.abs(self._ret_best) + 1e-8)
@@ -343,7 +390,8 @@ class MasterPurePPOTrainer:
                 self.opt.step()
                 last = {"pi_loss": pi_loss.item(), "v_loss": v_loss.item(),
                         "entropy": ent.mean().item(), "loss": loss.item(),
-                        "grad_norm": grad_norm, "beta": beta.tolist()}
+                        "grad_norm": grad_norm, "beta": beta.tolist(),
+                        "ret_mean": self._last_ret_mean.tolist()}
             if self.target_kl is not None:
                 with torch.no_grad():
                     bid_mean = self.actor(obs_b)
@@ -389,7 +437,8 @@ class MasterPurePPOTrainer:
         chunk = self.rollout_steps
         sim = self._fresh_sim()
         agent = MasterPurePPORolloutAgent(self.actor, self.critic, sim, self.rc,
-                                          equity_calc=self.equity_calc)
+                                          equity_calc=self.equity_calc,
+                                          stream_select=self.stream_select)
         step = 0
         for _ in range(n_updates):
             it = self._it_global
@@ -398,8 +447,15 @@ class MasterPurePPOTrainer:
             if info is not None:
                 self.history.append({"iter": it, **info})
                 if self.verbose:
-                    print(f"[ppo chunk {it:3d}] ready={info['n_ready']} backlog={info['n_backlog']} "
+                    print(f"[{self.mode} chunk {it:3d}] ready={info['n_ready']} backlog={info['n_backlog']} "
                          f"pi_loss={info.get('pi_loss', 0):+.4f} v_loss={info.get('v_loss', 0):.4f} "
                          f"beta={info.get('beta')} | gini_util={info['gini_util']:.3f}"
                          + (" |PASS-BARU" if boundary else ""))
+        if self.mode == "pretrain_specialist":
+            # r_star = rerata return 20% chunk TERAKHIR (proksi "sudah convergent") --
+            # acuan TETAP Pers.13-adaptasi (bkn per-state Q, lih. docstring kelas).
+            rets = [h["ret_mean"][0] for h in self.history if "ret_mean" in h]
+            tail_n = max(1, len(rets) // 5)
+            r_star = float(np.mean(rets[-tail_n:])) if rets else 0.0
+            return self.actor, self.critic, r_star
         return self.actor, self.critic
