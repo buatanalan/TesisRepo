@@ -553,6 +553,94 @@ class MasterEVPPOPrefPolicySmall(MasterEVPPOPrefPolicy):
                          critic_head_small=critic_head_small)
 
 
+class MasterEVPPOPrefPolicySmallLateCtx(MasterEVPPOPrefPolicySmall):
+    """`MasterEVPPOPrefPolicySmall` DENGAN "context lambat" (2026-08-28) -- context
+    preferensi (c_t + attended_pref) TIDAK lagi disuntik ke `station_encoder` SEBELUM
+    MLP pertama (jalur baku SEMUA kelas MasterEVPPOPref* lain: lih. diskusi arsitektur
+    -- ini "zona konflik", bobot `station_encoder` tercampur gradien preferensi sejak
+    lapisan pertama, diduga akar `n_kolaps` seed berulang tiap modifikasi aktor
+    ditambahkan). Di sini `station_encoder` HANYA menerima `station_feats`
+    (context_dim=0) -> `emb_pure` (representasi stasiun MURNI, sama sekali tak
+    tersentuh preferensi). `context` baru disiarkan & digabung SETELAH itu lewat
+    lapisan gabung kecil terpisah (`ctx_merge`, bobot BEDA dari `station_encoder`),
+    dgn gerbang nol-awal (pola sama `pref_gate`/`station_attn_gate`) -- di awal
+    latihan `emb ≈ emb_pure`, context BELUM mengganggu representasi stasiun yg baru
+    mulai belajar.
+
+    TUJUAN: mempersempit zona konflik gradien preferensi-vs-representasi-stasiun.
+    `station_encoder` (komponen terbesar kedua) kini dibentuk MURNI oleh fitur
+    stasiun; konflik (kalau masih ada) tergeser ke `ctx_merge` (lapisan kecil BARU)
+    & seterusnya (`StationAttn`/`ConcatHead`/`disc_head`) saja -- bukan lagi seluruh
+    `station_encoder`.
+
+    Jalur KRITIK SENGAJA TIDAK diubah (`critic_station_encoder` tetap context-awal
+    spt semula) -- bukan bagian dari hipotesis yg diuji, & jalur kritik sudah
+    terbukti terpisah total dari sumber instabilitas (`separate_critic_heads`,
+    n_kolaps=0) sejak diagnosis sebelumnya."""
+
+    def __init__(self, n_spklu: int, hidden: int = 32, critic_hidden: int = 64,
+                n_critics: int = 1, pref_d_lstm: int = 8, pref_d_attn: int = 8,
+                pref_feature_mode: bool = False, use_preference: bool = True,
+                use_hist: bool = True, use_station_attn: bool = False,
+                station_attn_dim: int = None, use_concat_head: bool = False,
+                concat_attn_dim: int = 8, concat_mlp_hidden: int = 32,
+                separate_critic_heads: bool = False, critic_head_small: int = 32):
+        super().__init__(n_spklu, hidden=hidden, critic_hidden=critic_hidden,
+                         n_critics=n_critics, pref_d_lstm=pref_d_lstm, pref_d_attn=pref_d_attn,
+                         pref_feature_mode=pref_feature_mode, use_preference=use_preference,
+                         use_hist=use_hist, use_station_attn=use_station_attn,
+                         station_attn_dim=station_attn_dim, use_concat_head=use_concat_head,
+                         concat_attn_dim=concat_attn_dim, concat_mlp_hidden=concat_mlp_hidden,
+                         separate_critic_heads=separate_critic_heads,
+                         critic_head_small=critic_head_small)
+        # GANTI station_encoder AKTOR: context_dim=0 (beda dari __init__ warisan yg
+        # menyuntik context SEBELUM MLP pertama). critic_station_encoder TAK disentuh.
+        self._late_ctx_dim = self.hist_hidden + self.pref_d_attn
+        self.station_encoder = StationEncoder(STATION_FEAT_DIM_MASTER_EV, 0, hidden)
+        self.ctx_merge = nn.Linear(hidden + self._late_ctx_dim, hidden)
+        self.ctx_merge_gate_raw = nn.Parameter(torch.tensor(-2.0))
+
+    @property
+    def ctx_merge_gate(self):
+        """sigmoid(ctx_merge_gate_raw) in (0,1) -- pola SAMA station_attn_gate
+        (raw=-2.0, bukan -5.0 -- lih. diagnosis gradien-macet sebelumnya)."""
+        return torch.sigmoid(self.ctx_merge_gate_raw)
+
+    def forward(self, obs, hist=None, critic_obs=None, pref_hist=None):
+        c_t = self._encode_hist(hist)
+        _, station_feats = self._split_station_block(obs, STATION_FEAT_DIM_MASTER_EV, 0)
+
+        if pref_hist is not None and self.use_preference:
+            c_pref = self._encode_pref(pref_hist)
+            attended_pref, _ = self.pref_attn(station_feats, c_pref)
+            attended_pref = self.pref_gate * attended_pref
+        else:
+            attended_pref = torch.zeros(obs.shape[0], self.pref_d_attn, device=obs.device)
+
+        context = torch.cat([c_t, attended_pref], dim=-1)
+
+        # --- Jalur AKTOR: context LAMBAT (setelah station_encoder) --------------
+        _zero_ctx = torch.zeros(obs.shape[0], 0, device=obs.device, dtype=station_feats.dtype)
+        emb_pure = self.station_encoder(station_feats, _zero_ctx)
+        n = emb_pure.shape[1]
+        context_exp = context.unsqueeze(1).expand(-1, n, -1)
+        merged = torch.relu(self.ctx_merge(torch.cat([emb_pure, context_exp], dim=-1)))
+        emb = emb_pure + self.ctx_merge_gate * (merged - emb_pure)
+
+        if self.use_concat_head:
+            logits = self.concat_head(emb)
+        else:
+            if self.use_station_attn:
+                emb = emb + self.station_attn_gate * self.station_attn(emb)
+            logits = self.disc_head(emb).squeeze(-1)
+
+        # --- Jalur KRITIK: TETAP context-awal (tak diubah) -----------------------
+        c_emb = self.critic_station_encoder(station_feats, context)
+        pooled = self.critic_pool(c_emb)
+        value = self._critic_value(pooled)
+        return logits, value
+
+
 class MasterEV3Transition:
     """Duplikat `rollout.py::Transition`, HANYA beda `reward_streams` berukuran 3
     (bukan `N_REWARD_STREAMS`=2 bersama) -- lihat catatan `STREAM_WAIT/PROX/GLOBAL3`

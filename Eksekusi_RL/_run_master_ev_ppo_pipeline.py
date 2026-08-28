@@ -14,6 +14,7 @@ import torch
 import common
 from marl_spklu.rl.master_ev_ppo_policy import (MasterEVPPOTrainer, MasterEVPPOPolicy,
                                                 MasterEVPPOPrefPolicy, MasterEVPPOPrefPolicySmall,
+                                                MasterEVPPOPrefPolicySmallLateCtx,
                                                 MasterEVPPOInferenceAgent)
 from marl_spklu.rl.master_ev_ppo_acc import MasterEVPPOAccRolloutAgent, STREAM_ACCURACY
 from marl_spklu.rl.rewards import RewardCalculator
@@ -63,6 +64,15 @@ p.add_argument("--pref-small", action="store_true",
                    "h6b_utama. TIDAK mengubah struktur (encoder aktor/kritik TETAP "
                    "terpisah, CTDE penuh terjaga) -- murni skala. Hanya berlaku bila "
                    "--pref diberikan.")
+p.add_argument("--late-ctx", action="store_true",
+              help="MasterEVPPOPrefPolicySmallLateCtx (2026-08-28) -- station_encoder "
+                   "AKTOR HANYA menerima station_feats (context_dim=0) -> emb_pure MURNI "
+                   "tak tersentuh preferensi; context (c_t+attended_pref) baru disiarkan "
+                   "& digabung SETELAH itu lewat lapisan `ctx_merge` terpisah bergerbang "
+                   "nol-awal. Tujuan: mempersempit 'zona konflik' gradien preferensi-vs-"
+                   "representasi-stasiun yg diduga akar n_kolaps seed berulang tiap "
+                   "modifikasi aktor ditambahkan. Jalur kritik TAK diubah. WAJIB "
+                   "--pref-small (kelas ini MEWARISI MasterEVPPOPrefPolicySmall).")
 p.add_argument("--no-hist", action="store_true",
               help="ABLASI: matikan kontribusi hist_lstm (c_t) -- utk isolasi dugaan "
                    "hist_lstm & pref_lstm saling mengganggu (satu-satunya hasil P yg "
@@ -207,7 +217,10 @@ assert not (args.pref_feature_mode and not args.pref), "--pref-feature-mode butu
 assert args.alpha_acc == 0.0 or args.n_critics == 5, (
     "--alpha-acc>0 butuh --n-critics 5 (STREAM_ACCURACY, lihat master_ev_ppo_acc.py)")
 ROLLOUT_AGENT_CLS = MasterEVPPOAccRolloutAgent if args.alpha_acc != 0.0 else None
-POLICY_CLS = ((MasterEVPPOPrefPolicySmall if args.pref_small else MasterEVPPOPrefPolicy)
+assert not args.late_ctx or args.pref_small, "--late-ctx WAJIB disertai --pref-small"
+POLICY_CLS = ((MasterEVPPOPrefPolicySmallLateCtx if args.late_ctx
+              else MasterEVPPOPrefPolicySmall if args.pref_small
+              else MasterEVPPOPrefPolicy)
              if args.pref else MasterEVPPOPolicy)
 POLICY_KW = dict(pref_feature_mode=args.pref_feature_mode) if args.pref else dict()
 if args.no_hist:
@@ -261,8 +274,9 @@ _concat_suffix = (f"_concatA{args.concat_attn_dim}H{args.concat_mlp_hidden}"
                   if args.use_concat_head else "")
 _sepcrit_suffix = (f"_sepcritH{args.critic_head_small}" if args.separate_critic_heads else "")
 _small_suffix = "_small" if args.pref_small else ""
+_latectx_suffix = "_latectx" if args.late_ctx else ""
 _suffix = (("_pref_feat" if args.pref_feature_mode else ("_pref" if args.pref else ""))
-          + _small_suffix
+          + _small_suffix + _latectx_suffix
           + _hist_suffix + _prefk_suffix + _trust_suffix + _accept_suffix + _equity_suffix
           + _acc_suffix + _gini_mode_suffix + _cmdp_suffix + _stattn_suffix + _concat_suffix
           + _sepcrit_suffix

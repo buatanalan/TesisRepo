@@ -19,6 +19,7 @@ sys.argv = _argv_asli
 
 from marl_spklu.rl.master_ev_ppo_policy import (MasterEVPPOPolicy, MasterEVPPOPrefPolicy,
                                                 MasterEVPPOPrefPolicySmall,
+                                                MasterEVPPOPrefPolicySmallLateCtx,
                                                 MasterEVPPOInferenceAgent)
 from marl_spklu.rl.forecaster import FormulaForecaster
 
@@ -36,6 +37,9 @@ _is_pref = "pref" in TAG_ARM
 # (hidden/critic_hidden/pref_d_lstm/pref_d_attn), MENGUBAH bentuk bobot SELURUH
 # jaringan, WAJIB cocok spt stattn/concat/sepcrit di atas.
 _is_small = "_small" in TAG_ARM
+# `_latectx`: MasterEVPPOPrefPolicySmallLateCtx (2026-08-28) -- station_encoder aktor
+# context_dim=0 + ctx_merge terpisah, MENGUBAH bentuk bobot, WAJIB cocok spt di atas.
+_is_latectx = "_latectx" in TAG_ARM
 # `vwf`: forecaster HARUS SAMA dgn yg dipakai `_run_master_ev_ppo_pipeline.py --forecaster
 # vwf` saat melatih checkpoint ini -- pakai `K.VW` (_uji_konsolidasi.py), BUKAN kelas
 # terpisah, supaya identik persis dgn yg dipakai evaluasi H-PPO/P-PPO/MASTER (konvensi
@@ -80,7 +84,9 @@ PREF_HIST_K = int(_m_prefk.group(1)) if _m_prefk else None
 LABEL_ARM = (f"MASTER-EV-PPO+P(fitur)[{TAG_ARM}]" if _is_pref_feat
             else f"MASTER-EV-PPO+P[{TAG_ARM}]" if _is_pref
             else f"MASTER-EV-PPO[{TAG_ARM}]")
-POLICY_CLS = ((MasterEVPPOPrefPolicySmall if _is_small else MasterEVPPOPrefPolicy)
+POLICY_CLS = ((MasterEVPPOPrefPolicySmallLateCtx if _is_latectx
+              else MasterEVPPOPrefPolicySmall if _is_small
+              else MasterEVPPOPrefPolicy)
              if _is_pref else MasterEVPPOPolicy)
 POLICY_KW = dict(pref_feature_mode=True) if _is_pref_feat else dict()
 POLICY_KW["n_critics"] = N_CRITICS
