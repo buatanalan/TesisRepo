@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import torch
 import common
 from marl_spklu.rl.master_pure_ppo_trainer import MasterPurePPOTrainer
+from marl_spklu.rl.rewards import RewardCalculator
 
 T0 = time.time()
 def elapsed():
@@ -36,6 +37,10 @@ p.add_argument("--specialist1-tag", type=str, default=None)
 p.add_argument("--specialist-seed", type=int, default=0,
               help="Seed spesialis mana yg r_star-nya dipakai sbg acuan (baku seed=0).")
 p.add_argument("--overwrite", action="store_true")
+p.add_argument("--wait-reward-clip", type=float, default=None,
+              help="Klip opsional pd `improvement` wait_reward (satuan wait_scale) -- "
+                   "diagnosis kolaps entropi PPO-Master-murni (2026-08-29): reward wait "
+                   "berekor tebal mendominasi advantage GAE. None=perilaku lama (tak diklip).")
 args = p.parse_args()
 
 if args.mode == "pretrain_specialist":
@@ -48,11 +53,12 @@ if args.dataset != "4x":
 
 _horizon_suffix = "" if args.horizon == "30d" else f"_{args.horizon}"
 
+_clip_suffix = "" if args.wait_reward_clip is None else f"_clip{args.wait_reward_clip:g}"
 if args.mode == "pretrain_specialist":
     STREAM_NAME = {0: "wait", 1: "gini"}[args.stream_select]
-    TAG_ARM = f"master_pure_ppo_specialist{args.stream_select}_{STREAM_NAME}{_horizon_suffix}"
+    TAG_ARM = f"master_pure_ppo_specialist{args.stream_select}_{STREAM_NAME}{_horizon_suffix}{_clip_suffix}"
 else:
-    TAG_ARM = f"master_pure_ppo_dgr{_horizon_suffix}"
+    TAG_ARM = f"master_pure_ppo_dgr{_horizon_suffix}{_clip_suffix}"
 
 print(f"[{elapsed()}] Dataset: {DATASET}", flush=True)
 print(f"[{elapsed()}] Lengan: tag={TAG_ARM} mode={args.mode} stream_select={args.stream_select}",
@@ -65,7 +71,7 @@ def _specialist_tag(stream: int, explicit: str):
     if explicit:
         return explicit
     name = {0: "wait", 1: "gini"}[stream]
-    return f"master_pure_ppo_specialist{stream}_{name}{_horizon_suffix}"
+    return f"master_pure_ppo_specialist{stream}_{name}{_horizon_suffix}{_clip_suffix}"
 
 
 def _load_r_star(tag: str, seed: int) -> float:
@@ -77,6 +83,8 @@ def _load_r_star(tag: str, seed: int) -> float:
 def train_one(seed):
     kw = dict(dataset_path=DATASET, mode=args.mode, rollout_steps=args.rollout_steps,
              seed=seed, verbose=False)
+    if args.wait_reward_clip is not None:
+        kw["reward_calc"] = RewardCalculator(wait_reward_clip=args.wait_reward_clip)
     if args.mode == "pretrain_specialist":
         kw["stream_select"] = args.stream_select
     else:

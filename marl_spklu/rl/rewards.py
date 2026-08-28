@@ -110,8 +110,17 @@ class RewardCalculator:
                  wait_scale: float = 60.0, use_delta_gini: bool = False,
                  alpha_trust: float = 0.0, alpha_accept: float = 0.0,
                  alpha_equity: float = 0.0, alpha_acc: float = 0.0,
-                 tau_acc: float = None):
+                 tau_acc: float = None, wait_reward_clip: float = None):
         self.alpha_wait = float(alpha_wait)
+        # Klip OPSIONAL (default None -> perilaku lama TAK BERUBAH) pada `improvement`
+        # (sblm dikali alpha_wait) di `wait_reward`. Diusulkan sbg respons diagnosis
+        # kolaps PPO-di-atas-Master-murni (2026-08-29): wait_reward berekor tebal/tak
+        # terbatas (beda dari gini yg [0,1]) -- transisi wait-ekstrem langka mendominasi
+        # advantage GAE stlh normalisasi, mendorong update kebijakan besar & kolaps
+        # entropi rekomendasi (rec_entropy -> ~0). Klip di sisi `improvement` (satuan
+        # wait_scale, BUKAN reward akhir) supaya nilainya tetap terinterpretasi sbg
+        # "menit tunggu yg diperbaiki, dibatasi maks N kelipatan wait_scale".
+        self.wait_reward_clip = None if wait_reward_clip is None else float(wait_reward_clip)
         self.beta_prox = float(beta_prox)
         self.alpha_gini = float(alpha_gini)
         self.alpha_flock = float(alpha_flock)
@@ -271,6 +280,8 @@ class RewardCalculator:
     # (murni forecaster), jadi tak ada lagi honesty_gap yang bisa diatribusikan ke aksi agen.
     def wait_reward(self, wait_default: float, wait_actual: float, disp_estwait: float = 0.0) -> float:
         improvement = max(0.0, float(wait_default) - float(wait_actual)) / self.wait_scale
+        if self.wait_reward_clip is not None:
+            improvement = min(improvement, self.wait_reward_clip)
         return self.alpha_wait * improvement
 
     def trust_shaping_reward(self, delta_trust: float) -> float:
