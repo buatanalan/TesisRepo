@@ -285,10 +285,20 @@ def make_reward_calc():
                             alpha_acc=args.alpha_acc, tau_acc=args.tau_acc)
 
 
+# BUG (2026-08-28, ditemukan via RuntimeError size-mismatch --pref-small): trainer
+# SELALU meneruskan hidden/critic_hidden EKSPLISIT ke policy_cls(...) (baku 64/128,
+# args konstruktor `MasterEVPPOTrainer` sendiri, BUKAN dari policy_kw) -- menimpa
+# diam2 baku `MasterEVPPOPrefPolicySmall` (32/64) saat training, padahal `load_policy`
+# saat eval TAK meneruskan hidden eksplisit shg benar2 pakai 32/64 -- checkpoint
+# (64/128) vs rekonstruksi eval (32/64) mismatch. WAJIB diteruskan eksplisit di sini
+# jgn hanya andalkan default kelas, krn trainer menimpanya.
+_HIDDEN_KW = dict(hidden=32, critic_hidden=64) if args.pref_small else dict()
+
+
 def train_one(seed, tag):
     rc = make_reward_calc()
     tr = MasterEVPPOTrainer(DATASET, rollout_steps=args.rollout_steps, seed=seed, verbose=False,
-                            reward_calc=rc, k=args.k, n_critics=args.n_critics,
+                            reward_calc=rc, k=args.k, n_critics=args.n_critics, **_HIDDEN_KW,
                             policy_cls=POLICY_CLS, policy_kw=POLICY_KW,
                             pref_hist_k=args.pref_hist_k, beta_mode=args.beta_mode,
                             beta_sigma=args.beta_sigma, gini_mode=args.gini_mode,
