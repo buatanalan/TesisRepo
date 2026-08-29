@@ -57,6 +57,11 @@ p.add_argument("--wait-fail-penalty", type=float, default=-1.0,
 p.add_argument("--pref-feature-mode", action="store_true",
               help="Riwayat preferensi sbg PASANGAN VEKTOR FITUR stasiun (10 dim), bukan "
                    "one-hot identitas. Sama mode dipakai Kandidat A.")
+p.add_argument("--pref-gate-init", type=float, default=0.0,
+              help="Nilai AWAL gerbang preferensi (baku 0.0 = GTrXL zero-init, perilaku "
+                   "lama). MASALAH: pada gerbang PERSIS 0 gradien ke pref_lstm/pref_attn "
+                   "adalah PERSIS NOL, jadi modul P tak bisa mulai belajar (deadlock "
+                   "ayam-telur). Nilai kecil bukan-nol (mis. 0.1) memutusnya.")
 p.add_argument("--pref-pair-outcome", action="store_true",
               help="Tempelkan blok HASIL [complied, realized_gap_norm] (10 -> 12 dim, "
                    "2026-08-29) -- pref_lstm menduga preferensi DAN kepercayaan sekaligus. "
@@ -78,9 +83,11 @@ _fail_suffix = ("" if args.wait_fail_threshold is None
 assert not (args.pref_pair_outcome and not args.pref_feature_mode), (
     "--pref-pair-outcome WAJIB disertai --pref-feature-mode")
 ACTOR_KW = dict(ACTOR_KW_BASE, pref_feature_mode=args.pref_feature_mode,
-                pref_pair_outcome=args.pref_pair_outcome)
+                pref_pair_outcome=args.pref_pair_outcome,
+                pref_gate_init=args.pref_gate_init)
 _pref_suffix = (("_preffeat" if args.pref_feature_mode else "")
-                + ("_pairout" if args.pref_pair_outcome else ""))
+                + ("_pairout" if args.pref_pair_outcome else "")
+                + ("" if args.pref_gate_init == 0.0 else f"_pg{args.pref_gate_init:g}"))
 _clip_suffix = _clip_suffix + _fail_suffix + _pref_suffix
 if args.mode == "pretrain_specialist":
     STREAM_NAME = {0: "wait", 1: "gini"}[args.stream_select]

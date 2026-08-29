@@ -82,8 +82,12 @@ class MasterPureTransition:
     """Duck-type Transition (rollout.py), field-demi-field spy hook RLRolloutAgent
     bekerja tanpa modifikasi. `obs`=joint (N,7) §3.1 MURNI (TANPA +EV)."""
 
-    def __init__(self, obs, mask, action, step, primary_idx):
+    def __init__(self, obs, mask, action, step, primary_idx, pref_hist=None):
         self.obs = obs; self.mask = mask; self.action = action
+        # WAJIB disimpan (2026-08-29) -- lih. catatan identik di MasterHybridPPOTransition:
+        # tanpa ini langkah `_update` memanggil aktor TANPA pref_hist, sehingga parameter
+        # preferensi tak pernah masuk graf gradien & modul P efektif mati.
+        self.pref_hist = pref_hist
         self.step = step
         self.chosen_indices = [int(primary_idx)]
         self.reward_streams = np.zeros(N_REWARD_STREAMS, dtype=np.float64)
@@ -149,6 +153,7 @@ class MasterPureRolloutAgent(RLRolloutAgent):
         # DIWARISI RLRolloutAgent.__init__ (auto-deteksi hasattr(actor,'pref_lstm')) --
         # aktor LAMA (`MasterPureActor`, tanpa pref_lstm) tak terpengaruh, tetap
         # dipanggil obs-saja spt semula (kompatibel mundur penuh).
+        pref_hist = None
         with torch.no_grad():
             if self._use_pref:
                 pref_hist = self._build_pref_hist(user)
@@ -179,7 +184,7 @@ class MasterPureRolloutAgent(RLRolloutAgent):
         recs = [self.sids[i] for i in chosen_order]
 
         tr = MasterPureTransition(joint_obs, mask, raw_bids.astype(np.float32),
-                                  self.sim.current_step, primary_idx)
+                                  self.sim.current_step, primary_idx, pref_hist=pref_hist)
         tr.disp_estwait = primary_disp
         tr.wait_default = float(self.sim.compute_virtual_wait(
             user, self.sim.spklus[self.sids[default_idx]], time_now)
@@ -249,16 +254,23 @@ class MasterPureReplayBuffer:
     def __init__(self, capacity: int = 1000):
         self.buf = deque(maxlen=capacity)
 
-    def push(self, obs, mask, action, reward_vec, next_obs, next_mask, I_raw, done):
-        self.buf.append((obs, mask, action, reward_vec, next_obs, next_mask, I_raw, done))
+    def push(self, obs, mask, action, reward_vec, next_obs, next_mask, I_raw, done,
+             pref_hist=None, next_pref_hist=None):
+        self.buf.append((obs, mask, action, reward_vec, next_obs, next_mask, I_raw, done,
+                         pref_hist, next_pref_hist))
 
     def sample(self, batch_size: int):
         batch = random.sample(self.buf, min(batch_size, len(self.buf)))
         cols = list(zip(*batch))
-        obs, mask, action, reward_vec, next_obs, next_mask, I_raw, done = cols
+        (obs, mask, action, reward_vec, next_obs, next_mask, I_raw, done,
+         pref_hist, next_pref_hist) = cols
+        # `pref_hist` di-stack HANYA bila SELURUH sampel batch punya (aktor bermodul-P);
+        # None utk aktor polos -> jalur lama tak berubah sama sekali.
+        ph = np.stack(pref_hist) if all(x is not None for x in pref_hist) else None
+        nph = np.stack(next_pref_hist) if all(x is not None for x in next_pref_hist) else None
         return (np.stack(obs), np.stack(mask), np.stack(action), np.stack(reward_vec),
                 np.stack(next_obs), np.stack(next_mask), np.stack(I_raw),
-                np.array(done, dtype=np.float32))
+                np.array(done, dtype=np.float32), ph, nph)
 
     def __len__(self):
         return len(self.buf)
@@ -429,7 +441,8 @@ class MasterPureTrainer:
             I_vec = np.array([I_snap.get(sid, 0.0) for sid in agent.sids], dtype=np.float32)
             self.buffer.push(t.obs, t.mask, t.action,
                              t.reward_vec(self.n_critics, self.stream_select),
-                             nx.obs, nx.mask, I_vec, 1.0 if t.done else 0.0)
+                             nx.obs, nx.mask, I_vec, 1.0 if t.done else 0.0,
+                             pref_hist=t.pref_hist, next_pref_hist=nx.pref_hist)
             t.pushed = True
             n_new += 1
         if boundary and trs:
@@ -443,7 +456,8 @@ class MasterPureTrainer:
                 I_vec = np.array([I_snap.get(sid, 0.0) for sid in agent.sids], dtype=np.float32)
                 self.buffer.push(last.obs, last.mask, last.action,
                                  last.reward_vec(self.n_critics, self.stream_select),
-                                 last.obs, last.mask, I_vec, 1.0)
+                                 last.obs, last.mask, I_vec, 1.0,
+                                 pref_hist=last.pref_hist, next_pref_hist=last.pref_hist)
                 last.pushed = True
                 n_new += 1
         k = 0
@@ -452,7 +466,7 @@ class MasterPureTrainer:
         agent.transitions = trs[k:]
         return n_new
 
-    def _compute_beta_dgr(self, obs_t, mask_t, I_t):
+    def _compute_beta_dgr(self, obs_t, mask_t, I_t, pref_t=None):
         """Pers. (13)-(14) SUNGGUHAN -- gap-ratio thd SPESIALIS beku, dievaluasi pada
         state (obs_t, I_t) YANG SAMA dgn data batch saat ini, TAPI dgn AKSI MILIK
         SPESIALIS `b*_k(o)` sendiri (bukan aksi kebijakan multi-objektif sekarang)."""
@@ -461,9 +475,9 @@ class MasterPureTrainer:
         gaps = []
         with torch.no_grad():
             for k, (act_s, crit_s) in enumerate(self.specialists):
-                a_star = act_s(obs_t)                              # b*_k(o^i_t)
+                a_star = act_s(obs_t, mask_t, pref_t)                              # b*_k(o^i_t)
                 q_star, _ = crit_s(obs_t, a_star, mask_t, I_t)       # Q*_k(x*_t), (B,1)
-                a_now = self.actor(obs_t)
+                a_now = self.actor(obs_t, mask_t, pref_t)
                 q_now, _ = self.critic(obs_t, a_now, mask_t, I_t)    # Q_k(x_t) dgn kritik MULTI-obj
                 q_star_m = q_star.mean().item()
                 q_now_k = q_now[:, k].mean().item()
@@ -478,7 +492,11 @@ class MasterPureTrainer:
     def _update(self):
         if len(self.buffer) < self.batch_size:
             return None
-        obs, mask, action, reward_vec, next_obs, next_mask, I_raw, done = self.buffer.sample(self.batch_size)
+        (obs, mask, action, reward_vec, next_obs, next_mask, I_raw, done,
+         pref_hist, next_pref_hist) = self.buffer.sample(self.batch_size)
+        pref_t = None if pref_hist is None else torch.as_tensor(pref_hist, dtype=torch.float32)
+        next_pref_t = (None if next_pref_hist is None
+                       else torch.as_tensor(next_pref_hist, dtype=torch.float32))
         obs_t = torch.as_tensor(obs, dtype=torch.float32)
         mask_t = torch.as_tensor(mask, dtype=torch.bool)
         action_t = torch.as_tensor(action, dtype=torch.float32)
@@ -489,7 +507,7 @@ class MasterPureTrainer:
         done_t = torch.as_tensor(done, dtype=torch.float32).unsqueeze(-1)
 
         with torch.no_grad():
-            next_action = self.actor_target(next_obs_t)
+            next_action = self.actor_target(next_obs_t, next_mask_t, next_pref_t)
             q_next, _ = self.critic_target(next_obs_t, next_action, next_mask_t, I_t)
             target = reward_t + self.gamma * (1.0 - done_t) * q_next
         q_sa, _ = self.critic(obs_t, action_t, mask_t, I_t)
@@ -498,9 +516,9 @@ class MasterPureTrainer:
         critic_grad = nn.utils.clip_grad_norm_(self.critic.parameters(), 10.0)
         self.opt_critic.step()
 
-        beta = self._compute_beta_dgr(obs_t, mask_t, I_t)
+        beta = self._compute_beta_dgr(obs_t, mask_t, I_t, pref_t)
         beta_t = torch.as_tensor(beta, dtype=torch.float32)
-        actor_action = self.actor(obs_t)
+        actor_action = self.actor(obs_t, mask_t, pref_t)
         q_pi, _ = self.critic(obs_t, actor_action, mask_t, I_t)
         actor_loss = -(q_pi @ beta_t).mean()
         self.opt_actor.zero_grad(); actor_loss.backward()

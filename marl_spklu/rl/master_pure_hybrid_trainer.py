@@ -29,8 +29,15 @@ from marl_spklu.rl.rewards import RewardCalculator
 
 
 class MasterHybridPPOTransition:
-    def __init__(self, obs, mask, primary_idx, logp, value, step):
+    def __init__(self, obs, mask, primary_idx, logp, value, step, pref_hist=None):
         self.obs = obs; self.mask = mask
+        # `pref_hist` WAJIB disimpan (2026-08-29): langkah update PPO menghitung ULANG
+        # logit, dan bila di sana `pref_hist=None` maka SELURUH parameter preferensi
+        # (pref_lstm/pref_attn/pref_gate) TAK PERNAH masuk graf gradien -> `pref_gate`
+        # tetap persis 0.0 -> `attended_pref = 0 * (...)` -> forward tak bergantung isi
+        # riwayat sama sekali. Itulah sebabnya lengan +P menghasilkan perilaku IDENTIK
+        # dgn lengan tanpa P (metrik bit-identik lintas 3 seed).
+        self.pref_hist = pref_hist
         self.logp = float(logp); self.value = value
         self.step = step
         self.chosen_indices = [int(primary_idx)]
@@ -134,7 +141,7 @@ class MasterHybridPPORolloutAgent(RLRolloutAgent):
 
         tr = MasterHybridPPOTransition(joint_obs, mask, primary_idx, logp,
                                        value.squeeze(0).numpy().astype(np.float64),
-                                       self.sim.current_step)
+                                       self.sim.current_step, pref_hist=pref_hist)
         tr.stream_select = self.stream_select
         tr.disp_estwait = primary_disp
         tr.wait_default = float(self.sim.compute_virtual_wait(
@@ -357,6 +364,9 @@ class MasterHybridPPOTrainer:
         primary_b = torch.as_tensor([t.chosen_indices[0] for t in transitions], dtype=torch.long)
         I_b = torch.as_tensor(np.stack([t.I_raw for t in transitions]), dtype=torch.float32)
         old_logp = torch.as_tensor(np.array([t.logp for t in transitions]), dtype=torch.float32)
+        _ph = [t.pref_hist for t in transitions]
+        pref_b = (torch.as_tensor(np.stack(_ph), dtype=torch.float32)
+                  if all(x is not None for x in _ph) else None)
         ret_b = torch.as_tensor(returns, dtype=torch.float32)
         adv_b = torch.as_tensor(adv_combined, dtype=torch.float32)
 
@@ -368,7 +378,8 @@ class MasterHybridPPOTrainer:
             np.random.shuffle(idx)
             for start in range(0, B, self.minibatch):
                 mb = idx[start:start + self.minibatch]
-                logits = self.actor(obs_b[mb], mask_b[mb], None)
+                logits = self.actor(obs_b[mb], mask_b[mb],
+                                    None if pref_b is None else pref_b[mb])
                 dist = torch.distributions.Categorical(logits=logits)
                 logp = dist.log_prob(primary_b[mb])
                 ent = dist.entropy()
@@ -396,7 +407,7 @@ class MasterHybridPPOTrainer:
                         "ret_mean": self._last_ret_mean.tolist()}
             if self.target_kl is not None:
                 with torch.no_grad():
-                    logits = self.actor(obs_b, mask_b, None)
+                    logits = self.actor(obs_b, mask_b, pref_b)
                     dist = torch.distributions.Categorical(logits=logits)
                     nlp = dist.log_prob(primary_b)
                     kl = float((old_logp - nlp).mean())

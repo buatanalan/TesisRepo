@@ -4,7 +4,7 @@
 #   nohup bash Eksekusi_RL/eval_master_hybrid_pairout_metrik.sh > Eksekusi_RL/outputs/eval_master_hybrid_pairout_metrik.log 2>&1 &
 set -e
 PY=.venv/bin/python
-SUF=cwtfail120pen-2_preffeat_pairout
+SUF=cwtfail120pen-2_preffeat_pairout_pg0.1
 
 echo "=== Master-Hybrid PPO ==="
 UJI=Eksekusi_RL/_uji_master_pure_hybrid_ppo_metrik.py

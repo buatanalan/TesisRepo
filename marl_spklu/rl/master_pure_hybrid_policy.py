@@ -92,7 +92,8 @@ class _PrefStationBackbone(nn.Module):
     def __init__(self, n_spklu: int, station_feat_dim: int = STATION_FEAT_DIM_MASTER,
                 vec_dim: int = 8, bid_hidden: int = 16, pref_d_lstm: int = 8,
                 pref_d_attn: int = 8, station_attn_dim: int = 8,
-                pref_feature_mode: bool = False, pref_pair_outcome: bool = False):
+                pref_feature_mode: bool = False, pref_pair_outcome: bool = False,
+                pref_gate_init: float = 0.0):
         super().__init__()
         self.vec_head = StationVectorHead(station_feat_dim, vec_dim, bid_hidden)
         self.pref_feature_mode = bool(pref_feature_mode)
@@ -110,7 +111,18 @@ class _PrefStationBackbone(nn.Module):
             pref_hist_feat_dim = hist_feat_dim(n_spklu)
         self.pref_lstm = nn.LSTM(pref_hist_feat_dim, pref_d_lstm, batch_first=True)
         self.pref_attn = PreferenceAttention(station_feat_dim, pref_d_lstm, pref_d_attn)
-        self.pref_gate = nn.Parameter(torch.tensor(0.0))
+        # `pref_gate_init` (2026-08-29): nilai AWAL gerbang preferensi. Baku 0.0 =
+        # perilaku lama (GTrXL zero-init). MASALAH yg ditemukan: pada gerbang PERSIS 0,
+        # gradien yg sampai ke `pref_lstm`/`pref_attn` adalah PERSIS NOL (terverifikasi:
+        # gate=0.0 -> |grad pref_lstm|=0.000e+00; gate=0.05 -> 6.2e-03), sehingga modul
+        # preferensi TAK BISA mulai belajar sampai gerbangnya bergeser sendiri -- padahal
+        # gerbang itu sendiri bergerak lambat. Deadlock ayam-telur yg sama kelasnya dgn
+        # `station_attn_gate` raw=-5.0 yg dulu terbukti MACET (turunan sigmoid 0,0067).
+        # Nilai kecil bukan-nol (mis. 0.1) memutus deadlock TANPA meninggalkan semangat
+        # "mulai hampir tak berkontribusi". CATATAN: gerbang ini BEBAS TANDA (bukan
+        # sigmoid spt LatePrefMerge/SmallStationAttention) -- risiko konvergen ke tanda
+        # berbeda antar-seed tetap ada, lih. diagnosis station_attn 2026-08-24.
+        self.pref_gate = nn.Parameter(torch.tensor(float(pref_gate_init)))
         self.late_merge = LatePrefMerge(vec_dim, pref_d_attn)
         self.station_attn = SmallStationAttention(vec_dim, station_attn_dim)
 
@@ -146,11 +158,12 @@ class MasterHybridDDPGActor(nn.Module):
                 vec_dim: int = 8, bid_hidden: int = 16, pref_d_lstm: int = 8,
                 pref_d_attn: int = 8, station_attn_dim: int = 8,
                 pref_feature_mode: bool = False, bid_scale: float = 10.0,
-                pref_pair_outcome: bool = False):
+                pref_pair_outcome: bool = False, pref_gate_init: float = 0.0):
         super().__init__()
         self.backbone = _PrefStationBackbone(n_spklu, station_feat_dim, vec_dim, bid_hidden,
                                              pref_d_lstm, pref_d_attn, station_attn_dim,
-                                             pref_feature_mode, pref_pair_outcome)
+                                             pref_feature_mode, pref_pair_outcome,
+                                             pref_gate_init)
         self.pref_lstm = self.backbone.pref_lstm   # DIBACA RLRolloutAgent.__init__ (_use_pref)
         self.head = nn.Linear(vec_dim, 1)
         self.bid_scale = float(bid_scale)
@@ -170,11 +183,13 @@ class MasterHybridPPOActor(nn.Module):
     def __init__(self, n_spklu: int, station_feat_dim: int = STATION_FEAT_DIM_MASTER,
                 vec_dim: int = 8, bid_hidden: int = 16, pref_d_lstm: int = 8,
                 pref_d_attn: int = 8, station_attn_dim: int = 8,
-                pref_feature_mode: bool = False, pref_pair_outcome: bool = False):
+                pref_feature_mode: bool = False, pref_pair_outcome: bool = False,
+                pref_gate_init: float = 0.0):
         super().__init__()
         self.backbone = _PrefStationBackbone(n_spklu, station_feat_dim, vec_dim, bid_hidden,
                                              pref_d_lstm, pref_d_attn, station_attn_dim,
-                                             pref_feature_mode, pref_pair_outcome)
+                                             pref_feature_mode, pref_pair_outcome,
+                                             pref_gate_init)
         self.pref_lstm = self.backbone.pref_lstm
         self.head = nn.Linear(vec_dim, 1)
 

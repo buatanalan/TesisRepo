@@ -23,7 +23,7 @@ set -e
 PY=.venv/bin/python
 COMMON="--n-train-seed 3 --n-updates 300 --rollout-steps 96 --horizon 30d \
         --wait-fail-threshold 120 --wait-fail-penalty -2.0 \
-        --pref-feature-mode --pref-pair-outcome"
+        --pref-feature-mode --pref-pair-outcome --pref-gate-init 0.1"
 
 echo "=== [1/2] Master-Hybrid PPO ==="
 PIPE=Eksekusi_RL/_run_master_pure_hybrid_ppo_pipeline.py
