@@ -110,7 +110,8 @@ class RewardCalculator:
                  wait_scale: float = 60.0, use_delta_gini: bool = False,
                  alpha_trust: float = 0.0, alpha_accept: float = 0.0,
                  alpha_equity: float = 0.0, alpha_acc: float = 0.0,
-                 tau_acc: float = None, wait_reward_clip: float = None):
+                 tau_acc: float = None, wait_reward_clip: float = None,
+                 wait_fail_threshold: float = None, wait_fail_penalty: float = -1.0):
         self.alpha_wait = float(alpha_wait)
         # Klip OPSIONAL (default None -> perilaku lama TAK BERUBAH) pada `improvement`
         # (sblm dikali alpha_wait) di `wait_reward`. Diusulkan sbg respons diagnosis
@@ -121,6 +122,27 @@ class RewardCalculator:
         # wait_scale, BUKAN reward akhir) supaya nilainya tetap terinterpretasi sbg
         # "menit tunggu yg diperbaiki, dibatasi maks N kelipatan wait_scale".
         self.wait_reward_clip = None if wait_reward_clip is None else float(wait_reward_clip)
+        # Ambang-gagal + penalti TETAP OPSIONAL (default None -> nonaktif, TAK mengubah
+        # lengan manapun yg sudah ada), mereplikasi mekanisme CWT paper MASTER (Lampiran B,
+        # 2102.07359v1): "...fail to charge when the CWT exceeds a predefined threshold
+        # (45 minutes). The penal reward eps_cwt of failed request is -60." Beda dari
+        # `wait_reward_clip` (yg cuma memotong SISI ATAS `improvement`, tetap 0 saat
+        # wait_actual meleset jauh): di sini, begitu `wait_actual` melewati
+        # `wait_fail_threshold`, reward LANGSUNG diganti penalti TETAP (`wait_fail_penalty`,
+        # biasanya NEGATIF) -- bukan proporsional thd separah apa keterlambatannya. Ini
+        # "circuit breaker" thd ekor tebal wait_reward yg didiagnosis sbg akar kolaps
+        # entropi PPO/DDPG di atas MASTER murni (2026-08-29): brp pun besar wait_actual
+        # (1000+ menit pd seed kolaps), kontribusinya ke reward tetap TERBATAS di
+        # `alpha_wait * wait_fail_penalty`, sama spt paper membatasi r_cwt di [eps_cwt, 0].
+        # CATATAN KESETIAAN: paper JUGA mengeluarkan permintaan itu dari antrean simulator
+        # begitu gagal (CFR sungguhan, memutus loop kongesti di sumbernya) -- di sini HANYA
+        # sisi REWARD yg dibatasi, antrean simulator TETAP berjalan apa adanya (perubahan
+        # level-simulator jauh lebih invasif, menyentuh SEMUA eksperimen lain yg bergantung
+        # pd dinamika antrean tak-terpotong). Pendekatan reward-side ini menyasar mekanisme
+        # SPESIFIK yg terbukti merusak (dominasi ekor tebal di advantage GAE), bukan replikasi
+        # CFR penuh -- deviasi yg disengaja & diatribusikan, bukan kealpaan.
+        self.wait_fail_threshold = None if wait_fail_threshold is None else float(wait_fail_threshold)
+        self.wait_fail_penalty = float(wait_fail_penalty)
         self.beta_prox = float(beta_prox)
         self.alpha_gini = float(alpha_gini)
         self.alpha_flock = float(alpha_flock)
@@ -279,6 +301,8 @@ class RewardCalculator:
     # rollout.py) tapi TAK LAGI dipakai -- EstWait yang ditampilkan sekarang selalu jujur
     # (murni forecaster), jadi tak ada lagi honesty_gap yang bisa diatribusikan ke aksi agen.
     def wait_reward(self, wait_default: float, wait_actual: float, disp_estwait: float = 0.0) -> float:
+        if self.wait_fail_threshold is not None and float(wait_actual) > self.wait_fail_threshold:
+            return self.alpha_wait * self.wait_fail_penalty
         improvement = max(0.0, float(wait_default) - float(wait_actual)) / self.wait_scale
         if self.wait_reward_clip is not None:
             improvement = min(improvement, self.wait_reward_clip)

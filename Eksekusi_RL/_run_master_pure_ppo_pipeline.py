@@ -41,6 +41,12 @@ p.add_argument("--wait-reward-clip", type=float, default=None,
               help="Klip opsional pd `improvement` wait_reward (satuan wait_scale) -- "
                    "diagnosis kolaps entropi PPO-Master-murni (2026-08-29): reward wait "
                    "berekor tebal mendominasi advantage GAE. None=perilaku lama (tak diklip).")
+p.add_argument("--wait-fail-threshold", type=float, default=None,
+              help="Ambang gagal (menit, replika mekanisme CWT paper MASTER: >45 menit -> "
+                   "gagal, penalti TETAP eps_cwt=-60). None=nonaktif (perilaku lama).")
+p.add_argument("--wait-fail-penalty", type=float, default=-1.0,
+              help="Penalti TETAP (satuan wait_scale, sblm dikali alpha_wait) saat "
+                   "wait_actual > --wait-fail-threshold. Diabaikan bila threshold None.")
 args = p.parse_args()
 
 if args.mode == "pretrain_specialist":
@@ -54,6 +60,9 @@ if args.dataset != "4x":
 _horizon_suffix = "" if args.horizon == "30d" else f"_{args.horizon}"
 
 _clip_suffix = "" if args.wait_reward_clip is None else f"_clip{args.wait_reward_clip:g}"
+_fail_suffix = ("" if args.wait_fail_threshold is None
+               else f"_cwtfail{args.wait_fail_threshold:g}pen{args.wait_fail_penalty:g}")
+_clip_suffix = _clip_suffix + _fail_suffix
 if args.mode == "pretrain_specialist":
     STREAM_NAME = {0: "wait", 1: "gini"}[args.stream_select]
     TAG_ARM = f"master_pure_ppo_specialist{args.stream_select}_{STREAM_NAME}{_horizon_suffix}{_clip_suffix}"
@@ -83,8 +92,10 @@ def _load_r_star(tag: str, seed: int) -> float:
 def train_one(seed):
     kw = dict(dataset_path=DATASET, mode=args.mode, rollout_steps=args.rollout_steps,
              seed=seed, verbose=False)
-    if args.wait_reward_clip is not None:
-        kw["reward_calc"] = RewardCalculator(wait_reward_clip=args.wait_reward_clip)
+    if args.wait_reward_clip is not None or args.wait_fail_threshold is not None:
+        kw["reward_calc"] = RewardCalculator(wait_reward_clip=args.wait_reward_clip,
+                                             wait_fail_threshold=args.wait_fail_threshold,
+                                             wait_fail_penalty=args.wait_fail_penalty)
     if args.mode == "pretrain_specialist":
         kw["stream_select"] = args.stream_select
     else:
