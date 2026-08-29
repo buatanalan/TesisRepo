@@ -27,7 +27,8 @@ K_REC = 3
 # bentuk jaringannya (kelas bug "latih & uji beda mode", berulang di repo ini).
 ACTOR_KW = dict(vec_dim=8, bid_hidden=16, pref_d_lstm=8, pref_d_attn=8, station_attn_dim=8,
                 pref_feature_mode="_preffeat" in TAG_ARM,
-                pref_pair_outcome="_pairout" in TAG_ARM)
+                pref_pair_outcome="_pairout" in TAG_ARM,
+                station_feat_dim=(10 if "_evobs" in TAG_ARM else 7))
 K.DS = os.path.join(common.ROOT, K.HORIZON[TAG])
 
 

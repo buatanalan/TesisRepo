@@ -20,7 +20,8 @@ import torch.nn as nn
 
 from marl_spklu.rl.rollout import (RLRolloutAgent, RewardCalculatorStub, STREAM_INDIVIDUAL,
                                    STREAM_GLOBAL, N_REWARD_STREAMS, _gini)
-from marl_spklu.rl.master_paper_obs import build_joint_obs_master, STATION_FEAT_DIM_MASTER
+from marl_spklu.rl.master_paper_obs import (build_joint_obs_master, build_joint_obs_master_ev,
+                                            STATION_FEAT_DIM_MASTER, STATION_FEAT_DIM_MASTER_EV)
 from marl_spklu.rl.master_pure_hybrid_policy import MasterHybridPPOActor
 from marl_spklu.rl.master_pure_ppo_policy import MasterPurePPOCritic
 from marl_spklu.rl.master_pure_trainer import snapshot_slots_raw, _SlotRawLog
@@ -84,6 +85,9 @@ class MasterHybridPPORolloutAgent(RLRolloutAgent):
                          pref_pair_outcome=pref_pair_outcome, pref_pad_right=True)
         self.actor = actor
         self.critic = critic
+        # DUA VERSI OBSERVASI -- lih. catatan identik di MasterPureRolloutAgent.
+        self._ev_obs = (getattr(actor, "station_feat_dim", STATION_FEAT_DIM_MASTER)
+                        == STATION_FEAT_DIM_MASTER_EV)
         self.stream_select = stream_select
         # `deterministic=True` -> argmax logit, TANPA sampling (evaluasi bersih). Dipakai
         # `MasterHybridPPOInferenceAgent` yg kini MENDELEGASIKAN ke kelas ini supaya
@@ -99,7 +103,9 @@ class MasterHybridPPORolloutAgent(RLRolloutAgent):
         feasible_ids = list(feasible_spklus.keys())
 
         _rich_obs_unused, default_idx, wait_hat = self._build_obs(user, soc, feasible_ids, time_now)
-        joint_obs = build_joint_obs_master(self.sim, self.sids, time_now)
+        joint_obs = (build_joint_obs_master_ev(self.sim, self.sids, time_now, user, soc)
+                     if self._ev_obs else
+                     build_joint_obs_master(self.sim, self.sids, time_now))
         mask = self._feasible_mask(feasible_ids)
 
         obs_t = torch.as_tensor(joint_obs, dtype=torch.float32).unsqueeze(0)
@@ -263,7 +269,8 @@ class MasterHybridPPOTrainer:
         self.N = len(sim0.spklus)
 
         self.actor = MasterHybridPPOActor(self.N, **(actor_kwargs or {}))
-        self.critic = MasterPurePPOCritic(STATION_FEAT_DIM_MASTER, hidden=hidden,
+        _sfd = getattr(self.actor, "station_feat_dim", STATION_FEAT_DIM_MASTER)
+        self.critic = MasterPurePPOCritic(_sfd, hidden=hidden,
                                           n_critics=self.n_critics)
         self.opt = torch.optim.Adam(
             list(self.actor.parameters()) + list(self.critic.parameters()), lr=lr)

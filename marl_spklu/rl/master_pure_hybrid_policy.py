@@ -95,6 +95,11 @@ class _PrefStationBackbone(nn.Module):
                 pref_feature_mode: bool = False, pref_pair_outcome: bool = False,
                 pref_gate_init: float = 0.0):
         super().__init__()
+        # Disimpan agar rollout agent & trainer bisa MENURUNKAN dimensi observasi dari
+        # aktor (bukan diteruskan terpisah) -- menjamin obs yang dibangun selalu cocok.
+        # 7  = STATION_FEAT_DIM_MASTER    (§3.1 murni, stasiun buta thd pemohon)
+        # 10 = STATION_FEAT_DIM_MASTER_EV (+ jarak relatif, SoC, kapasitas baterai)
+        self.station_feat_dim = int(station_feat_dim)
         self.vec_head = StationVectorHead(station_feat_dim, vec_dim, bid_hidden)
         self.pref_feature_mode = bool(pref_feature_mode)
         # Blok HASIL [complied, realized_gap_norm] ditempelkan di belakang pasangan fitur
@@ -164,7 +169,8 @@ class MasterHybridDDPGActor(nn.Module):
                                              pref_d_lstm, pref_d_attn, station_attn_dim,
                                              pref_feature_mode, pref_pair_outcome,
                                              pref_gate_init)
-        self.pref_lstm = self.backbone.pref_lstm   # DIBACA RLRolloutAgent.__init__ (_use_pref)
+        self.pref_lstm = self.backbone.pref_lstm
+        self.station_feat_dim = self.backbone.station_feat_dim   # DIBACA RLRolloutAgent.__init__ (_use_pref)
         self.head = nn.Linear(vec_dim, 1)
         self.bid_scale = float(bid_scale)
 
@@ -191,6 +197,7 @@ class MasterHybridPPOActor(nn.Module):
                                              pref_feature_mode, pref_pair_outcome,
                                              pref_gate_init)
         self.pref_lstm = self.backbone.pref_lstm
+        self.station_feat_dim = self.backbone.station_feat_dim
         self.head = nn.Linear(vec_dim, 1)
 
     def forward(self, station_obs, mask=None, pref_hist=None):

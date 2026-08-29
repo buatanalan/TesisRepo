@@ -35,7 +35,8 @@ import torch
 import torch.nn as nn
 
 from marl_spklu.rl.rollout import RLRolloutAgent, STREAM_INDIVIDUAL, STREAM_GLOBAL, N_REWARD_STREAMS, _gini
-from marl_spklu.rl.master_paper_obs import build_joint_obs_master, STATION_FEAT_DIM_MASTER
+from marl_spklu.rl.master_paper_obs import (build_joint_obs_master, build_joint_obs_master_ev,
+                                            STATION_FEAT_DIM_MASTER, STATION_FEAT_DIM_MASTER_EV)
 from marl_spklu.rl.master_pure_policy import MasterPureActor, MasterPureCritic
 from marl_spklu.rl.rewards import RewardCalculator
 
@@ -128,6 +129,12 @@ class MasterPureRolloutAgent(RLRolloutAgent):
                          pref_feature_mode=pref_feature_mode,
                          pref_pair_outcome=pref_pair_outcome, pref_pad_right=True)
         self.actor = actor
+        # DUA VERSI OBSERVASI (2026-08-29). Diturunkan dari aktor, bukan flag terpisah:
+        #   7  -> `build_joint_obs_master`     (MASTER murni, Pers.11 -- buta thd pemohon)
+        #   10 -> `build_joint_obs_master_ev`  (+3 fitur pemohon: jarak relatif, SoC,
+        #         kapasitas baterai) -- sesuai spesifikasi o_i (K x 10) Bab IV.
+        self._ev_obs = (getattr(actor, "station_feat_dim", STATION_FEAT_DIM_MASTER)
+                        == STATION_FEAT_DIM_MASTER_EV)
         self.noise_std = float(noise_std)
         self.ou_theta = 0.15
         self._ou_state = np.zeros(self.N, dtype=np.float32)
@@ -144,7 +151,9 @@ class MasterPureRolloutAgent(RLRolloutAgent):
         feasible_ids = list(feasible_spklus.keys())
 
         _rich_obs_unused, default_idx, wait_hat = self._build_obs(user, soc, feasible_ids, time_now)
-        joint_obs = build_joint_obs_master(self.sim, self.sids, time_now)   # (N,7) §3.1 MURNI
+        joint_obs = (build_joint_obs_master_ev(self.sim, self.sids, time_now, user, soc)
+                     if self._ev_obs else
+                     build_joint_obs_master(self.sim, self.sids, time_now))
         mask = self._feasible_mask(feasible_ids)
 
         obs_t = torch.as_tensor(joint_obs, dtype=torch.float32).unsqueeze(0)
@@ -368,8 +377,10 @@ class MasterPureTrainer:
         self.actor_target.load_state_dict(self.actor.state_dict())
         self.actor_target.eval()
 
-        self.critic = MasterPureCritic(STATION_FEAT_DIM_MASTER, hidden=hidden, n_critics=self.n_critics)
-        self.critic_target = MasterPureCritic(STATION_FEAT_DIM_MASTER, hidden=hidden, n_critics=self.n_critics)
+        # Dimensi kritik MENGIKUTI aktor -- lih. `_ev_obs` di MasterPureRolloutAgent.
+        _sfd = getattr(self.actor, "station_feat_dim", STATION_FEAT_DIM_MASTER)
+        self.critic = MasterPureCritic(_sfd, hidden=hidden, n_critics=self.n_critics)
+        self.critic_target = MasterPureCritic(_sfd, hidden=hidden, n_critics=self.n_critics)
         self.critic_target.load_state_dict(self.critic.state_dict())
         self.critic_target.eval()
 

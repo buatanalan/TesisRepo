@@ -57,6 +57,14 @@ p.add_argument("--wait-fail-penalty", type=float, default=-1.0,
 p.add_argument("--pref-feature-mode", action="store_true",
               help="Riwayat preferensi sbg PASANGAN VEKTOR FITUR stasiun (10 dim), bukan "
                    "one-hot identitas. Sama mode dipakai Kandidat A.")
+p.add_argument("--ev-obs", action="store_true",
+              help="Observasi (K x 10) sesuai spesifikasi o_i Bab IV: 7 fitur stasiun "
+                   "+ 3 fitur PEMOHON yg disiarkan (jarak relatif, SoC, kapasitas "
+                   "baterai) via `build_joint_obs_master_ev`. BAKU MATI -> tetap 7 fitur "
+                   "§3.1 murni (Pers.11, stasiun buta thd pemohon). Tanpa flag ini agen "
+                   "hanya mengenali pemohon lewat riwayat (pref_hist), TIDAK lewat "
+                   "keadaan fisiknya saat ini -- shg tak bisa menalar keterjangkauan "
+                   "maupun range-anxiety utk permintaan yang sedang dilayani.")
 p.add_argument("--pref-gate-init", type=float, default=0.0,
               help="Nilai AWAL gerbang preferensi (baku 0.0 = GTrXL zero-init, perilaku "
                    "lama). MASALAH: pada gerbang PERSIS 0 gradien ke pref_lstm/pref_attn "
@@ -82,12 +90,17 @@ _fail_suffix = ("" if args.wait_fail_threshold is None
                else f"_cwtfail{args.wait_fail_threshold:g}pen{args.wait_fail_penalty:g}")
 assert not (args.pref_pair_outcome and not args.pref_feature_mode), (
     "--pref-pair-outcome WAJIB disertai --pref-feature-mode")
+from marl_spklu.rl.master_paper_obs import (STATION_FEAT_DIM_MASTER,
+                                            STATION_FEAT_DIM_MASTER_EV)
 ACTOR_KW = dict(ACTOR_KW_BASE, pref_feature_mode=args.pref_feature_mode,
                 pref_pair_outcome=args.pref_pair_outcome,
-                pref_gate_init=args.pref_gate_init)
+                pref_gate_init=args.pref_gate_init,
+                station_feat_dim=(STATION_FEAT_DIM_MASTER_EV if args.ev_obs
+                                  else STATION_FEAT_DIM_MASTER))
 _pref_suffix = (("_preffeat" if args.pref_feature_mode else "")
                 + ("_pairout" if args.pref_pair_outcome else "")
-                + ("" if args.pref_gate_init == 0.0 else f"_pg{args.pref_gate_init:g}"))
+                + ("" if args.pref_gate_init == 0.0 else f"_pg{args.pref_gate_init:g}")
+                + ("_evobs" if args.ev_obs else ""))
 _clip_suffix = _clip_suffix + _fail_suffix + _pref_suffix
 if args.mode == "pretrain_specialist":
     STREAM_NAME = {0: "wait", 1: "gini"}[args.stream_select]
