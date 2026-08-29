@@ -124,7 +124,11 @@ def _specialist_tag(stream: int, explicit: str):
 
 def _load_specialist(tag: str, seed: int, n_spklu: int):
     actor = MasterHybridDDPGActor(n_spklu, **ACTOR_KW)
-    critic = MasterPureCritic(STATION_FEAT_DIM_MASTER, n_critics=1)
+    # Dimensi kritik WAJIB mengikuti ACTOR_KW, BUKAN STATION_FEAT_DIM_MASTER hardcoded:
+    # dgn --ev-obs observasi jadi 10 fitur, sehingga `pool.W_a/W_c` spesialis ber-in_dim
+    # 75 (=10+a+p) bukan 72 (=7+a+p). Hardcode lama menyebabkan size-mismatch saat
+    # memuat checkpoint spesialis pd tahap DGR (ditemukan 2026-08-29).
+    critic = MasterPureCritic(ACTOR_KW["station_feat_dim"], n_critics=1)
     a_path = os.path.join(common.OUTDIR, f"{tag}_actor_seed{seed}.pt")
     c_path = os.path.join(common.OUTDIR, f"{tag}_critic_seed{seed}.pt")
     assert os.path.exists(a_path), f"checkpoint spesialis tak ditemukan: {a_path}"
