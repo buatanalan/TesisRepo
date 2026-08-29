@@ -22,6 +22,7 @@ import common
 from marl_spklu.rl.master_pure_trainer import MasterPureTrainer
 from marl_spklu.rl.master_pure_policy import MasterPureActor, MasterPureCritic
 from marl_spklu.rl.master_paper_obs import STATION_FEAT_DIM_MASTER
+from marl_spklu.rl.rewards import RewardCalculator
 
 T0 = time.time()
 def elapsed():
@@ -49,6 +50,15 @@ p.add_argument("--specialist-seed", type=int, default=0,
 p.add_argument("--overwrite", action="store_true",
               help="Timpa eval_results.json lama meski n_updates lebih kecil (lih. "
                    "pengaman insiden 2026-08-23 di _run_master_ev_ppo_pipeline.py).")
+p.add_argument("--wait-reward-clip", type=float, default=None,
+              help="Klip opsional pd `improvement` wait_reward (satuan wait_scale) -- "
+                   "sama mekanisme diuji di _run_master_pure_ppo_pipeline.py, kini diuji "
+                   "jg utk DDPG murni (2026-08-29). None=perilaku lama (tak diklip).")
+p.add_argument("--wait-fail-threshold", type=float, default=None,
+              help="Ambang gagal (menit, replika CWT paper MASTER) -- penalti TETAP saat "
+                   "wait_actual > ambang. None=nonaktif.")
+p.add_argument("--wait-fail-penalty", type=float, default=-1.0,
+              help="Penalti TETAP (satuan wait_scale) saat wait_actual > --wait-fail-threshold.")
 args = p.parse_args()
 
 if args.mode == "pretrain_specialist":
@@ -64,12 +74,16 @@ if args.dataset != "4x":
         "kekeliruan. Sertakan --horizon eksplisit, mis. --horizon 90d.")
 
 _horizon_suffix = "" if args.horizon == "30d" else f"_{args.horizon}"
+_clip_suffix = "" if args.wait_reward_clip is None else f"_clip{args.wait_reward_clip:g}"
+_fail_suffix = ("" if args.wait_fail_threshold is None
+               else f"_cwtfail{args.wait_fail_threshold:g}pen{args.wait_fail_penalty:g}")
+_clip_suffix = _clip_suffix + _fail_suffix
 
 if args.mode == "pretrain_specialist":
     STREAM_NAME = {0: "wait", 1: "gini"}[args.stream_select]
-    TAG_ARM = f"master_pure_specialist{args.stream_select}_{STREAM_NAME}{_horizon_suffix}"
+    TAG_ARM = f"master_pure_specialist{args.stream_select}_{STREAM_NAME}{_horizon_suffix}{_clip_suffix}"
 else:
-    TAG_ARM = f"master_pure_dgr{_horizon_suffix}"
+    TAG_ARM = f"master_pure_dgr{_horizon_suffix}{_clip_suffix}"
 
 print(f"[{elapsed()}] Dataset: {DATASET}", flush=True)
 print(f"[{elapsed()}] Lengan: tag={TAG_ARM} mode={args.mode} "
@@ -82,7 +96,7 @@ def _specialist_tag(stream: int, explicit: str):
     if explicit:
         return explicit
     name = {0: "wait", 1: "gini"}[stream]
-    return f"master_pure_specialist{stream}_{name}{_horizon_suffix}"
+    return f"master_pure_specialist{stream}_{name}{_horizon_suffix}{_clip_suffix}"
 
 
 def _load_specialist(tag: str, seed: int):
@@ -101,6 +115,10 @@ def _load_specialist(tag: str, seed: int):
 def train_one(seed):
     kw = dict(dataset_path=DATASET, mode=args.mode, rollout_steps=args.rollout_steps,
              seed=seed, verbose=False)
+    if args.wait_reward_clip is not None or args.wait_fail_threshold is not None:
+        kw["reward_calc"] = RewardCalculator(wait_reward_clip=args.wait_reward_clip,
+                                             wait_fail_threshold=args.wait_fail_threshold,
+                                             wait_fail_penalty=args.wait_fail_penalty)
     if args.mode == "pretrain_specialist":
         kw["stream_select"] = args.stream_select
     else:
