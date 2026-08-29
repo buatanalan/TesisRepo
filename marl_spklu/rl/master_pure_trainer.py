@@ -466,6 +466,17 @@ class MasterPureTrainer:
         agent.transitions = trs[k:]
         return n_new
 
+    @staticmethod
+    def _actor_fwd(actor, obs_t, mask_t, pref_t):
+        """Panggil aktor sesuai SIGNATURE-nya. `MasterPureActor` polos (MASTER murni)
+        hanya menerima `forward(station_obs)`; aktor Hybrid (`MasterHybridDDPGActor`)
+        menerima `forward(station_obs, mask, pref_hist)`. Dibedakan lewat ada/tidaknya
+        atribut `backbone` -- BUKAN lewat `pref_t is None`, krn aktor Hybrid TETAP harus
+        dipanggil bentuk 3-argumen walau riwayatnya kebetulan kosong."""
+        if getattr(actor, "backbone", None) is None:
+            return actor(obs_t)
+        return actor(obs_t, mask_t, pref_t)
+
     def _compute_beta_dgr(self, obs_t, mask_t, I_t, pref_t=None):
         """Pers. (13)-(14) SUNGGUHAN -- gap-ratio thd SPESIALIS beku, dievaluasi pada
         state (obs_t, I_t) YANG SAMA dgn data batch saat ini, TAPI dgn AKSI MILIK
@@ -475,9 +486,9 @@ class MasterPureTrainer:
         gaps = []
         with torch.no_grad():
             for k, (act_s, crit_s) in enumerate(self.specialists):
-                a_star = act_s(obs_t, mask_t, pref_t)                              # b*_k(o^i_t)
+                a_star = self._actor_fwd(act_s, obs_t, mask_t, pref_t)                              # b*_k(o^i_t)
                 q_star, _ = crit_s(obs_t, a_star, mask_t, I_t)       # Q*_k(x*_t), (B,1)
-                a_now = self.actor(obs_t, mask_t, pref_t)
+                a_now = self._actor_fwd(self.actor, obs_t, mask_t, pref_t)
                 q_now, _ = self.critic(obs_t, a_now, mask_t, I_t)    # Q_k(x_t) dgn kritik MULTI-obj
                 q_star_m = q_star.mean().item()
                 q_now_k = q_now[:, k].mean().item()
@@ -507,7 +518,7 @@ class MasterPureTrainer:
         done_t = torch.as_tensor(done, dtype=torch.float32).unsqueeze(-1)
 
         with torch.no_grad():
-            next_action = self.actor_target(next_obs_t, next_mask_t, next_pref_t)
+            next_action = self._actor_fwd(self.actor_target, next_obs_t, next_mask_t, next_pref_t)
             q_next, _ = self.critic_target(next_obs_t, next_action, next_mask_t, I_t)
             target = reward_t + self.gamma * (1.0 - done_t) * q_next
         q_sa, _ = self.critic(obs_t, action_t, mask_t, I_t)
@@ -518,7 +529,7 @@ class MasterPureTrainer:
 
         beta = self._compute_beta_dgr(obs_t, mask_t, I_t, pref_t)
         beta_t = torch.as_tensor(beta, dtype=torch.float32)
-        actor_action = self.actor(obs_t, mask_t, pref_t)
+        actor_action = self._actor_fwd(self.actor, obs_t, mask_t, pref_t)
         q_pi, _ = self.critic(obs_t, actor_action, mask_t, I_t)
         actor_loss = -(q_pi @ beta_t).mean()
         self.opt_actor.zero_grad(); actor_loss.backward()
