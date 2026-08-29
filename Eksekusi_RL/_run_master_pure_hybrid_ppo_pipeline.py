@@ -24,7 +24,7 @@ T0 = time.time()
 def elapsed():
     return f"{time.time()-T0:.1f}s"
 
-ACTOR_KW = dict(vec_dim=8, bid_hidden=16, pref_d_lstm=8, pref_d_attn=8, station_attn_dim=8)
+ACTOR_KW_BASE = dict(vec_dim=8, bid_hidden=16, pref_d_lstm=8, pref_d_attn=8, station_attn_dim=8)
 
 p = argparse.ArgumentParser()
 p.add_argument("--mode", type=str, required=True, choices=["pretrain_specialist", "dgr"])
@@ -47,6 +47,16 @@ p.add_argument("--wait-fail-threshold", type=float, default=None,
                    "wait_actual > ambang. None=nonaktif.")
 p.add_argument("--wait-fail-penalty", type=float, default=-1.0,
               help="Penalti TETAP (satuan wait_scale) saat wait_actual > --wait-fail-threshold.")
+p.add_argument("--pref-feature-mode", action="store_true",
+              help="Riwayat preferensi sbg PASANGAN VEKTOR FITUR stasiun ([jarak, est_wait, "
+                   "antrean, konektor, utilisasi] utk direkomendasikan ++ dipilih, 10 dim) "
+                   "-- bukan one-hot identitas paper PDQN. Sama mode dipakai Kandidat A.")
+p.add_argument("--pref-pair-outcome", action="store_true",
+              help="Tempelkan blok HASIL [complied, realized_gap_norm] di belakang pasangan "
+                   "fitur (10 -> 12 dim, 2026-08-29). `realized_gap` = besaran yg SAMA "
+                   "dipakai User.update_trust, jadi `pref_lstm` menduga preferensi DAN "
+                   "kepercayaan sekaligus -- `hist_lstm` terpisah jadi mubazir, bukan "
+                   "bersaing. WAJIB --pref-feature-mode.")
 p.add_argument("--reward-preset", type=str, default="raw", choices=["raw", "seimbang4x"],
               help="'raw' (BAKU -- RewardCalculator() mentah, alpha_wait=1.0 alpha_gini=0.5, "
                    "TAK PERNAH dikalibrasi utk rezim 4x) | 'seimbang4x' (RewardCalculator."
@@ -70,7 +80,14 @@ _clip_suffix = "" if args.wait_reward_clip is None else f"_clip{args.wait_reward
 _fail_suffix = ("" if args.wait_fail_threshold is None
                else f"_cwtfail{args.wait_fail_threshold:g}pen{args.wait_fail_penalty:g}")
 _rw_suffix = "" if args.reward_preset == "raw" else f"_{args.reward_preset}"
-_clip_suffix = _clip_suffix + _fail_suffix + _rw_suffix
+assert not (args.pref_pair_outcome and not args.pref_feature_mode), (
+    "--pref-pair-outcome WAJIB disertai --pref-feature-mode (blok hasil tak bermakna "
+    "di mode one-hot identitas)")
+ACTOR_KW = dict(ACTOR_KW_BASE, pref_feature_mode=args.pref_feature_mode,
+                pref_pair_outcome=args.pref_pair_outcome)
+_pref_suffix = (("_preffeat" if args.pref_feature_mode else "")
+                + ("_pairout" if args.pref_pair_outcome else ""))
+_clip_suffix = _clip_suffix + _fail_suffix + _rw_suffix + _pref_suffix
 if args.mode == "pretrain_specialist":
     STREAM_NAME = {0: "wait", 1: "gini"}[args.stream_select]
     TAG_ARM = f"master_hybrid_ppo_specialist{args.stream_select}_{STREAM_NAME}{_horizon_suffix}{_clip_suffix}"

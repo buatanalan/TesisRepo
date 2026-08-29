@@ -81,6 +81,30 @@ def hist_feat_dim_feature(station_feat_dim: int = PREF_STATION_FEAT_DIM) -> int:
     return 2 * int(station_feat_dim)
 
 
+# Blok HASIL opsional (2026-08-29) yg diTEMPELkan di belakang pasangan fitur:
+#     [complied, realized_gap_norm]
+# `realized_gap_norm` = (wait_aktual - disp_estwait)/wait_scale -- BESARAN YANG SAMA
+# PERSIS dipakai `User.update_trust` menghukum kepercayaan, jadi ini proksi KEPERCAYAAN
+# yg selama ini HANYA ada di `hist_lstm` (policy.py::HIST_FEAT_DIM) sbg modul TERPISAH.
+# Dengan menempelkannya ke sini, satu langkah riwayat jadi satu pernyataan utuh:
+# "pengguna diminta bergeser dari stasiun berkarakter A ke B, ia terima/tolak, dan janji
+# yg menyertainya meleset sekian" -- yaitu sinyal ANGGARAN PERGESERAN (preferensi memberi
+# titik acuan, kepercayaan memberi radius). Konsekuensinya `hist_lstm` jadi MUBAZIR,
+# bukan bersaing: dugaan interferensi hist_lstm-vs-pref_lstm (alasan `--no-hist`)
+# terselesaikan dgn MENGHAPUS PENYEBABNYA, bukan mengujinya ulang.
+#
+# SENGAJA TIDAK memuat: (a) selisih feat(a_hat)-feat(a) -- kombinasi linear DALAM satu
+# langkah waktu, hal termudah yg bisa dipelajari lapisan pertama LSTM, & 5 dim redundan
+# malah memperberat kompresi ke pref_d_lstm kecil; (b) disp_estwait -- duplikat `est_wait`
+# di blok feat(a_hat), krn sejak v2 EstWait yg ditampilkan SELALU jujur (murni forecaster).
+PREF_OUTCOME_DIM = 2
+
+
+def hist_feat_dim_feature_outcome(station_feat_dim: int = PREF_STATION_FEAT_DIM) -> int:
+    """Dim per-langkah mode FITUR + HASIL: feat(a_hat) ++ feat(a) ++ [complied, gap]."""
+    return 2 * int(station_feat_dim) + PREF_OUTCOME_DIM
+
+
 class PreferenceAttention(nn.Module):
     """Attention (paper §IV.A): fitur preferensi c_t sbg QUERY, fitur per-stasiun sbg
     KEY/VALUE. Menghasilkan ringkasan state yang dibobot menurut relevansinya thd

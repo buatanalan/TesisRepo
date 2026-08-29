@@ -115,8 +115,14 @@ class MasterPureRolloutAgent(RLRolloutAgent):
     §3.1) -- KEBALIKAN `MasterDDPGRolloutAgent` lama."""
 
     def __init__(self, actor, sim, reward_calc, forecaster=None, noise_std: float = 8.0,
-                k: int = 3, equity_calc=None):
-        super().__init__(actor, sim, reward_calc, forecaster, k=k, equity_calc=equity_calc)
+                k: int = 3, equity_calc=None, pref_feature_mode: bool = False,
+                pref_pair_outcome: bool = False):
+        # `pref_pad_right=True` -- lihat catatan identik di `MasterHybridPPORolloutAgent`
+        # (bug padding vs pack_padded_sequence, ditemukan 2026-08-29). Tak berpengaruh
+        # bila aktor tanpa modul P (jalur pref tak dieksekusi sama sekali).
+        super().__init__(actor, sim, reward_calc, forecaster, k=k, equity_calc=equity_calc,
+                         pref_feature_mode=pref_feature_mode,
+                         pref_pair_outcome=pref_pair_outcome, pref_pad_right=True)
         self.actor = actor
         self.noise_std = float(noise_std)
         self.ou_theta = 0.15
@@ -551,8 +557,13 @@ class MasterPureTrainer:
         chunk = self.rollout_steps
         self._total_chunks = int(n_updates)
         sim = self._fresh_sim()
+        # Mode pref DITURUNKAN dari aktor (lih. catatan identik di trainer Hybrid-PPO) --
+        # `MasterPureActor` polos tak punya `backbone`, jadi getattr -> False (perilaku lama).
+        _bb = getattr(self.actor, "backbone", None)
         agent = MasterPureRolloutAgent(self.actor, sim, self.rc, noise_std=self._noise_std(),
-                                       equity_calc=self.equity_calc)
+                                       equity_calc=self.equity_calc,
+                                       pref_feature_mode=getattr(_bb, "pref_feature_mode", False),
+                                       pref_pair_outcome=getattr(_bb, "pref_pair_outcome", False))
         step = 0
         for _ in range(n_updates):
             it = self._it_global

@@ -18,7 +18,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from marl_spklu.rl.rollout import RLRolloutAgent, STREAM_INDIVIDUAL, STREAM_GLOBAL, N_REWARD_STREAMS, _gini
+from marl_spklu.rl.rollout import (RLRolloutAgent, RewardCalculatorStub, STREAM_INDIVIDUAL,
+                                   STREAM_GLOBAL, N_REWARD_STREAMS, _gini)
 from marl_spklu.rl.master_paper_obs import build_joint_obs_master, STATION_FEAT_DIM_MASTER
 from marl_spklu.rl.master_pure_hybrid_policy import MasterHybridPPOActor
 from marl_spklu.rl.master_pure_ppo_policy import MasterPurePPOCritic
@@ -64,11 +65,25 @@ class MasterHybridPPORolloutAgent(RLRolloutAgent):
     docstring modul)."""
 
     def __init__(self, actor, critic, sim, reward_calc, forecaster=None, k: int = 3,
-                equity_calc=None, stream_select=None):
-        super().__init__(actor, sim, reward_calc, forecaster, k=k, equity_calc=equity_calc)
+                equity_calc=None, stream_select=None, pref_feature_mode: bool = False,
+                pref_pair_outcome: bool = False, deterministic: bool = False):
+        # `pref_pad_right=True` WAJIB & tak bersyarat di sini: `_PrefStationBackbone.
+        # _encode_pref` memakai `pack_padded_sequence` yg mensyaratkan padding di BELAKANG,
+        # sedangkan basis `RLRolloutAgent` mem-padding di DEPAN. Ketidakcocokan inilah bug
+        # yg ditemukan 2026-08-29 -- `pref_lstm` seluruh lengan Hybrid selama ini hanya
+        # membaca baris PADDING NOL, tak pernah riwayat sungguhan.
+        super().__init__(actor, sim, reward_calc, forecaster, k=k, equity_calc=equity_calc,
+                         pref_feature_mode=pref_feature_mode,
+                         pref_pair_outcome=pref_pair_outcome, pref_pad_right=True)
         self.actor = actor
         self.critic = critic
         self.stream_select = stream_select
+        # `deterministic=True` -> argmax logit, TANPA sampling (evaluasi bersih). Dipakai
+        # `MasterHybridPPOInferenceAgent` yg kini MENDELEGASIKAN ke kelas ini supaya
+        # `pref_hist` sungguhan ikut terbangun saat uji -- lihat catatan di kelas itu.
+        self.deterministic = bool(deterministic)
+        # Hanya dipakai sbg bentuk placeholder `value` saat critic=None (jalur inferensi).
+        self.n_critics_hint = int(getattr(critic, "n_critics", N_REWARD_STREAMS))
 
     def get_recommendation(self, feasible_spklus: dict):
         user = self.sim._current_spawn_user
@@ -88,10 +103,16 @@ class MasterHybridPPORolloutAgent(RLRolloutAgent):
                           if pref_hist is not None else None)
             logits = self.actor(obs_t, mask_t, pref_hist_t)          # (1,N), -inf di tak-feasible
             dist = torch.distributions.Categorical(logits=logits)
-            primary_t = dist.sample()
+            primary_t = logits.argmax(dim=-1) if self.deterministic else dist.sample()
             logp = float(dist.log_prob(primary_t).item())
-            zero_I = torch.zeros_like(mask_t, dtype=torch.float32)
-            value, _ = self.critic(obs_t, mask_t, zero_I)
+            # `critic=None` pd jalur INFERENSI (`MasterHybridPPOInferenceAgent`) -- V(s)
+            # tak dipakai sama sekali di sana krn transisi dibuang tiap langkah. Dilewati
+            # supaya kelas ini bisa dipakai ulang utk evaluasi tanpa memuat kritik.
+            if self.critic is not None:
+                zero_I = torch.zeros_like(mask_t, dtype=torch.float32)
+                value, _ = self.critic(obs_t, mask_t, zero_I)
+            else:
+                value = torch.zeros(1, self.n_critics_hint)
         logits_np = logits.squeeze(0).numpy()
         primary_idx = int(primary_t.item())
 
@@ -127,7 +148,21 @@ class MasterHybridPPORolloutAgent(RLRolloutAgent):
 
 
 class MasterHybridPPOInferenceAgent:
-    """Evaluasi bersih: argmax logit (deterministik, TANPA sampling)."""
+    """Evaluasi bersih: argmax logit (deterministik, TANPA sampling).
+
+    DIUBAH 2026-08-29 -- sebelumnya kelas ini BERDIRI SENDIRI dan memanggil
+    `self.actor(obs, mask, None)`, yakni `pref_hist=None`. Akibatnya modul P **netral
+    (nol) sepanjang evaluasi**, sehingga seluruh metrik pembanding tak pernah mengukur
+    kontribusi P sama sekali. Komentar lama membenarkannya dgn menyebut
+    `MasterEVPPOInferenceAgent` sbg preseden -- KLAIM ITU KELIRU: kelas tsb justru
+    MENDELEGASIKAN ke `MasterEVPPORolloutAgent` penuh, yang membangun `pref_hist`
+    sungguhan DAN meneruskan `on_decision`/`on_charge_complete` supaya riwayat
+    preferensi terakumulasi selama evaluasi.
+
+    Kini kelas ini memakai pola delegasi yang sama: rollout agent dipakai apa adanya
+    (dgn `deterministic=True`, `RewardCalculatorStub`, transisi dibuang tiap langkah),
+    sehingga jalur `pref_hist` saat UJI identik dgn saat LATIH -- kelas bug 'latih dan
+    uji beda mode' yang sudah berulang di repo ini."""
 
     def __init__(self, actor, forecaster=None, k: int = 3):
         self.actor = actor
@@ -135,38 +170,36 @@ class MasterHybridPPOInferenceAgent:
         from marl_spklu.rl.forecaster import FormulaForecaster
         self.forecaster = forecaster or FormulaForecaster()
         self.k = int(k)
-        self.sids = None; self.sid_to_idx = None; self.N = None
+        self._roll = None
 
     def bind_to_sim(self, sim):
+        _bb = getattr(self.actor, "backbone", None)
+        self._roll = MasterHybridPPORolloutAgent(
+            self.actor, None, sim, RewardCalculatorStub(), self.forecaster, k=self.k,
+            pref_feature_mode=getattr(_bb, "pref_feature_mode", False),
+            pref_pair_outcome=getattr(_bb, "pref_pair_outcome", False),
+            deterministic=True)
         self.sim = sim
-        self.sids = list(sim.spklus.keys())
-        self.sid_to_idx = {s: i for i, s in enumerate(self.sids)}
-        self.N = len(self.sids)
 
     def get_recommendation(self, feasible_spklus: dict):
-        assert self.sids is not None, "panggil bind_to_sim(sim) sebelum sim.run(agent=...)"
-        time_now = self.sim.current_step * self.sim.dt_minutes
-        joint_obs = build_joint_obs_master(self.sim, self.sids, time_now)
-        mask = np.zeros(self.N, dtype=bool)
-        for sid in feasible_spklus:
-            if sid in self.sid_to_idx:
-                mask[self.sid_to_idx[sid]] = True
-        obs_t = torch.as_tensor(joint_obs, dtype=torch.float32).unsqueeze(0)
-        mask_t = torch.as_tensor(mask, dtype=torch.bool).unsqueeze(0)
-        with torch.no_grad():
-            logits = self.actor(obs_t, mask_t, None).squeeze(0).numpy()
-        feasible_idx = np.nonzero(mask)[0]
-        if feasible_idx.size == 0:
-            return []
-        k_eff = max(1, min(self.k, int(feasible_idx.size)))
-        order = feasible_idx[np.argsort(-logits[feasible_idx], kind="stable")]
-        return [self.sids[int(i)] for i in order[:k_eff]]
+        assert self._roll is not None, "panggil bind_to_sim(sim) sebelum sim.run(agent=...)"
+        recs = self._roll.get_recommendation(feasible_spklus)
+        self._roll.transitions.clear()
+        return recs
 
     def predict_waits(self, feasible_spklus: dict):
-        time_now = self.sim.current_step * self.sim.dt_minutes
-        user = self.sim._current_spawn_user
-        soc = self.sim._current_spawn_soc
-        return self.forecaster.predict(feasible_spklus, time_now, user=user, soc=soc, sim=self.sim)
+        return self._roll.predict_waits(feasible_spklus)
+
+    def on_decision(self, user, chosen_spklu_id, recs, feasible_spklus):
+        # WAJIB diteruskan -- di sinilah `_record_pref` menambah pasangan (a_hat,a) ke
+        # riwayat. Tanpa ini `pref_hist` selalu kosong walau sudah dibangun.
+        self._roll.on_decision(user, chosen_spklu_id, recs, feasible_spklus)
+        self._roll.transitions.clear()
+
+    def on_charge_complete(self, user):
+        # WAJIB diteruskan -- di sinilah blok HASIL (`realized_gap_norm`) di-backfill.
+        self._roll.on_charge_complete(user)
+        self._roll.transitions.clear()
 
 
 class MasterHybridPPOTrainer:
@@ -404,9 +437,14 @@ class MasterHybridPPOTrainer:
     def train(self, n_updates: int):
         chunk = self.rollout_steps
         sim = self._fresh_sim()
+        # Mode pref DITURUNKAN dari aktor (bukan diteruskan terpisah) -- menjamin dimensi
+        # `pref_hist` yg dibangun rollout SELALU cocok dgn yg diharapkan `pref_lstm`.
+        _bb = getattr(self.actor, "backbone", None)
         agent = MasterHybridPPORolloutAgent(self.actor, self.critic, sim, self.rc,
                                             equity_calc=self.equity_calc,
-                                            stream_select=self.stream_select)
+                                            stream_select=self.stream_select,
+                                            pref_feature_mode=getattr(_bb, "pref_feature_mode", False),
+                                            pref_pair_outcome=getattr(_bb, "pref_pair_outcome", False))
         step = 0
         for _ in range(n_updates):
             it = self._it_global

@@ -21,7 +21,8 @@ import torch
 import torch.nn as nn
 
 from marl_spklu.rl.master_paper_obs import STATION_FEAT_DIM_MASTER
-from marl_spklu.rl.pdqn_policy import PreferenceAttention, hist_feat_dim, hist_feat_dim_feature
+from marl_spklu.rl.pdqn_policy import (PreferenceAttention, hist_feat_dim,
+                                       hist_feat_dim_feature, hist_feat_dim_feature_outcome)
 
 
 class StationVectorHead(nn.Module):
@@ -91,13 +92,22 @@ class _PrefStationBackbone(nn.Module):
     def __init__(self, n_spklu: int, station_feat_dim: int = STATION_FEAT_DIM_MASTER,
                 vec_dim: int = 8, bid_hidden: int = 16, pref_d_lstm: int = 8,
                 pref_d_attn: int = 8, station_attn_dim: int = 8,
-                pref_feature_mode: bool = False):
+                pref_feature_mode: bool = False, pref_pair_outcome: bool = False):
         super().__init__()
         self.vec_head = StationVectorHead(station_feat_dim, vec_dim, bid_hidden)
         self.pref_feature_mode = bool(pref_feature_mode)
+        # Blok HASIL [complied, realized_gap_norm] ditempelkan di belakang pasangan fitur
+        # (2026-08-29) -- lihat pdqn_policy.py::PREF_OUTCOME_DIM. WAJIB pref_feature_mode.
+        # Dgn ini `pref_lstm` menduga preferensi DAN kepercayaan sekaligus, sehingga
+        # `hist_lstm` terpisah tak lagi diperlukan (dan tak pernah ada di kelas ini).
+        self.pref_pair_outcome = bool(pref_pair_outcome) and self.pref_feature_mode
         self.pref_d_attn = int(pref_d_attn)
-        pref_hist_feat_dim = (hist_feat_dim_feature() if self.pref_feature_mode
-                              else hist_feat_dim(n_spklu))
+        if self.pref_pair_outcome:
+            pref_hist_feat_dim = hist_feat_dim_feature_outcome()
+        elif self.pref_feature_mode:
+            pref_hist_feat_dim = hist_feat_dim_feature()
+        else:
+            pref_hist_feat_dim = hist_feat_dim(n_spklu)
         self.pref_lstm = nn.LSTM(pref_hist_feat_dim, pref_d_lstm, batch_first=True)
         self.pref_attn = PreferenceAttention(station_feat_dim, pref_d_lstm, pref_d_attn)
         self.pref_gate = nn.Parameter(torch.tensor(0.0))
@@ -135,11 +145,12 @@ class MasterHybridDDPGActor(nn.Module):
     def __init__(self, n_spklu: int, station_feat_dim: int = STATION_FEAT_DIM_MASTER,
                 vec_dim: int = 8, bid_hidden: int = 16, pref_d_lstm: int = 8,
                 pref_d_attn: int = 8, station_attn_dim: int = 8,
-                pref_feature_mode: bool = False, bid_scale: float = 10.0):
+                pref_feature_mode: bool = False, bid_scale: float = 10.0,
+                pref_pair_outcome: bool = False):
         super().__init__()
         self.backbone = _PrefStationBackbone(n_spklu, station_feat_dim, vec_dim, bid_hidden,
                                              pref_d_lstm, pref_d_attn, station_attn_dim,
-                                             pref_feature_mode)
+                                             pref_feature_mode, pref_pair_outcome)
         self.pref_lstm = self.backbone.pref_lstm   # DIBACA RLRolloutAgent.__init__ (_use_pref)
         self.head = nn.Linear(vec_dim, 1)
         self.bid_scale = float(bid_scale)
@@ -159,11 +170,11 @@ class MasterHybridPPOActor(nn.Module):
     def __init__(self, n_spklu: int, station_feat_dim: int = STATION_FEAT_DIM_MASTER,
                 vec_dim: int = 8, bid_hidden: int = 16, pref_d_lstm: int = 8,
                 pref_d_attn: int = 8, station_attn_dim: int = 8,
-                pref_feature_mode: bool = False):
+                pref_feature_mode: bool = False, pref_pair_outcome: bool = False):
         super().__init__()
         self.backbone = _PrefStationBackbone(n_spklu, station_feat_dim, vec_dim, bid_hidden,
                                              pref_d_lstm, pref_d_attn, station_attn_dim,
-                                             pref_feature_mode)
+                                             pref_feature_mode, pref_pair_outcome)
         self.pref_lstm = self.backbone.pref_lstm
         self.head = nn.Linear(vec_dim, 1)
 
@@ -178,7 +189,15 @@ class MasterHybridPPOActor(nn.Module):
 class MasterHybridDDPGInferenceAgent:
     """Evaluasi bersih varian DDPG-Hybrid -- BEDA dari `MasterPureInferenceAgent` lama
     (yg TAK membangun `mask`/`pref_hist` sungguhan, hanya mengandalkan default kosong
-    di `forward()`, salah utk aktor bermodul-P). Bid TERTINGGI menang (argmax)."""
+    di `forward()`, salah utk aktor bermodul-P). Bid TERTINGGI menang (argmax).
+
+    DIUBAH 2026-08-29 -- versi sebelumnya memanggil `self.actor(obs, mask, None)`, yakni
+    `pref_hist=None`, sehingga modul P **netral (nol) sepanjang evaluasi** dan metrik
+    pembanding tak pernah mengukur kontribusinya. Komentar lama membenarkannya dgn
+    menyebut `MasterEVPPOInferenceAgent` sbg preseden -- KLAIM ITU KELIRU: kelas tsb
+    justru mendelegasikan ke rollout agent penuh. Kini kelas ini memakai pola delegasi
+    yang sama (`MasterPureRolloutAgent` dgn `noise_std=0` = deterministik, argmax bid),
+    supaya jalur `pref_hist` saat UJI identik dgn saat LATIH."""
 
     def __init__(self, actor, forecaster=None, k: int = 3, pref_feature_mode: bool = False):
         self.actor = actor
@@ -187,41 +206,35 @@ class MasterHybridDDPGInferenceAgent:
         self.forecaster = forecaster or FormulaForecaster()
         self.k = int(k)
         self.pref_feature_mode = bool(pref_feature_mode)
-        self.sids = None; self.sid_to_idx = None; self.N = None
+        self._roll = None
 
     def bind_to_sim(self, sim):
+        # Impor lokal: menghindari lingkar impor policy <-> trainer.
+        from marl_spklu.rl.master_pure_trainer import MasterPureRolloutAgent
+        from marl_spklu.rl.rollout import RewardCalculatorStub
+        _bb = getattr(self.actor, "backbone", None)
+        self._roll = MasterPureRolloutAgent(
+            self.actor, sim, RewardCalculatorStub(), self.forecaster,
+            noise_std=0.0, k=self.k,                      # noise 0 -> deterministik
+            pref_feature_mode=getattr(_bb, "pref_feature_mode", False),
+            pref_pair_outcome=getattr(_bb, "pref_pair_outcome", False))
         self.sim = sim
-        self.sids = list(sim.spklus.keys())
-        self.sid_to_idx = {s: i for i, s in enumerate(self.sids)}
-        self.N = len(self.sids)
 
     def get_recommendation(self, feasible_spklus: dict):
-        from marl_spklu.rl.master_paper_obs import build_joint_obs_master
-        assert self.sids is not None, "panggil bind_to_sim(sim) sebelum sim.run(agent=...)"
-        time_now = self.sim.current_step * self.sim.dt_minutes
-        joint_obs = build_joint_obs_master(self.sim, self.sids, time_now)
-        mask = np.zeros(self.N, dtype=bool)
-        for sid in feasible_spklus:
-            if sid in self.sid_to_idx:
-                mask[self.sid_to_idx[sid]] = True
-        obs_t = torch.as_tensor(joint_obs, dtype=torch.float32).unsqueeze(0)
-        mask_t = torch.as_tensor(mask, dtype=torch.bool).unsqueeze(0)
-        # `pref_hist` TIDAK dibangun sungguhan di sini (evaluasi via `_uji_konsolidasi.K.
-        # satu_run`, TAK melewati mekanisme rollout/`_build_pref_hist` biasa) -- P efektif
-        # netral (nol) saat evaluasi bersih, konsisten pola `MasterPurePPOInferenceAgent`
-        # (jalur `None`) DAN `MasterEVPPOInferenceAgent` (yg jg tak isi pref_hist saat eval
-        # metrik-agregat, hanya saat rollout latihan sungguhan).
-        with torch.no_grad():
-            bids = self.actor(obs_t, mask_t, None).squeeze(0).numpy()
-        feasible_idx = np.nonzero(mask)[0]
-        if feasible_idx.size == 0:
-            return []
-        k_eff = max(1, min(self.k, int(feasible_idx.size)))
-        order = feasible_idx[np.argsort(-bids[feasible_idx], kind="stable")]
-        return [self.sids[int(i)] for i in order[:k_eff]]
+        assert self._roll is not None, "panggil bind_to_sim(sim) sebelum sim.run(agent=...)"
+        recs = self._roll.get_recommendation(feasible_spklus)
+        self._roll.transitions.clear()
+        return recs
 
     def predict_waits(self, feasible_spklus: dict):
-        time_now = self.sim.current_step * self.sim.dt_minutes
-        user = self.sim._current_spawn_user
-        soc = self.sim._current_spawn_soc
-        return self.forecaster.predict(feasible_spklus, time_now, user=user, soc=soc, sim=self.sim)
+        return self._roll.predict_waits(feasible_spklus)
+
+    def on_decision(self, user, chosen_spklu_id, recs, feasible_spklus):
+        # WAJIB -- di sinilah `_record_pref` menambah pasangan (a_hat,a) ke riwayat.
+        self._roll.on_decision(user, chosen_spklu_id, recs, feasible_spklus)
+        self._roll.transitions.clear()
+
+    def on_charge_complete(self, user):
+        # WAJIB -- di sinilah blok HASIL (`realized_gap_norm`) di-backfill.
+        self._roll.on_charge_complete(user)
+        self._roll.transitions.clear()

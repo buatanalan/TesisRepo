@@ -22,6 +22,7 @@ from marl_spklu.rl.rewards import _gini as _gini_calc
 from marl_spklu.rl.policy import HIST_FEAT_DIM
 from marl_spklu.rl.pdqn_policy import (PDQN_HIST_K, hist_feat_dim as _pref_hist_feat_dim,
                                        hist_feat_dim_feature as _pref_hist_feat_dim_feature,
+                                       hist_feat_dim_feature_outcome as _pref_hist_feat_dim_outcome,
                                        PREF_STATION_FEAT_DIM)
 
 HIST_K = 5   # panjang jendela riwayat interaksi yang dilihat encoder rekuren (c_t)
@@ -122,7 +123,8 @@ class RLRolloutAgent:
 
     def __init__(self, policy, sim, reward_calc, forecaster=None, k: int = 3,
                  equity_calc=None, pref_feature_mode: bool = False,
-                 epsilon: float = 0.0, threshold: float = 0.20):
+                 epsilon: float = 0.0, threshold: float = 0.20,
+                 pref_pair_outcome: bool = False, pref_pad_right: bool = False):
         self.policy = policy
         self.sim = sim
         self.rc = reward_calc
@@ -171,8 +173,27 @@ class RLRolloutAgent:
         # one-hot identitas paper asli -- supaya LSTM belajar dari KARAKTERISTIK stasiun,
         # bukan cuma memorisasi indeks (berguna terutama saat N besar/heterogen).
         self.pref_feature_mode = bool(pref_feature_mode)
-        self._pref_hist_feat_dim = (_pref_hist_feat_dim_feature() if self.pref_feature_mode
-                                    else _pref_hist_feat_dim(self.N))
+        # `pref_pair_outcome` (2026-08-29): tempelkan blok HASIL [complied, realized_gap_norm]
+        # di belakang pasangan fitur -- lihat pdqn_policy.py::PREF_OUTCOME_DIM utk alasan
+        # lengkap. WAJIB `pref_feature_mode=True` (blok hasil tak bermakna di mode one-hot).
+        # BAKU MATI -> dimensi & perilaku lengan lama TAK BERUBAH sama sekali.
+        self.pref_pair_outcome = bool(pref_pair_outcome) and self.pref_feature_mode
+        if self.pref_pair_outcome:
+            self._pref_hist_feat_dim = _pref_hist_feat_dim_outcome()
+        elif self.pref_feature_mode:
+            self._pref_hist_feat_dim = _pref_hist_feat_dim_feature()
+        else:
+            self._pref_hist_feat_dim = _pref_hist_feat_dim(self.N)
+        # Arah padding `_build_pref_hist`. BAKU depan (kiri) -- perilaku historis, dipakai
+        # PDQN & lengan lama yg encoder-nya memproses seluruh K langkah apa adanya.
+        # `pref_pad_right=True` WAJIB bila encoder memakai `pack_padded_sequence` (yang
+        # mensyaratkan padding di BELAKANG) -- lih. `master_ev_ppo_policy.py::
+        # MasterEVPPORolloutAgent._build_pref_hist` yg meng-override justru krn ini.
+        # BUG DITEMUKAN 2026-08-29: keluarga Master-Hybrid memakai `_encode_pref` ber-
+        # `pack_padded_sequence` TAPI mewarisi padding-kiri basis ini -- akibatnya
+        # `lengths` baris pertama yg diambil justru PADDING NOL, sehingga `pref_lstm`
+        # TAK PERNAH melihat riwayat sungguhan. Flag ini perbaikannya.
+        self._pref_pad_right = bool(pref_pad_right)
         self._pref_hist = {}   # user_id -> deque[pair], onehot-idx ATAU vektor fitur tergantung mode
 
     def _pref_station_feat(self, sid, user, wait_hat):
@@ -197,7 +218,9 @@ class RLRolloutAgent:
         h = self._pref_hist.get(user.user_id)
         if h:
             recent = list(h)[-PDQN_HIST_K:]
-            offset = PDQN_HIST_K - len(recent)
+            # padding di BELAKANG (offset=0) bila encoder memakai pack_padded_sequence,
+            # di DEPAN (offset=K-len) spt semula bila tidak -- lihat `_pref_pad_right`.
+            offset = 0 if self._pref_pad_right else PDQN_HIST_K - len(recent)
             for t, pair in enumerate(recent):
                 if self.pref_feature_mode:
                     arr[offset + t] = pair
@@ -207,7 +230,11 @@ class RLRolloutAgent:
                     arr[offset + t, self.N + a_idx] = 1.0
         return arr
 
-    def _record_pref(self, user, a_hat_idx, a_idx, wait_hat=None):
+    def _record_pref(self, user, a_hat_idx, a_idx, wait_hat=None, complied=None):
+        """`complied` hanya dipakai mode `pref_pair_outcome` -- blok hasil ditulis
+        [complied, 0.0]; elemen kedua (`realized_gap_norm`) di-BACKFILL belakangan di
+        `on_charge_complete`, krn baru diketahui setelah sesi pengisian selesai. Pola
+        backfill identik `user.interaction_history[-1]` di hook yang sama."""
         h = self._pref_hist.get(user.user_id)
         if h is None:
             h = deque(maxlen=PDQN_HIST_K)
@@ -215,9 +242,23 @@ class RLRolloutAgent:
         if self.pref_feature_mode:
             feat_hat = self._pref_station_feat(self.sids[a_hat_idx], user, wait_hat or {})
             feat_a = self._pref_station_feat(self.sids[a_idx], user, wait_hat or {})
-            h.append(np.concatenate([feat_hat, feat_a]))
+            row = np.concatenate([feat_hat, feat_a])
+            if self.pref_pair_outcome:
+                row = np.concatenate([row, np.array([1.0 if complied else 0.0, 0.0],
+                                                    dtype=np.float32)])
+            h.append(row)
         else:
             h.append((int(a_hat_idx), int(a_idx)))
+
+    def _backfill_pref_outcome(self, user, realized_gap_norm: float):
+        """Isi elemen terakhir (`realized_gap_norm`) blok hasil pd entri riwayat
+        preferensi TERAKHIR pengguna ini. Aman krn `_user_trip_tr` menjamin satu trip
+        aktif per pengguna, sehingga entri terakhir memang milik trip yang baru selesai."""
+        if not self.pref_pair_outcome:
+            return
+        h = self._pref_hist.get(user.user_id)
+        if h:
+            h[-1][-1] = np.float32(realized_gap_norm)
 
     def _build_hist(self, user):
         """Riwayat interaksi K-langkah terakhir -> (K, HIST_FEAT_DIM), left-padded nol.
@@ -470,7 +511,7 @@ class RLRolloutAgent:
         if self._use_pref:
             chosen_idx = self.sid_to_idx.get(chosen_spklu_id)
             if chosen_idx is not None:
-                self._record_pref(user, primary_idx, chosen_idx, wait_hat)
+                self._record_pref(user, primary_idx, chosen_idx, wait_hat, complied=complied)
         # Catat interaksi ini ke riwayat pengguna -> dibaca encoder LSTM pada keputusan
         # berikutnya (proksi belief trust dari jejak, bukan akses T_i langsung). Elemen
         # ke-4 (realized_gap_norm) BELUM diketahui saat ini (hasil aktual baru ada di
@@ -539,6 +580,12 @@ class RLRolloutAgent:
                 complied_v, disp_v, wdef_v, _ = user.interaction_history[-1]
                 realized_gap_norm = (user.wait_time - tr.disp_estwait) / self.wait_scale
                 user.interaction_history[-1] = (complied_v, disp_v, wdef_v, realized_gap_norm)
+                # Backfill blok HASIL riwayat preferensi (mode pref_pair_outcome, BAKU MATI
+                # -> no-op utk lengan lama). Digerbang `tr.complied` SAMA spt di atas:
+                # bila rekomendasi DITOLAK, `realized_gap` mengukur akurasi janji di stasiun
+                # yg TIDAK kita rekomendasikan -- bukan konsekuensi kausal aksi agen, jadi
+                # dibiarkan 0.0 (netral), konsisten `wait_reward`/`interaction_history`.
+                self._backfill_pref_outcome(user, realized_gap_norm)
 
 
 class InferenceAgent:

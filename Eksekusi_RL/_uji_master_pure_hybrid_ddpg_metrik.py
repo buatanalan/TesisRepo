@@ -23,7 +23,11 @@ TAG = sys.argv[2] if len(sys.argv) > 2 else "30d"
 TAG_ARM = sys.argv[3] if len(sys.argv) > 3 else "master_hybrid_ddpg_dgr"
 LABEL_ARM = f"MASTER-HYBRID-DDPG[{TAG_ARM}]"
 K_REC = 3
-ACTOR_KW = dict(vec_dim=8, bid_hidden=16, pref_d_lstm=8, pref_d_attn=8, station_attn_dim=8)
+# Mode pref DITURUNKAN dari TAG_ARM -- checkpoint & rekonstruksi eval WAJIB sama
+# bentuk jaringannya (kelas bug "latih & uji beda mode", berulang di repo ini).
+ACTOR_KW = dict(vec_dim=8, bid_hidden=16, pref_d_lstm=8, pref_d_attn=8, station_attn_dim=8,
+                pref_feature_mode="_preffeat" in TAG_ARM,
+                pref_pair_outcome="_pairout" in TAG_ARM)
 K.DS = os.path.join(common.ROOT, K.HORIZON[TAG])
 
 
