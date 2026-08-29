@@ -47,6 +47,14 @@ p.add_argument("--wait-fail-threshold", type=float, default=None,
                    "wait_actual > ambang. None=nonaktif.")
 p.add_argument("--wait-fail-penalty", type=float, default=-1.0,
               help="Penalti TETAP (satuan wait_scale) saat wait_actual > --wait-fail-threshold.")
+p.add_argument("--reward-preset", type=str, default="raw", choices=["raw", "seimbang4x"],
+              help="'raw' (BAKU -- RewardCalculator() mentah, alpha_wait=1.0 alpha_gini=0.5, "
+                   "TAK PERNAH dikalibrasi utk rezim 4x) | 'seimbang4x' (RewardCalculator."
+                   "seimbang4x() -- preset TERKALIBRASI, alpha_wait=0.0046 alpha_gini=2.6019, "
+                   "use_delta_gini=True). Diuji 2026-08-29: satu2nya komponen Kandidat A yg "
+                   "belum pernah ditransplantasi ke lengan MASTER manapun, diduga faktor "
+                   "paling berpengaruh thd gap gini/entropy/herding vs Kandidat A. Digabung "
+                   "dgn --wait-fail-* via override kwargs (kompatibel).")
 args = p.parse_args()
 
 if args.mode == "pretrain_specialist":
@@ -61,7 +69,8 @@ _horizon_suffix = "" if args.horizon == "30d" else f"_{args.horizon}"
 _clip_suffix = "" if args.wait_reward_clip is None else f"_clip{args.wait_reward_clip:g}"
 _fail_suffix = ("" if args.wait_fail_threshold is None
                else f"_cwtfail{args.wait_fail_threshold:g}pen{args.wait_fail_penalty:g}")
-_clip_suffix = _clip_suffix + _fail_suffix
+_rw_suffix = "" if args.reward_preset == "raw" else f"_{args.reward_preset}"
+_clip_suffix = _clip_suffix + _fail_suffix + _rw_suffix
 if args.mode == "pretrain_specialist":
     STREAM_NAME = {0: "wait", 1: "gini"}[args.stream_select]
     TAG_ARM = f"master_hybrid_ppo_specialist{args.stream_select}_{STREAM_NAME}{_horizon_suffix}{_clip_suffix}"
@@ -91,10 +100,13 @@ def _load_r_star(tag: str, seed: int) -> float:
 def train_one(seed):
     kw = dict(dataset_path=DATASET, mode=args.mode, rollout_steps=args.rollout_steps,
              seed=seed, verbose=False, actor_kwargs=ACTOR_KW)
-    if args.wait_reward_clip is not None or args.wait_fail_threshold is not None:
-        kw["reward_calc"] = RewardCalculator(wait_reward_clip=args.wait_reward_clip,
-                                             wait_fail_threshold=args.wait_fail_threshold,
-                                             wait_fail_penalty=args.wait_fail_penalty)
+    if (args.wait_reward_clip is not None or args.wait_fail_threshold is not None
+            or args.reward_preset != "raw"):
+        _rc_kw = dict(wait_reward_clip=args.wait_reward_clip,
+                      wait_fail_threshold=args.wait_fail_threshold,
+                      wait_fail_penalty=args.wait_fail_penalty)
+        kw["reward_calc"] = (RewardCalculator.seimbang4x(**_rc_kw)
+                             if args.reward_preset == "seimbang4x" else RewardCalculator(**_rc_kw))
     if args.mode == "pretrain_specialist":
         kw["stream_select"] = args.stream_select
     else:
