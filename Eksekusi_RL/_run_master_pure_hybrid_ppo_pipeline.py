@@ -37,6 +37,12 @@ p.add_argument("--dataset", type=str, default="4x")
 p.add_argument("--horizon", type=str, default="30d")
 p.add_argument("--specialist0-tag", type=str, default=None)
 p.add_argument("--specialist1-tag", type=str, default=None)
+p.add_argument("--beta-denom", type=str, default=None, choices=["r_star", "ret_std"],
+              help="Penyebut gap-ratio DGR. 'r_star' = |r_star| (perilaku lama). "
+                   "'ret_std' = simpangan baku return -- WAJIB bila ada aliran yang "
+                   "reratanya mendekati nol (mis. delta-gini, yang reratanya ~0 secara "
+                   "STRUKTURAL krn deret teleskopik). Baku: 'ret_std' bila --pure-streams, "
+                   "'r_star' bila tidak (menjaga hasil lama tetap sah).")
 p.add_argument("--specialist2-tag", type=str, default=None,
               help="Hanya dipakai bila --pure-streams (aliran ke-3 = acceptance).")
 p.add_argument("--pure-streams", action="store_true",
@@ -137,6 +143,9 @@ assert not (args.pure_streams and args.alpha_accept == 0.0), (
     "lenyap di normalisasi advantage & gap-ratio); pakai 1.0 saja.")
 assert not (args.pure_streams and args.accept_stream != "global"), (
     "--accept-stream tak berlaku di --pure-streams (acceptance selalu punya aliran sendiri)")
+# Baku bergantung mode -- DINYATAKAN, bukan diam-diam (lihat cetakan di bawah).
+if args.beta_denom is None:
+    args.beta_denom = "ret_std" if args.pure_streams else "r_star"
 
 _DATASET_4X = os.path.join(common.ROOT, "scenario_dataset_klaster12_4x.json")
 DATASET = _DATASET_4X if args.dataset == "4x" else os.path.join(common.ROOT, args.dataset)
@@ -186,6 +195,10 @@ print(f"[{elapsed()}] Lengan: tag={TAG_ARM} mode={args.mode} stream_select={args
      flush=True)
 print(f"[{elapsed()}] Anggaran: n_updates={args.n_updates} rollout_steps={args.rollout_steps} "
      f"n_train_seed={args.n_train_seed}", flush=True)
+if args.mode == "dgr":
+    print(f"[{elapsed()}] DGR: penyebut gap-ratio = {args.beta_denom}"
+         + ("  (std return -- aman utk aliran ber-rerata ~0)" if args.beta_denom == "ret_std"
+            else "  (|r_star| -- perilaku lama)"), flush=True)
 
 
 def _specialist_tag(stream: int, explicit: str):
@@ -210,7 +223,7 @@ def train_one(seed):
              critic_pref_gate_init=args.critic_pref_gate_init,
              accept_stream=(STREAM_GLOBAL if args.accept_stream == "global"
                             else STREAM_INDIVIDUAL),
-             pure_streams=args.pure_streams)
+             pure_streams=args.pure_streams, beta_denom=args.beta_denom)
     if (args.wait_reward_clip is not None or args.wait_fail_threshold is not None
             or args.reward_preset != "raw" or args.alpha_accept != 0.0):
         _rc_kw = dict(wait_reward_clip=args.wait_reward_clip,

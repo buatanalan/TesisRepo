@@ -242,7 +242,15 @@ class MasterHybridPPOTrainer:
                 reward_calc=None, seed: int = 0, verbose: bool = True,
                 equity_calc=None, max_step_gap: int = 4, critic_pref: bool = False,
                 critic_pref_gate_init: float = 0.1,
-                accept_stream: int = STREAM_GLOBAL, pure_streams: bool = False):
+                accept_stream: int = STREAM_GLOBAL, pure_streams: bool = False,
+                beta_denom: str = "r_star"):
+        # `beta_denom` (2026-08-30): penyebut gap-ratio DGR.
+        #   "r_star"  = |r_star|      (BAKU, perilaku lama -- TAK mengubah run yg sudah ada)
+        #   "ret_std" = std(return)   (WAJIB bila ada aliran yg reratanya ~0, mis. delta-gini)
+        # Lihat alasan lengkap di `_compute_beta`.
+        assert beta_denom in ("r_star", "ret_std"), f"beta_denom={beta_denom!r} tak dikenal"
+        self.beta_denom = str(beta_denom)
+        self._ret_std_ema = None
         # `pure_streams` (2026-08-30): SATU suku per aliran (wait / gini / acceptance),
         # `prox` & `flock` dibuang -- menghapus kebutuhan kalibrasi `alpha` sepenuhnya
         # krn penskalaan seragam satu-suku lenyap baik di normalisasi advantage maupun
@@ -403,13 +411,42 @@ class MasterHybridPPOTrainer:
 
     def _compute_beta(self, returns):
         K = self.n_critics
-        ret_mean = np.asarray(returns, dtype=np.float64).mean(axis=0)
+        R = np.asarray(returns, dtype=np.float64)
+        ret_mean = R.mean(axis=0)
         self._last_ret_mean = ret_mean
         if not self._fixed_ret_best:
             self._ret_best = np.maximum(self._ret_best, ret_mean)
         if self.beta_mode != "gap_ratio":
             return np.full(K, 1.0 / K, dtype=np.float64)
-        gap = (self._ret_best - ret_mean) / (np.abs(self._ret_best) + 1e-8)
+
+        if self.beta_denom == "ret_std":
+            # PENYEBUT BERBASIS SIMPANGAN BAKU RETURN (2026-08-30) --------------------
+            # MASALAH penyebut lama `|r_star|`: ia meledak bila suatu objektif punya
+            # rerata return mendekati nol. Ini BUKAN kasus langka -- pada `use_delta_gini`
+            # rerata delta per langkah mendekati nol SECARA STRUKTURAL (deret teleskopik:
+            # jumlah seluruh perubahan = gini_akhir - gini_awal, dibagi ribuan langkah).
+            # TERUKUR pd mode aliran-murni: r_star = [wait 15, gini 0,0007, acc 5] --
+            # beda EMPAT orde. Deviasi 0,001 memberi gap 0,00007 pd wait tapi 1,43 pd
+            # gini, sehingga `beta` melompat 0,25 <-> 1,00 hanya krn derau, dan DGR
+            # berubah jadi saklar yang terkunci ke gini alih-alih menyeimbangkan.
+            #
+            # Penyebut `std(return)` menyatakan gap dalam satuan "berapa simpangan baku
+            # di bawah plafon" -- besaran yang setara antar-aliran apa pun skalanya, dan
+            # tidak pernah mendekati nol selama aliran itu membawa sinyal.
+            #
+            # KEBAL-SKALA TETAP TERJAGA (syarat mutlak mode aliran-murni): bila seluruh
+            # aliran diskalakan c, maka r_star, ret_mean, DAN std sama-sama ikut c,
+            # sehingga gap tak berubah -- `alpha` tetap tanpa efek, persis spt semula.
+            std = R.std(axis=0)
+            if self._ret_std_ema is None:
+                self._ret_std_ema = std.copy()
+            else:
+                self._ret_std_ema = 0.8 * self._ret_std_ema + 0.2 * std
+            denom = np.maximum(self._ret_std_ema, 1e-8)
+        else:
+            denom = np.abs(self._ret_best) + 1e-8
+
+        gap = (self._ret_best - ret_mean) / denom
         gap = np.clip(gap, 0.0, 10.0)
         z = gap / max(self.beta_sigma, 1e-8)
         z -= z.max()
