@@ -23,6 +23,7 @@ import torch.nn as nn
 from marl_spklu.rl.master_paper_obs import STATION_FEAT_DIM_MASTER
 from marl_spklu.rl.pdqn_policy import (PreferenceAttention, hist_feat_dim,
                                        hist_feat_dim_feature, hist_feat_dim_feature_outcome)
+from marl_spklu.rl.master_pure_ppo_policy import MasterPurePPOAttentivePooling
 
 
 class StationVectorHead(nn.Module):
@@ -222,6 +223,72 @@ class MasterHybridPPOActor(nn.Module):
         vec = self.backbone(station_obs, mask, pref_hist)
         logits = self.head(vec).squeeze(-1)
         return logits.masked_fill(~mask, float("-inf"))
+
+
+class MasterHybridPPOCritic(nn.Module):
+    """V^k(x_t) BER-P (2026-08-30) -- `MasterPurePPOCritic` SELALU buta thd `pref_hist`
+    (forward-nya cuma `joint_obs, mask, I_raw`, tak ada jalur P sama sekali), dipakai
+    TANPA modifikasi di seluruh varian Hybrid selama ini. Ini diduga jadi sumber
+    variansi advantage tambahan KHUSUS utk keputusan berbasis P: baseline PPO (V(s))
+    tak bisa "menjelaskan" hasil yg didorong preferensi/kepercayaan pengguna, krn
+    tak pernah melihatnya -- beda dgn station attention yg SETIDAKNYA berkorelasi tak
+    langsung lewat fitur stasiun mentah yg memang sudah dilihat kritik.
+
+    Perbaikan: tambah jalur P SAMA seperti `_PrefStationBackbone` (LSTM+atensi+gerbang,
+    param TERPISAH dari aktor -- bukan berbagi bobot), disuntik ke representasi SEBELUM
+    `AttentivePooling` (broadcast ke tiap baris, sama pola `LatePrefMerge` versi aktor
+    tapi di sini via concat, bukan gerbang residual, krn kritik memang sudah memakai
+    concat utk `I_raw`)."""
+
+    def __init__(self, station_feat_dim: int = STATION_FEAT_DIM_MASTER, hidden: int = 64,
+                n_critics: int = 2, p_dim: int = 64, n_spklu: int = None,
+                pref_d_lstm: int = 8, pref_d_attn: int = 8,
+                pref_feature_mode: bool = False, pref_pair_outcome: bool = False,
+                pref_gate_init: float = 0.0, pref_hist_k: int = None):
+        super().__init__()
+        self.n_critics = int(n_critics)
+        self.pref_hist_k = pref_hist_k
+        self.W_p = nn.Linear(1, p_dim)
+        self.pref_feature_mode = bool(pref_feature_mode)
+        self.pref_pair_outcome = bool(pref_pair_outcome) and self.pref_feature_mode
+        if self.pref_pair_outcome:
+            pref_hist_feat_dim = hist_feat_dim_feature_outcome()
+        elif self.pref_feature_mode:
+            pref_hist_feat_dim = hist_feat_dim_feature()
+        else:
+            assert n_spklu is not None, "n_spklu wajib bila bukan pref_feature_mode (onehot dim)"
+            pref_hist_feat_dim = hist_feat_dim(n_spklu)
+        self.pref_lstm = nn.LSTM(pref_hist_feat_dim, pref_d_lstm, batch_first=True)
+        self.pref_attn = PreferenceAttention(station_feat_dim, pref_d_lstm, pref_d_attn)
+        self.pref_gate = nn.Parameter(torch.tensor(float(pref_gate_init)))
+        self.pref_d_attn = int(pref_d_attn)
+        in_dim = station_feat_dim + p_dim + pref_d_attn   # obs + p^i_t + P (TANPA aksi)
+        self.pool = MasterPurePPOAttentivePooling(in_dim, hidden)
+        self.head = nn.Linear(hidden, self.n_critics)
+
+    def _encode_pref(self, pref_hist):
+        lengths = (pref_hist.abs().sum(dim=-1) > 0).sum(dim=1).clamp(min=1).cpu()
+        packed = nn.utils.rnn.pack_padded_sequence(pref_hist, lengths, batch_first=True,
+                                                    enforce_sorted=False)
+        _, (h_n, _) = self.pref_lstm(packed)
+        return h_n[-1]
+
+    def forward(self, joint_obs, mask, I_raw, pref_hist=None):
+        """joint_obs:(B,N,F) mask:(B,N) I_raw:(B,N) MENTAH pref_hist:(B,K,d) opsional
+        -> V:(B,K_kritik)."""
+        p = torch.relu(self.W_p(I_raw.unsqueeze(-1)))
+        if pref_hist is not None:
+            c_pref = self._encode_pref(pref_hist)
+            attended_pref, _ = self.pref_attn(joint_obs, c_pref)
+            attended_pref = self.pref_gate * attended_pref
+        else:
+            attended_pref = torch.zeros(joint_obs.shape[0], self.pref_d_attn,
+                                        device=joint_obs.device)
+        n = joint_obs.shape[1]
+        pref_exp = attended_pref.unsqueeze(1).expand(-1, n, -1)
+        raw = torch.cat([joint_obs, p, pref_exp], dim=-1)
+        x_t, attn_weights = self.pool(raw, mask)
+        return self.head(x_t), attn_weights
 
 
 class MasterHybridDDPGInferenceAgent:

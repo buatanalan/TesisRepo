@@ -22,7 +22,7 @@ from marl_spklu.rl.rollout import (RLRolloutAgent, RewardCalculatorStub, STREAM_
                                    STREAM_GLOBAL, N_REWARD_STREAMS, _gini)
 from marl_spklu.rl.master_paper_obs import (build_joint_obs_master, build_joint_obs_master_ev,
                                             STATION_FEAT_DIM_MASTER, STATION_FEAT_DIM_MASTER_EV)
-from marl_spklu.rl.master_pure_hybrid_policy import MasterHybridPPOActor
+from marl_spklu.rl.master_pure_hybrid_policy import MasterHybridPPOActor, MasterHybridPPOCritic
 from marl_spklu.rl.master_pure_ppo_policy import MasterPurePPOCritic
 from marl_spklu.rl.master_pure_trainer import snapshot_slots_raw, _SlotRawLog
 from marl_spklu.rl.ppo import compute_gae
@@ -125,7 +125,10 @@ class MasterHybridPPORolloutAgent(RLRolloutAgent):
             # supaya kelas ini bisa dipakai ulang utk evaluasi tanpa memuat kritik.
             if self.critic is not None:
                 zero_I = torch.zeros_like(mask_t, dtype=torch.float32)
-                value, _ = self.critic(obs_t, mask_t, zero_I)
+                if hasattr(self.critic, "pref_lstm"):
+                    value, _ = self.critic(obs_t, mask_t, zero_I, pref_hist_t)
+                else:
+                    value, _ = self.critic(obs_t, mask_t, zero_I)
             else:
                 value = torch.zeros(1, self.n_critics_hint)
         logits_np = logits.squeeze(0).numpy()
@@ -231,7 +234,22 @@ class MasterHybridPPOTrainer:
                 actor_kwargs: dict = None,
                 beta_mode: str = "gap_ratio", beta_sigma: float = 0.2,
                 reward_calc=None, seed: int = 0, verbose: bool = True,
-                equity_calc=None, max_step_gap: int = 4):
+                equity_calc=None, max_step_gap: int = 4, critic_pref: bool = False,
+                critic_pref_gate_init: float = 0.1):
+        # `critic_pref` (2026-08-30): pakai `MasterHybridPPOCritic` (BER-P, param
+        # TERPISAH dari aktor) menggantikan `MasterPurePPOCritic` (SELALU buta P) --
+        # uji hipotesis kritik jadi sumber variansi advantage tambahan khusus utk
+        # keputusan berbasis P (lih. docstring `MasterHybridPPOCritic`). Baku False ->
+        # perilaku lama TAK berubah.
+        self.critic_pref = bool(critic_pref)
+        # `critic_pref_gate_init` SENGAJA TERPISAH dari `pref_gate_init` milik aktor
+        # (bukan ikut `actor_kwargs`) -- supaya varian "Attn-saja + kritik-ber-P" bisa
+        # menguji kritik dgn P AKTIF (gerbang kritik >0) SEMENTARA gerbang P AKTOR
+        # tetap 0 (P aktor sengaja inert, sesuai definisi "Attn-saja"). Kalau gerbang
+        # kritik ikut default 0 aktor, kritik akan terjebak deadlock gradien SAMA PERSIS
+        # spt bug lama di aktor (gate=0 -> grad pref_lstm=0) -- baku 0.1 di sini utk
+        # menghindarinya scr otomatis, bukan menunggu user mengingat set manual.
+        self.critic_pref_gate_init = float(critic_pref_gate_init)
         assert mode in ("pretrain_specialist", "dgr"), f"mode={mode!r} tak dikenal"
         self.mode = mode
         self.dataset_path = dataset_path
@@ -273,8 +291,20 @@ class MasterHybridPPOTrainer:
 
         self.actor = MasterHybridPPOActor(self.N, **(actor_kwargs or {}))
         _sfd = getattr(self.actor, "station_feat_dim", STATION_FEAT_DIM_MASTER)
-        self.critic = MasterPurePPOCritic(_sfd, hidden=hidden,
-                                          n_critics=self.n_critics)
+        _bb = getattr(self.actor, "backbone", None)
+        if self.critic_pref:
+            # Kritik BER-P dgn param TERPISAH dari aktor (bobot sendiri), tapi mode
+            # fitur/outcome/gerbang-init HARUS sama dgn aktor supaya dimensi cocok &
+            # eksperimennya adil (P yg SAMA dilihat kedua sisi, bukan mode berbeda).
+            self.critic = MasterHybridPPOCritic(
+                _sfd, hidden=hidden, n_critics=self.n_critics, n_spklu=self.N,
+                pref_feature_mode=getattr(_bb, "pref_feature_mode", False),
+                pref_pair_outcome=getattr(_bb, "pref_pair_outcome", False),
+                pref_gate_init=self.critic_pref_gate_init,
+                pref_hist_k=getattr(_bb, "pref_hist_k", None))
+        else:
+            self.critic = MasterPurePPOCritic(_sfd, hidden=hidden,
+                                              n_critics=self.n_critics)
         self.opt = torch.optim.Adam(
             list(self.actor.parameters()) + list(self.critic.parameters()), lr=lr)
 
@@ -393,7 +423,11 @@ class MasterHybridPPOTrainer:
                 dist = torch.distributions.Categorical(logits=logits)
                 logp = dist.log_prob(primary_b[mb])
                 ent = dist.entropy()
-                value, _ = self.critic(obs_b[mb], mask_b[mb], I_b[mb])
+                if hasattr(self.critic, "pref_lstm"):
+                    value, _ = self.critic(obs_b[mb], mask_b[mb], I_b[mb],
+                                           None if pref_b is None else pref_b[mb])
+                else:
+                    value, _ = self.critic(obs_b[mb], mask_b[mb], I_b[mb])
 
                 ratio = torch.exp(logp - old_logp[mb])
                 s1 = ratio * adv_b[mb]

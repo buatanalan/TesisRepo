@@ -49,9 +49,18 @@ K.DS = os.path.join(common.ROOT, K.HORIZON[TAG])
 
 def muat_policy(seed, n_spklu):
     ckpt = os.path.join(common.OUTDIR, f"{TAG_ARM}_actor_seed{seed}.pt")
-    assert os.path.exists(ckpt), (
-        f"checkpoint tak ditemukan: {ckpt}\n"
-        f"latih dulu lewat: python _run_master_pure_hybrid_ppo_pipeline.py --n-train-seed {seed+1} ...")
+    if not os.path.exists(ckpt):
+        # Fallback (2026-08-30): 1 seed LATIH, N seed EVAL -- pola pengurangan skala
+        # eksploratif. Checkpoint seed>0 sengaja tak ada; pakai seed0 tapi simulasi
+        # TETAP dijalankan dgn seed stokastik `seed` aslinya (varian antar-run masih
+        # berarti krn stokastisitas lingkungan, bukan cuma kebetulan bit-identik).
+        ckpt0 = os.path.join(common.OUTDIR, f"{TAG_ARM}_actor_seed0.pt")
+        assert os.path.exists(ckpt0), (
+            f"checkpoint tak ditemukan: {ckpt} (maupun fallback {ckpt0})\n"
+            f"latih dulu lewat: python _run_master_pure_hybrid_ppo_pipeline.py --n-train-seed {seed+1} ...")
+        print(f"  [fallback] seed={seed}: checkpoint tak ada, pakai bobot seed0 "
+             f"(simulasi tetap seed={seed})", flush=True)
+        ckpt = ckpt0
     pol = MasterHybridPPOActor(n_spklu, **ACTOR_KW)
     pol.load_state_dict(torch.load(ckpt, map_location="cpu"))
     pol.eval()

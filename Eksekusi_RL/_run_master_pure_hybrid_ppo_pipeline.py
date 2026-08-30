@@ -75,6 +75,18 @@ p.add_argument("--pref-hist-k", type=int, default=None,
                    "global, TAK berubah). Mis. 5 -- ablasi apakah jendela lebih pendek "
                    "membantu optimasi `pref_lstm` (bukan soal padding, itu sudah ditangani "
                    "benar via pack_padded_sequence -- ini murni soal panjang konteks).")
+p.add_argument("--critic-pref", action="store_true",
+              help="Pakai `MasterHybridPPOCritic` (menerima pref_hist, param P TERPISAH "
+                   "dari aktor) menggantikan `MasterPurePPOCritic` (SELALU buta P) -- uji "
+                   "hipotesis kritik jadi sumber variansi advantage tambahan khusus utk "
+                   "keputusan berbasis P. WAJIB --pref-feature-mode (P tak berarti kalau "
+                   "aktor sendiri tak memakainya).")
+p.add_argument("--critic-pref-gate-init", type=float, default=0.1,
+              help="Gerbang P KRITIK, TERPISAH dari --pref-gate-init aktor (baku 0.1, "
+                   "BUKAN 0.0 -- kalau ikut default aktor 0.0, kritik terjebak deadlock "
+                   "gradien sama spt bug lama di aktor). Sengaja terpisah supaya varian "
+                   "'Attn-saja + kritik-ber-P' bisa menguji kritik BER-P AKTIF sementara "
+                   "gerbang P AKTOR tetap 0 (P aktor sengaja inert).")
 p.add_argument("--no-station-attn", action="store_true",
               help="Matikan `SmallStationAttention` sepenuhnya (2026-08-30, ABLASI) -- "
                    "utk mengisolasi kontribusi Modul P TANPA atensi antar-stasiun (varian "
@@ -106,6 +118,9 @@ _rw_suffix = "" if args.reward_preset == "raw" else f"_{args.reward_preset}"
 assert not (args.pref_pair_outcome and not args.pref_feature_mode), (
     "--pref-pair-outcome WAJIB disertai --pref-feature-mode (blok hasil tak bermakna "
     "di mode one-hot identitas)")
+assert not (args.critic_pref and not args.pref_feature_mode), (
+    "--critic-pref WAJIB disertai --pref-feature-mode (P kritik tak berarti kalau "
+    "aktor sendiri tak memakainya)")
 from marl_spklu.rl.master_paper_obs import (STATION_FEAT_DIM_MASTER,
                                             STATION_FEAT_DIM_MASTER_EV)
 ACTOR_KW = dict(ACTOR_KW_BASE, pref_feature_mode=args.pref_feature_mode,
@@ -120,7 +135,8 @@ _pref_suffix = (("_preffeat" if args.pref_feature_mode else "")
                 + ("" if args.pref_gate_init == 0.0 else f"_pg{args.pref_gate_init:g}")
                 + ("_evobs" if args.ev_obs else "")
                 + ("_noattn" if args.no_station_attn else "")
-                + ("" if args.pref_hist_k is None else f"_histK{args.pref_hist_k}"))
+                + ("" if args.pref_hist_k is None else f"_histK{args.pref_hist_k}")
+                + ("_critpref" if args.critic_pref else ""))
 _clip_suffix = _clip_suffix + _fail_suffix + _rw_suffix + _pref_suffix
 if args.mode == "pretrain_specialist":
     STREAM_NAME = {0: "wait", 1: "gini"}[args.stream_select]
@@ -150,7 +166,8 @@ def _load_r_star(tag: str, seed: int) -> float:
 
 def train_one(seed):
     kw = dict(dataset_path=DATASET, mode=args.mode, rollout_steps=args.rollout_steps,
-             seed=seed, verbose=False, actor_kwargs=ACTOR_KW)
+             seed=seed, verbose=False, actor_kwargs=ACTOR_KW, critic_pref=args.critic_pref,
+             critic_pref_gate_init=args.critic_pref_gate_init)
     if (args.wait_reward_clip is not None or args.wait_fail_threshold is not None
             or args.reward_preset != "raw"):
         _rc_kw = dict(wait_reward_clip=args.wait_reward_clip,
