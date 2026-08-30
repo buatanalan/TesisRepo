@@ -38,6 +38,12 @@ K_REC = 3
 # bentuk jaringannya (kelas bug "latih & uji beda mode", berulang di repo ini).
 import re as _re
 _m_histk = _re.search(r"_histK(\d+)", TAG_ARM)
+# `initial_trust` DITURUNKAN dari TAG_ARM (bukan argumen terpisah) -- kebijakan WAJIB
+# diuji di lingkungan yang SAMA dgn tempatnya dilatih. Menurunkannya dari tag membuat
+# ketidakcocokan latih/uji mustahil terjadi karena lupa meneruskan argumen, kelas bug
+# yang sudah berulang di repo ini (pref_hist saat uji, station_feat_dim, dst).
+_m_it = _re.search(r"_it([0-9.]+)", TAG_ARM)
+INIT_TRUST = float(_m_it.group(1)) if _m_it else None
 ACTOR_KW = dict(vec_dim=8, bid_hidden=16, pref_d_lstm=8, pref_d_attn=8, station_attn_dim=8,
                 pref_feature_mode="_preffeat" in TAG_ARM,
                 pref_pair_outcome="_pairout" in TAG_ARM,
@@ -104,6 +110,8 @@ def fac_dari_policy(policy):
 def main():
     print(f"horizon={TAG} ({K.DS})", flush=True)
     print(f"seed: {SEEDS}", flush=True)
+    if INIT_TRUST is not None:
+        print(f"lingkungan: initial_trust={INIT_TRUST:g} (diturunkan dari tag)", flush=True)
     n_spklu = len(_fresh_sim_common(K.DS).spklus)
 
     per_seed = {}
@@ -138,4 +146,14 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # Konteks dibentangkan menutupi SELURUH main(): `K.satu_run` membuat simulator baru
+    # tiap run, dan `initial_trust` menambal `User.__init__` -- jadi harus aktif saat
+    # setiap simulator dibentuk, bukan sekali di awal.
+    import contextlib
+    if INIT_TRUST is not None:
+        from marl_spklu.experiments.ablations import initial_trust as _initial_trust
+        _ctx = _initial_trust(INIT_TRUST)
+    else:
+        _ctx = contextlib.nullcontext()
+    with _ctx:
+        main()

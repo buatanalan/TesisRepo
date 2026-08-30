@@ -37,6 +37,16 @@ p.add_argument("--dataset", type=str, default="4x")
 p.add_argument("--horizon", type=str, default="30d")
 p.add_argument("--specialist0-tag", type=str, default=None)
 p.add_argument("--specialist1-tag", type=str, default=None)
+p.add_argument("--initial-trust", type=float, default=None,
+              help="Trust AWAL semua pengguna (baku None -> INIT_TRUST=0.5 bawaan). "
+                   "Trust TETAP DINAMIS sesudahnya -- ini menguji sensitivitas thd titik "
+                   "awal, BUKAN membekukan dinamika performatif. Uji generalisasi "
+                   "LINGKUNGAN. Harus di (0,1). Dipakai saat LATIH maupun UJI.")
+p.add_argument("--gamma", type=float, default=0.99,
+              help="Faktor diskon PPO/GAE (baku 0.99). Uji sensitivitas ALGORITMA "
+                   "(bukan lingkungan). CATATAN: efeknya teredam oleh `max_step_gap=4` "
+                   "yang memutus rantai bootstrap antar-transisi berjauhan waktu, jadi "
+                   "horizon efektif sudah pendek terlepas dari gamma.")
 p.add_argument("--beta-denom", type=str, default=None, choices=["r_star", "ret_std"],
               help="Penyebut gap-ratio DGR. 'r_star' = |r_star| (perilaku lama). "
                    "'ret_std' = simpangan baku return -- WAJIB bila ada aliran yang "
@@ -180,6 +190,8 @@ _pref_suffix = (("_preffeat" if args.pref_feature_mode else "")
                 + ("" if args.pref_hist_k is None else f"_histK{args.pref_hist_k}")
                 + ("_critpref" if args.critic_pref else "")
                 + ("_pure3" if args.pure_streams else "")
+                + ("" if args.initial_trust is None else f"_it{args.initial_trust:g}")
+                + ("" if args.gamma == 0.99 else f"_g{args.gamma:g}")
                 + ("" if args.alpha_accept == 0.0 or args.pure_streams else
                    f"_acc{args.alpha_accept:g}" +
                    ("" if args.accept_stream == "global" else "S1")))
@@ -223,7 +235,8 @@ def train_one(seed):
              critic_pref_gate_init=args.critic_pref_gate_init,
              accept_stream=(STREAM_GLOBAL if args.accept_stream == "global"
                             else STREAM_INDIVIDUAL),
-             pure_streams=args.pure_streams, beta_denom=args.beta_denom)
+             pure_streams=args.pure_streams, beta_denom=args.beta_denom,
+             gamma=args.gamma)
     if (args.wait_reward_clip is not None or args.wait_fail_threshold is not None
             or args.reward_preset != "raw" or args.alpha_accept != 0.0):
         _rc_kw = dict(wait_reward_clip=args.wait_reward_clip,
@@ -272,17 +285,33 @@ try:
 except FileNotFoundError:
     pass
 
-for seed in range(args.n_train_seed):
-    if seed in existing:
-        print(f"[{elapsed()}]   seed={seed} -- SKIP (checkpoint sudah ada)", flush=True)
-        results.append(existing[seed])
-        continue
-    print(f"[{elapsed()}]   seed={seed} -- mulai training", flush=True)
-    row = train_one(seed)
-    print(f"[{elapsed()}]   seed={seed} -- SELESAI"
-         + (f" (r_star={row['r_star']:.4f})" if row["r_star"] is not None else ""), flush=True)
-    results.append(row)
-    common.save_json(results, results_path)
+# `initial_trust` menambal `User.__init__`, jadi HARUS aktif setiap kali simulator
+# dibuat -- bukan hanya di awal. Trainer memanggil `_fresh_sim()` saat konstruksi DAN
+# di tiap batas horizon (`_carry_forward`), sehingga konteks dibentangkan menutupi
+# SELURUH loop pelatihan, bukan dipasang per-pemanggilan.
+import contextlib
+if args.initial_trust is not None:
+    from marl_spklu.experiments.ablations import initial_trust as _initial_trust
+    _env_ctx = _initial_trust(args.initial_trust)
+    print(f"[{elapsed()}] Lingkungan: initial_trust={args.initial_trust:g} "
+         f"(trust tetap DINAMIS sesudahnya)", flush=True)
+else:
+    _env_ctx = contextlib.nullcontext()
+if args.gamma != 0.99:
+    print(f"[{elapsed()}] Algoritma: gamma={args.gamma:g} (baku 0.99)", flush=True)
+
+with _env_ctx:
+    for seed in range(args.n_train_seed):
+        if seed in existing:
+            print(f"[{elapsed()}]   seed={seed} -- SKIP (checkpoint sudah ada)", flush=True)
+            results.append(existing[seed])
+            continue
+        print(f"[{elapsed()}]   seed={seed} -- mulai training", flush=True)
+        row = train_one(seed)
+        print(f"[{elapsed()}]   seed={seed} -- SELESAI"
+             + (f" (r_star={row['r_star']:.4f})" if row["r_star"] is not None else ""), flush=True)
+        results.append(row)
+        common.save_json(results, results_path)
 print(f"[{elapsed()}] Pelatihan selesai ({len(results)} seed)", flush=True)
 
 _eval_out_path = os.path.join(common.OUTDIR, f"{TAG_ARM}_eval_results.json")

@@ -38,6 +38,21 @@
 # Jalankan dari root repo di server:
 #   nohup bash Eksekusi_RL/retrain_hybrid_ppo_pure3_2x2.sh > Eksekusi_RL/outputs/retrain_hybrid_ppo_pure3_2x2.log 2>&1 &
 set -e
+
+# --- PENJAGA PELUNCURAN GANDA ------------------------------------------------------
+# Peluncuran ganda pd tahap LATIH jauh lebih merusak drpd di eval: dua proses menulis
+# checkpoint & `training_results.json` yang SAMA, sehingga `r_star` bisa berpasangan
+# dgn bobot dari run yang berbeda -- korupsi senyap, tanpa pesan error.
+LOCK=/tmp/retrain_pure3_2x2.lock
+if ! mkdir "$LOCK" 2>/dev/null; then
+  echo "DITOLAK: sudah ada pelatihan pure3 yang berjalan (kunci: $LOCK)."
+  echo "  Periksa : pgrep -af '_run_master_pure_hybrid_ppo_pipeline'"
+  echo "  Bila itu proses mati/sisa, hapus kuncinya: rmdir $LOCK"
+  exit 1
+fi
+trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
+# -----------------------------------------------------------------------------------
+
 PY=.venv/bin/python
 PIPE=Eksekusi_RL/_run_master_pure_hybrid_ppo_pipeline.py
 BASE="--n-train-seed 3 --n-updates 300 --rollout-steps 96 \

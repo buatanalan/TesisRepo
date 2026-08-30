@@ -22,6 +22,22 @@
 #
 #   nohup bash Eksekusi_RL/eval_hybrid_ppo_pure3_2x2_metrik.sh > Eksekusi_RL/outputs/eval_hybrid_ppo_pure3_2x2_metrik.log 2>&1 &
 set -e
+
+# --- PENJAGA PELUNCURAN GANDA ------------------------------------------------------
+# `mkdir` bersifat atomik, jadi hanya SATU proses bisa membuatnya. Tanpa ini, dua
+# peluncuran menulis ke berkas keluaran yang SAMA dan yang selesai terakhir menimpa --
+# tanpa pesan apa pun. Lebih berbahaya lagi bila kedua proses memuat versi kode yang
+# berbeda (Python membaca .py saat proses MULAI), krn hasilnya bisa berbeda diam-diam.
+LOCK=/tmp/eval_pure3_2x2.lock
+if ! mkdir "$LOCK" 2>/dev/null; then
+  echo "DITOLAK: sudah ada eval pure3 yang berjalan (kunci: $LOCK)."
+  echo "  Periksa : pgrep -af '_uji_master_pure_hybrid_ppo_metrik'"
+  echo "  Bila itu proses mati/sisa, hapus kuncinya: rmdir $LOCK"
+  exit 1
+fi
+trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT
+# -----------------------------------------------------------------------------------
+
 PY=.venv/bin/python
 UJI=Eksekusi_RL/_uji_master_pure_hybrid_ppo_metrik.py
 SEEDS=0,1,2,3,4,5,6,7,8,9
