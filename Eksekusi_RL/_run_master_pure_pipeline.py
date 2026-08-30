@@ -36,6 +36,14 @@ p.add_argument("--stream-select", type=int, default=None, choices=[0, 1],
 p.add_argument("--n-train-seed", type=int, default=3)
 p.add_argument("--n-updates", type=int, default=300)
 p.add_argument("--rollout-steps", type=int, default=96)
+p.add_argument("--updates-per-chunk", type=int, default=20,
+              help="Langkah gradien MAKS per chunk (baku 20, dibatasi min(n_new, ini)). "
+                   "2026-08-31: dgn baku ini DDPG hanya menerima ~1/3 langkah gradien "
+                   "PPO meski memproses jumlah transisi lingkungan yg SAMA (54,5rb vs "
+                   "54,9rb, rasio 1,01x) -- krn PPO mengulang 10 epoch per batch sedangkan "
+                   "DDPG dibatasi 20 langkah/chunk terlepas dari ukuran buffer replay. "
+                   "Pakai --updates-per-chunk 62 utk anggaran gradien setara PPO (rasio "
+                   "terukur 3,11x, dihitung via _hitung_langkah_gradien.py).")
 p.add_argument("--dataset", type=str, default="4x",
               help="'4x' -> scenario_dataset_klaster12_4x.json (baku 30d). Path lain "
                    "utk dataset custom (mis. 90d) -- WAJIB dibarengi --horizon eksplisit.")
@@ -77,7 +85,8 @@ _horizon_suffix = "" if args.horizon == "30d" else f"_{args.horizon}"
 _clip_suffix = "" if args.wait_reward_clip is None else f"_clip{args.wait_reward_clip:g}"
 _fail_suffix = ("" if args.wait_fail_threshold is None
                else f"_cwtfail{args.wait_fail_threshold:g}pen{args.wait_fail_penalty:g}")
-_clip_suffix = _clip_suffix + _fail_suffix
+_clip_suffix = _clip_suffix + _fail_suffix + (
+    "" if args.updates_per_chunk == 20 else f"_upc{args.updates_per_chunk}")
 
 if args.mode == "pretrain_specialist":
     STREAM_NAME = {0: "wait", 1: "gini"}[args.stream_select]
@@ -114,7 +123,7 @@ def _load_specialist(tag: str, seed: int):
 
 def train_one(seed):
     kw = dict(dataset_path=DATASET, mode=args.mode, rollout_steps=args.rollout_steps,
-             seed=seed, verbose=False)
+             seed=seed, verbose=False, updates_per_chunk=args.updates_per_chunk)
     if args.wait_reward_clip is not None or args.wait_fail_threshold is not None:
         kw["reward_calc"] = RewardCalculator(wait_reward_clip=args.wait_reward_clip,
                                              wait_fail_threshold=args.wait_fail_threshold,
