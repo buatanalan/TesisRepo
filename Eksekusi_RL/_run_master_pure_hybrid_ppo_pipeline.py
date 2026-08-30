@@ -70,6 +70,11 @@ p.add_argument("--pref-pair-outcome", action="store_true",
                    "dipakai User.update_trust, jadi `pref_lstm` menduga preferensi DAN "
                    "kepercayaan sekaligus -- `hist_lstm` terpisah jadi mubazir, bukan "
                    "bersaing. WAJIB --pref-feature-mode.")
+p.add_argument("--pref-hist-k", type=int, default=None,
+              help="Override panjang jendela riwayat P (baku None -> ikut PDQN_HIST_K=10 "
+                   "global, TAK berubah). Mis. 5 -- ablasi apakah jendela lebih pendek "
+                   "membantu optimasi `pref_lstm` (bukan soal padding, itu sudah ditangani "
+                   "benar via pack_padded_sequence -- ini murni soal panjang konteks).")
 p.add_argument("--no-station-attn", action="store_true",
               help="Matikan `SmallStationAttention` sepenuhnya (2026-08-30, ABLASI) -- "
                    "utk mengisolasi kontribusi Modul P TANPA atensi antar-stasiun (varian "
@@ -107,13 +112,15 @@ ACTOR_KW = dict(ACTOR_KW_BASE, pref_feature_mode=args.pref_feature_mode,
                 pref_pair_outcome=args.pref_pair_outcome,
                 pref_gate_init=args.pref_gate_init,
                 use_station_attn=not args.no_station_attn,
+                pref_hist_k=args.pref_hist_k,
                 station_feat_dim=(STATION_FEAT_DIM_MASTER_EV if args.ev_obs
                                   else STATION_FEAT_DIM_MASTER))
 _pref_suffix = (("_preffeat" if args.pref_feature_mode else "")
                 + ("_pairout" if args.pref_pair_outcome else "")
                 + ("" if args.pref_gate_init == 0.0 else f"_pg{args.pref_gate_init:g}")
                 + ("_evobs" if args.ev_obs else "")
-                + ("_noattn" if args.no_station_attn else ""))
+                + ("_noattn" if args.no_station_attn else "")
+                + ("" if args.pref_hist_k is None else f"_histK{args.pref_hist_k}"))
 _clip_suffix = _clip_suffix + _fail_suffix + _rw_suffix + _pref_suffix
 if args.mode == "pretrain_specialist":
     STREAM_NAME = {0: "wait", 1: "gini"}[args.stream_select]

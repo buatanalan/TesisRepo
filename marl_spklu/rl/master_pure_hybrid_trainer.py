@@ -74,7 +74,8 @@ class MasterHybridPPORolloutAgent(RLRolloutAgent):
 
     def __init__(self, actor, critic, sim, reward_calc, forecaster=None, k: int = 3,
                 equity_calc=None, stream_select=None, pref_feature_mode: bool = False,
-                pref_pair_outcome: bool = False, deterministic: bool = False):
+                pref_pair_outcome: bool = False, deterministic: bool = False,
+                pref_hist_k: int = None):
         # `pref_pad_right=True` WAJIB & tak bersyarat di sini: `_PrefStationBackbone.
         # _encode_pref` memakai `pack_padded_sequence` yg mensyaratkan padding di BELAKANG,
         # sedangkan basis `RLRolloutAgent` mem-padding di DEPAN. Ketidakcocokan inilah bug
@@ -82,7 +83,8 @@ class MasterHybridPPORolloutAgent(RLRolloutAgent):
         # membaca baris PADDING NOL, tak pernah riwayat sungguhan.
         super().__init__(actor, sim, reward_calc, forecaster, k=k, equity_calc=equity_calc,
                          pref_feature_mode=pref_feature_mode,
-                         pref_pair_outcome=pref_pair_outcome, pref_pad_right=True)
+                         pref_pair_outcome=pref_pair_outcome, pref_pad_right=True,
+                         pref_hist_k=pref_hist_k)
         self.actor = actor
         self.critic = critic
         # DUA VERSI OBSERVASI -- lih. catatan identik di MasterPureRolloutAgent.
@@ -191,6 +193,7 @@ class MasterHybridPPOInferenceAgent:
             self.actor, None, sim, RewardCalculatorStub(), self.forecaster, k=self.k,
             pref_feature_mode=getattr(_bb, "pref_feature_mode", False),
             pref_pair_outcome=getattr(_bb, "pref_pair_outcome", False),
+            pref_hist_k=getattr(_bb, "pref_hist_k", None),
             deterministic=True)
         self.sim = sim
 
@@ -462,7 +465,8 @@ class MasterHybridPPOTrainer:
                                             equity_calc=self.equity_calc,
                                             stream_select=self.stream_select,
                                             pref_feature_mode=getattr(_bb, "pref_feature_mode", False),
-                                            pref_pair_outcome=getattr(_bb, "pref_pair_outcome", False))
+                                            pref_pair_outcome=getattr(_bb, "pref_pair_outcome", False),
+                                            pref_hist_k=getattr(_bb, "pref_hist_k", None))
         step = 0
         for _ in range(n_updates):
             it = self._it_global

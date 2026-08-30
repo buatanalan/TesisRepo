@@ -22,14 +22,27 @@ SEEDS = ([int(s) for s in sys.argv[1].replace(" ", "").split(",") if s]
         if len(sys.argv) > 1 else [0, 1, 2])
 TAG = sys.argv[2] if len(sys.argv) > 2 else "30d"
 TAG_ARM = sys.argv[3] if len(sys.argv) > 3 else "master_hybrid_ppo_dgr"
+# argumen ke-5 opsional (2026-08-30): "cepat" -> HANYA signed|dinamis (1 kombinasi,
+# bukan 4) -- mode paling realistis (signed = sesuai desain reward asli, dinamis =
+# trust hidup sungguhan). Baku "" -> perilaku lama (4 kombinasi), TAK berubah utk
+# pemanggil lama. Pakai "cepat" utk eksperimen eksploratif murah (mis. uji K=5);
+# kembalikan ke default sebelum melaporkan hasil FINAL, krn abs|dinamis pernah
+# terbukti membalik urutan gini (Gabungan vs Attn-saja) -- mode itu bisa jadi bukti
+# penting, jangan dibuang permanen dari SELURUH pengujian.
+MODE_SUBSET = sys.argv[4] if len(sys.argv) > 4 else ""
+MODE_COMBOS = ([("signed", False)] if MODE_SUBSET == "cepat"
+              else [(m, b) for m in ("abs", "signed") for b in (False, True)])
 LABEL_ARM = f"MASTER-HYBRID-PPO[{TAG_ARM}]"
 K_REC = 3
 # Mode pref DITURUNKAN dari TAG_ARM -- checkpoint & rekonstruksi eval WAJIB sama
 # bentuk jaringannya (kelas bug "latih & uji beda mode", berulang di repo ini).
+import re as _re
+_m_histk = _re.search(r"_histK(\d+)", TAG_ARM)
 ACTOR_KW = dict(vec_dim=8, bid_hidden=16, pref_d_lstm=8, pref_d_attn=8, station_attn_dim=8,
                 pref_feature_mode="_preffeat" in TAG_ARM,
                 pref_pair_outcome="_pairout" in TAG_ARM,
                 use_station_attn="_noattn" not in TAG_ARM,
+                pref_hist_k=(int(_m_histk.group(1)) if _m_histk else None),
                 station_feat_dim=(10 if "_evobs" in TAG_ARM else 7))
 K.DS = os.path.join(common.ROOT, K.HORIZON[TAG])
 
@@ -61,22 +74,21 @@ def main():
     per_seed = {}
     agregat = {}
     harian = {}
-    for mode in ("abs", "signed"):
-        for beku in (False, True):
-            label = f"{LABEL_ARM}|{mode}|{'beku' if beku else 'dinamis'}"
-            runs = []
-            for sd in SEEDS:
-                policy = muat_policy(sd, n_spklu)
-                fac = fac_dari_policy(policy)
-                print(f"  [{label}] seed={sd} ...", flush=True)
-                r = K.satu_run(fac, mode, sd, beku)
-                runs.append(r)
-            per_seed[label] = runs
-            agregat[label] = K.agg(runs)
-            harian[label] = K.agg_harian(runs)
-            print(f"  [{label}] gini={agregat[label]['gini']:.4f} "
-                 f"wait={agregat[label]['wait']:.1f} trust={agregat[label]['trust']:.3f} "
-                 f"acc={agregat[label]['acc']:.3f}", flush=True)
+    for mode, beku in MODE_COMBOS:
+        label = f"{LABEL_ARM}|{mode}|{'beku' if beku else 'dinamis'}"
+        runs = []
+        for sd in SEEDS:
+            policy = muat_policy(sd, n_spklu)
+            fac = fac_dari_policy(policy)
+            print(f"  [{label}] seed={sd} ...", flush=True)
+            r = K.satu_run(fac, mode, sd, beku)
+            runs.append(r)
+        per_seed[label] = runs
+        agregat[label] = K.agg(runs)
+        harian[label] = K.agg_harian(runs)
+        print(f"  [{label}] gini={agregat[label]['gini']:.4f} "
+             f"wait={agregat[label]['wait']:.1f} trust={agregat[label]['trust']:.3f} "
+             f"acc={agregat[label]['acc']:.3f}", flush=True)
 
     out = dict(horizon=TAG, seeds=SEEDS, per_seed=per_seed, agregat=agregat, harian=harian)
     nama = f"uji_{TAG_ARM}_metrik_{TAG}.json"

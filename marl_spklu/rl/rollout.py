@@ -124,7 +124,8 @@ class RLRolloutAgent:
     def __init__(self, policy, sim, reward_calc, forecaster=None, k: int = 3,
                  equity_calc=None, pref_feature_mode: bool = False,
                  epsilon: float = 0.0, threshold: float = 0.20,
-                 pref_pair_outcome: bool = False, pref_pad_right: bool = False):
+                 pref_pair_outcome: bool = False, pref_pad_right: bool = False,
+                 pref_hist_k: int = None):
         self.policy = policy
         self.sim = sim
         self.rc = reward_calc
@@ -194,6 +195,12 @@ class RLRolloutAgent:
         # `lengths` baris pertama yg diambil justru PADDING NOL, sehingga `pref_lstm`
         # TAK PERNAH melihat riwayat sungguhan. Flag ini perbaikannya.
         self._pref_pad_right = bool(pref_pad_right)
+        # `pref_hist_k` (2026-08-30): override panjang jendela riwayat P per-instance,
+        # TERISOLASI dari konstanta global `PDQN_HIST_K` -- pola SAMA `master_ev_ppo_
+        # policy.py::MasterEVPPORolloutAgent`. Baku None -> ikut PDQN_HIST_K (perilaku
+        # lama, TAK berubah). Dipakai utk ablasi panjang jendela (mis. K=5 vs K=10) tanpa
+        # menyentuh lengan lain yg berbagi modul ini (PDQN, Kandidat A/B, Hybrid).
+        self._pref_hist_k = int(pref_hist_k) if pref_hist_k is not None else PDQN_HIST_K
         self._pref_hist = {}   # user_id -> deque[pair], onehot-idx ATAU vektor fitur tergantung mode
 
     def _pref_station_feat(self, sid, user, wait_hat):
@@ -214,13 +221,13 @@ class RLRolloutAgent:
         """Riwayat T=PDQN_HIST_K pasangan (a_hat,a) terakhir pengguna ini -> (K, dim)
         left-padded nol -- one-hot ganda (K,2N, default, paper §IV.A) atau pasangan
         vektor fitur (K,2xPREF_STATION_FEAT_DIM, pref_feature_mode=True)."""
-        arr = np.zeros((PDQN_HIST_K, self._pref_hist_feat_dim), dtype=np.float32)
+        arr = np.zeros((self._pref_hist_k, self._pref_hist_feat_dim), dtype=np.float32)
         h = self._pref_hist.get(user.user_id)
         if h:
-            recent = list(h)[-PDQN_HIST_K:]
+            recent = list(h)[-self._pref_hist_k:]
             # padding di BELAKANG (offset=0) bila encoder memakai pack_padded_sequence,
             # di DEPAN (offset=K-len) spt semula bila tidak -- lihat `_pref_pad_right`.
-            offset = 0 if self._pref_pad_right else PDQN_HIST_K - len(recent)
+            offset = 0 if self._pref_pad_right else self._pref_hist_k - len(recent)
             for t, pair in enumerate(recent):
                 if self.pref_feature_mode:
                     arr[offset + t] = pair
@@ -237,7 +244,7 @@ class RLRolloutAgent:
         backfill identik `user.interaction_history[-1]` di hook yang sama."""
         h = self._pref_hist.get(user.user_id)
         if h is None:
-            h = deque(maxlen=PDQN_HIST_K)
+            h = deque(maxlen=self._pref_hist_k)
             self._pref_hist[user.user_id] = h
         if self.pref_feature_mode:
             feat_hat = self._pref_station_feat(self.sids[a_hat_idx], user, wait_hat or {})

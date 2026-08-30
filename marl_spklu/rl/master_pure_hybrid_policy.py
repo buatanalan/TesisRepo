@@ -93,8 +93,15 @@ class _PrefStationBackbone(nn.Module):
                 vec_dim: int = 8, bid_hidden: int = 16, pref_d_lstm: int = 8,
                 pref_d_attn: int = 8, station_attn_dim: int = 8,
                 pref_feature_mode: bool = False, pref_pair_outcome: bool = False,
-                pref_gate_init: float = 0.0, use_station_attn: bool = True):
+                pref_gate_init: float = 0.0, use_station_attn: bool = True,
+                pref_hist_k: int = None):
         super().__init__()
+        # `pref_hist_k` (2026-08-30, ABLASI): override panjang jendela riwayat P
+        # (baku None -> ikut PDQN_HIST_K=10 global). Disimpan di sini (bukan tensor,
+        # tak masuk state_dict) supaya rollout agent (train MAUPUN eval) bisa
+        # MENURUNKANNYA dari aktor -- pola SAMA `station_feat_dim`, menjamin latih & uji
+        # selalu memakai jendela yg sama tanpa perlu diteruskan terpisah di tiap panggilan.
+        self.pref_hist_k = pref_hist_k
         # `use_station_attn=False` (2026-08-30, ABLASI): lewati `SmallStationAttention`
         # sepenuhnya di forward() -- utk mengisolasi kontribusi Modul P TANPA atensi
         # antar-stasiun (varian "P saja"), memisahkan efek station attention (base
@@ -171,12 +178,12 @@ class MasterHybridDDPGActor(nn.Module):
                 pref_d_attn: int = 8, station_attn_dim: int = 8,
                 pref_feature_mode: bool = False, bid_scale: float = 10.0,
                 pref_pair_outcome: bool = False, pref_gate_init: float = 0.0,
-                use_station_attn: bool = True):
+                use_station_attn: bool = True, pref_hist_k: int = None):
         super().__init__()
         self.backbone = _PrefStationBackbone(n_spklu, station_feat_dim, vec_dim, bid_hidden,
                                              pref_d_lstm, pref_d_attn, station_attn_dim,
                                              pref_feature_mode, pref_pair_outcome,
-                                             pref_gate_init, use_station_attn)
+                                             pref_gate_init, use_station_attn, pref_hist_k)
         self.pref_lstm = self.backbone.pref_lstm
         self.station_feat_dim = self.backbone.station_feat_dim   # DIBACA RLRolloutAgent.__init__ (_use_pref)
         self.head = nn.Linear(vec_dim, 1)
@@ -198,12 +205,13 @@ class MasterHybridPPOActor(nn.Module):
                 vec_dim: int = 8, bid_hidden: int = 16, pref_d_lstm: int = 8,
                 pref_d_attn: int = 8, station_attn_dim: int = 8,
                 pref_feature_mode: bool = False, pref_pair_outcome: bool = False,
-                pref_gate_init: float = 0.0, use_station_attn: bool = True):
+                pref_gate_init: float = 0.0, use_station_attn: bool = True,
+                pref_hist_k: int = None):
         super().__init__()
         self.backbone = _PrefStationBackbone(n_spklu, station_feat_dim, vec_dim, bid_hidden,
                                              pref_d_lstm, pref_d_attn, station_attn_dim,
                                              pref_feature_mode, pref_pair_outcome,
-                                             pref_gate_init, use_station_attn)
+                                             pref_gate_init, use_station_attn, pref_hist_k)
         self.pref_lstm = self.backbone.pref_lstm
         self.station_feat_dim = self.backbone.station_feat_dim
         self.head = nn.Linear(vec_dim, 1)
