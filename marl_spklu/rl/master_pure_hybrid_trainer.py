@@ -75,7 +75,7 @@ class MasterHybridPPORolloutAgent(RLRolloutAgent):
     def __init__(self, actor, critic, sim, reward_calc, forecaster=None, k: int = 3,
                 equity_calc=None, stream_select=None, pref_feature_mode: bool = False,
                 pref_pair_outcome: bool = False, deterministic: bool = False,
-                pref_hist_k: int = None):
+                pref_hist_k: int = None, accept_stream: int = STREAM_INDIVIDUAL):
         # `pref_pad_right=True` WAJIB & tak bersyarat di sini: `_PrefStationBackbone.
         # _encode_pref` memakai `pack_padded_sequence` yg mensyaratkan padding di BELAKANG,
         # sedangkan basis `RLRolloutAgent` mem-padding di DEPAN. Ketidakcocokan inilah bug
@@ -84,7 +84,7 @@ class MasterHybridPPORolloutAgent(RLRolloutAgent):
         super().__init__(actor, sim, reward_calc, forecaster, k=k, equity_calc=equity_calc,
                          pref_feature_mode=pref_feature_mode,
                          pref_pair_outcome=pref_pair_outcome, pref_pad_right=True,
-                         pref_hist_k=pref_hist_k)
+                         pref_hist_k=pref_hist_k, accept_stream=accept_stream)
         self.actor = actor
         self.critic = critic
         # DUA VERSI OBSERVASI -- lih. catatan identik di MasterPureRolloutAgent.
@@ -235,7 +235,16 @@ class MasterHybridPPOTrainer:
                 beta_mode: str = "gap_ratio", beta_sigma: float = 0.2,
                 reward_calc=None, seed: int = 0, verbose: bool = True,
                 equity_calc=None, max_step_gap: int = 4, critic_pref: bool = False,
-                critic_pref_gate_init: float = 0.1):
+                critic_pref_gate_init: float = 0.1,
+                accept_stream: int = STREAM_GLOBAL):
+        # `accept_stream` BAKU STREAM_GLOBAL di TRAINER (beda dari baku
+        # STREAM_INDIVIDUAL di `RLRolloutAgent`, yg sengaja mempertahankan perilaku
+        # lengan lama). Alasan: lih. catatan `accept_stream` di rollout.py -- acceptance
+        # bermagnitudo +-1 SEGERA, menumpuknya dgn wait (kecil & tertunda) di aliran
+        # INDIVIDUAL adalah konfigurasi yg SUDAH terdiagnosis bermasalah pd Kandidat A.
+        # Suku ini BARU dipakai di keluarga Hybrid (belum pernah aktif), jadi tak ada
+        # perilaku lama yg dilanggar dgn memilih baku yg lebih aman sejak awal.
+        self.accept_stream = int(accept_stream)
         # `critic_pref` (2026-08-30): pakai `MasterHybridPPOCritic` (BER-P, param
         # TERPISAH dari aktor) menggantikan `MasterPurePPOCritic` (SELALU buta P) --
         # uji hipotesis kritik jadi sumber variansi advantage tambahan khusus utk
@@ -500,7 +509,8 @@ class MasterHybridPPOTrainer:
                                             stream_select=self.stream_select,
                                             pref_feature_mode=getattr(_bb, "pref_feature_mode", False),
                                             pref_pair_outcome=getattr(_bb, "pref_pair_outcome", False),
-                                            pref_hist_k=getattr(_bb, "pref_hist_k", None))
+                                            pref_hist_k=getattr(_bb, "pref_hist_k", None),
+                                            accept_stream=self.accept_stream)
         step = 0
         for _ in range(n_updates):
             it = self._it_global

@@ -125,7 +125,7 @@ class RLRolloutAgent:
                  equity_calc=None, pref_feature_mode: bool = False,
                  epsilon: float = 0.0, threshold: float = 0.20,
                  pref_pair_outcome: bool = False, pref_pad_right: bool = False,
-                 pref_hist_k: int = None):
+                 pref_hist_k: int = None, accept_stream: int = STREAM_INDIVIDUAL):
         self.policy = policy
         self.sim = sim
         self.rc = reward_calc
@@ -201,6 +201,18 @@ class RLRolloutAgent:
         # lama, TAK berubah). Dipakai utk ablasi panjang jendela (mis. K=5 vs K=10) tanpa
         # menyentuh lengan lain yg berbagi modul ini (PDQN, Kandidat A/B, Hybrid).
         self._pref_hist_k = int(pref_hist_k) if pref_hist_k is not None else PDQN_HIST_K
+        # `accept_stream` (2026-08-30): aliran tujuan suku `acceptance_reward`. BAKU
+        # STREAM_INDIVIDUAL = perilaku lama, TAK mengubah lengan manapun yg sudah ada.
+        # ALASAN opsi ini ada: diagnosis 2026-08-21 (lih. `master_ev_ppo_policy.py`
+        # ::on_decision) menemukan acceptance ber-magnitudo +-1 SEGERA tiap keputusan,
+        # bila menumpuk di aliran yg sama dgn `wait_reward` (kecil & TERTUNDA) membuat
+        # r_bar aliran itu meledak 10-30x -- diduga penyebab wait/gini liar pada
+        # Kandidat A. Kandidat A menyelesaikannya dgn memindahkan acceptance ke aliran
+        # GLOBAL. Keluarga Hybrid hanya punya 2 aliran (INDIVIDUAL=prox+wait,
+        # GLOBAL=gini+flock), jadi risiko tumpukan itu SAMA -- opsi ini memungkinkan
+        # menaruhnya di GLOBAL, sekaligus lebih selaras konseptual bila acceptance
+        # diperlakukan sbg PRASYARAT tujuan pemerataan (bukan kenyamanan individual).
+        self.accept_stream = int(accept_stream)
         self._pref_hist = {}   # user_id -> deque[pair], onehot-idx ATAU vektor fitur tergantung mode
 
     def _pref_station_feat(self, sid, user, wait_hat):
@@ -489,7 +501,7 @@ class RLRolloutAgent:
         # mengubah reward sama sekali). SIMETRIS (+patuh/-tolak), beda dari Prox/wait
         # yg tak pernah menghukum penolakan -- lihat RewardCalculator.acceptance_reward.
         if self.rc.alpha_accept != 0.0:
-            tr.add_reward(self.rc.acceptance_reward(complied), STREAM_INDIVIDUAL)
+            tr.add_reward(self.rc.acceptance_reward(complied), self.accept_stream)
         # Suku Prox (segera): kedekatan fitur fisik SPKLU rekomendasi PRIMER vs SPKLU
         # terpilih. Terdefinisi baik saat diterima maupun ditolak (tidak dikalikan
         # indikator kepatuhan).

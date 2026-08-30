@@ -75,6 +75,19 @@ p.add_argument("--pref-hist-k", type=int, default=None,
                    "global, TAK berubah). Mis. 5 -- ablasi apakah jendela lebih pendek "
                    "membantu optimasi `pref_lstm` (bukan soal padding, itu sudah ditangani "
                    "benar via pack_padded_sequence -- ini murni soal panjang konteks).")
+p.add_argument("--alpha-accept", type=float, default=0.0,
+              help="Bobot suku kepatuhan SIMETRIS (+alpha patuh / -alpha tolak), BAKU 0.0 "
+                   "= MATI (perilaku lama). TEMUAN yg mendasarinya: `wait_reward` hanya "
+                   "aktif bila patuh & TAK ADA hukuman bila ditolak, `decision_reward`(Prox) "
+                   "sama saja patuh/tidak -- artinya KEPATUHAN BUKAN sasaran reward sama "
+                   "sekali, shg tak ada jalur bagi Modul P utk mengubah 'paham preferensi' "
+                   "jadi 'kurangi penolakan demi pemerataan'.")
+p.add_argument("--accept-stream", type=str, default="global", choices=["global", "individual"],
+              help="Aliran tujuan suku kepatuhan. BAKU 'global' (bersama gini+flock) -- "
+                   "'individual' (bersama wait+prox) adalah konfigurasi yg SUDAH "
+                   "terdiagnosis bermasalah pd Kandidat A (2026-08-21): acceptance +-1 "
+                   "SEGERA menumpuk dgn wait yg kecil & tertunda -> r_bar aliran meledak "
+                   "10-30x. Sediakan hanya utk pembanding bila ingin mereplikasi diagnosis.")
 p.add_argument("--critic-pref", action="store_true",
               help="Pakai `MasterHybridPPOCritic` (menerima pref_hist, param P TERPISAH "
                    "dari aktor) menggantikan `MasterPurePPOCritic` (SELALU buta P) -- uji "
@@ -136,7 +149,10 @@ _pref_suffix = (("_preffeat" if args.pref_feature_mode else "")
                 + ("_evobs" if args.ev_obs else "")
                 + ("_noattn" if args.no_station_attn else "")
                 + ("" if args.pref_hist_k is None else f"_histK{args.pref_hist_k}")
-                + ("_critpref" if args.critic_pref else ""))
+                + ("_critpref" if args.critic_pref else "")
+                + ("" if args.alpha_accept == 0.0 else
+                   f"_acc{args.alpha_accept:g}" +
+                   ("" if args.accept_stream == "global" else "S1")))
 _clip_suffix = _clip_suffix + _fail_suffix + _rw_suffix + _pref_suffix
 if args.mode == "pretrain_specialist":
     STREAM_NAME = {0: "wait", 1: "gini"}[args.stream_select]
@@ -165,14 +181,18 @@ def _load_r_star(tag: str, seed: int) -> float:
 
 
 def train_one(seed):
+    from marl_spklu.rl.rollout import STREAM_INDIVIDUAL, STREAM_GLOBAL
     kw = dict(dataset_path=DATASET, mode=args.mode, rollout_steps=args.rollout_steps,
              seed=seed, verbose=False, actor_kwargs=ACTOR_KW, critic_pref=args.critic_pref,
-             critic_pref_gate_init=args.critic_pref_gate_init)
+             critic_pref_gate_init=args.critic_pref_gate_init,
+             accept_stream=(STREAM_GLOBAL if args.accept_stream == "global"
+                            else STREAM_INDIVIDUAL))
     if (args.wait_reward_clip is not None or args.wait_fail_threshold is not None
-            or args.reward_preset != "raw"):
+            or args.reward_preset != "raw" or args.alpha_accept != 0.0):
         _rc_kw = dict(wait_reward_clip=args.wait_reward_clip,
                       wait_fail_threshold=args.wait_fail_threshold,
-                      wait_fail_penalty=args.wait_fail_penalty)
+                      wait_fail_penalty=args.wait_fail_penalty,
+                      alpha_accept=args.alpha_accept)
         kw["reward_calc"] = (RewardCalculator.seimbang4x(**_rc_kw)
                              if args.reward_preset == "seimbang4x" else RewardCalculator(**_rc_kw))
     if args.mode == "pretrain_specialist":
