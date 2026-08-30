@@ -47,20 +47,46 @@ ACTOR_KW = dict(vec_dim=8, bid_hidden=16, pref_d_lstm=8, pref_d_attn=8, station_
 K.DS = os.path.join(common.ROOT, K.HORIZON[TAG])
 
 
+def _checkpoint_tersedia():
+    """Daftar indeks seed checkpoint yang BENAR-BENAR ada, terurut."""
+    ada = []
+    i = 0
+    while True:
+        if not os.path.exists(os.path.join(common.OUTDIR, f"{TAG_ARM}_actor_seed{i}.pt")):
+            break
+        ada.append(i)
+        i += 1
+    return ada
+
+
+_CKPT = _checkpoint_tersedia()
+
+
+def ckpt_untuk(seed):
+    """Pola LATIH 3 SEED / EVAL 10 SEED (2026-08-30): checkpoint dipakai BERGILIR
+    (`seed % jumlah_checkpoint`), bukan jatuh semua ke seed 0.
+
+    ALASAN: fallback lama mengarahkan SETIAP seed yang checkpoint-nya tak ada ke seed 0,
+    sehingga pd 3 checkpoint x 10 seed eval, checkpoint 0 terpakai 8 dari 10 sampel dan
+    agregat didominasi SATU kebijakan. Bergilir membuatnya 4/3/3 -- hampir seimbang.
+
+    CATATAN STATISTIK PENTING: 10 seed eval BUKAN 10 sampel bebas. Ia mengecilkan derau
+    LINGKUNGAN pd tiap checkpoint, tetapi jumlah kebijakan bebas tetap sebanyak
+    checkpoint yang dilatih (3). Simpangan baku yang layak dilaporkan sbg ketidakpastian
+    antar-kebijakan adalah simpangan baku dari RERATA PER-CHECKPOINT, bukan simpangan
+    baku ke-10 run mentah (yang akan meremehkan ragam antar-kebijakan)."""
+    assert _CKPT, (
+        f"tak ada checkpoint sama sekali utk {TAG_ARM}\n"
+        f"latih dulu: python _run_master_pure_hybrid_ppo_pipeline.py --n-train-seed 3 ...")
+    return _CKPT[seed % len(_CKPT)]
+
+
 def muat_policy(seed, n_spklu):
-    ckpt = os.path.join(common.OUTDIR, f"{TAG_ARM}_actor_seed{seed}.pt")
-    if not os.path.exists(ckpt):
-        # Fallback (2026-08-30): 1 seed LATIH, N seed EVAL -- pola pengurangan skala
-        # eksploratif. Checkpoint seed>0 sengaja tak ada; pakai seed0 tapi simulasi
-        # TETAP dijalankan dgn seed stokastik `seed` aslinya (varian antar-run masih
-        # berarti krn stokastisitas lingkungan, bukan cuma kebetulan bit-identik).
-        ckpt0 = os.path.join(common.OUTDIR, f"{TAG_ARM}_actor_seed0.pt")
-        assert os.path.exists(ckpt0), (
-            f"checkpoint tak ditemukan: {ckpt} (maupun fallback {ckpt0})\n"
-            f"latih dulu lewat: python _run_master_pure_hybrid_ppo_pipeline.py --n-train-seed {seed+1} ...")
-        print(f"  [fallback] seed={seed}: checkpoint tak ada, pakai bobot seed0 "
-             f"(simulasi tetap seed={seed})", flush=True)
-        ckpt = ckpt0
+    c = ckpt_untuk(seed)
+    if c != seed:
+        print(f"  [bergilir] seed eval={seed} -> checkpoint seed{c} "
+             f"(simulasi tetap seed={seed}; {len(_CKPT)} checkpoint tersedia)", flush=True)
+    ckpt = os.path.join(common.OUTDIR, f"{TAG_ARM}_actor_seed{c}.pt")
     pol = MasterHybridPPOActor(n_spklu, **ACTOR_KW)
     pol.load_state_dict(torch.load(ckpt, map_location="cpu"))
     pol.eval()
@@ -99,7 +125,13 @@ def main():
              f"wait={agregat[label]['wait']:.1f} trust={agregat[label]['trust']:.3f} "
              f"acc={agregat[label]['acc']:.3f}", flush=True)
 
-    out = dict(horizon=TAG, seeds=SEEDS, per_seed=per_seed, agregat=agregat, harian=harian)
+    # `ckpt_per_seed` WAJIB ikut tersimpan: pd pola latih-3/eval-10 beberapa seed eval
+    # berbagi checkpoint yang sama, sehingga analisis lanjutan HARUS bisa mengelompokkan
+    # run menurut kebijakannya (lihat catatan statistik di `ckpt_untuk`). Tanpa peta ini,
+    # simpangan baku ke-10 run akan disalahartikan sbg ragam antar-kebijakan.
+    out = dict(horizon=TAG, seeds=SEEDS, per_seed=per_seed, agregat=agregat, harian=harian,
+               ckpt_per_seed={int(s): int(ckpt_untuk(s)) for s in SEEDS},
+               n_checkpoint=len(_CKPT))
     nama = f"uji_{TAG_ARM}_metrik_{TAG}.json"
     common.save_json(out, nama)
     print(f"\nSAVED -> outputs/{nama}", flush=True)
