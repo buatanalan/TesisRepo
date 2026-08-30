@@ -12,7 +12,7 @@ Jalankan (server, latar belakang):
         --mode pretrain_specialist --stream-select 0 \
         > Eksekusi_RL/outputs/master_pure_hybrid_ppo_pipeline.log 2>&1 &
 """
-import sys, os, time, json, argparse
+import sys, os, time, json, argparse, re as _re
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import torch
@@ -163,6 +163,22 @@ if args.dataset != "4x":
     assert args.horizon != "30d", "--dataset kustom butuh --horizon eksplisit"
 
 _horizon_suffix = "" if args.horizon == "30d" else f"_{args.horizon}"
+# BUG DITEMUKAN & DIPERBAIKI 2026-08-31: tag SEBELUMNYA tak menyertakan nama dataset
+# sama sekali -- `--dataset scenario_dataset_klaster12_6x_90d.json --horizon 90d`
+# menghasilkan TAG_ARM PERSIS SAMA dgn baku `..._4x_90d.json --horizon 90d`
+# (keduanya cuma "_90d"), sehingga run beban 6x akan MENIMPA checkpoint/
+# training_results.json rezim 4x yg sudah ada TANPA peringatan apa pun. Rezim beban
+# adalah properti SUBSTRAT (Tahap 1, `common.py::SUBSTRAT["rezim_operasi_load_
+# multiplier"]=4.0, dibekukan), bukan sekadar path berkas -- wajib tercermin di tag
+# spt initial_trust/gamma. Dataset "4x" (kata kunci BAKU) dan file eksplisit yg
+# namanya memuat "_4x" TIDAK diberi akhiran (kompatibel mundur dgn seluruh tag lama);
+# rezim lain (mis. "_6x_") WAJIB diberi akhiran.
+_m_beban = _re.search(r"_(\d+(?:\.\d+)?)x(?:_|\.|$)", os.path.basename(args.dataset))
+_beban_suffix = ("" if args.dataset == "4x" or (_m_beban and _m_beban.group(1) == "4")
+                else (f"_load{_m_beban.group(1)}x" if _m_beban else "_dsCUSTOM"))
+if _beban_suffix:
+    print(f"[{elapsed()}] Dataset non-baku terdeteksi -> akhiran tag '{_beban_suffix}' "
+         f"ditambahkan (mencegah tabrakan dgn hasil rezim 4x).", flush=True)
 _clip_suffix = "" if args.wait_reward_clip is None else f"_clip{args.wait_reward_clip:g}"
 _fail_suffix = ("" if args.wait_fail_threshold is None
                else f"_cwtfail{args.wait_fail_threshold:g}pen{args.wait_fail_penalty:g}")
@@ -195,7 +211,7 @@ _pref_suffix = (("_preffeat" if args.pref_feature_mode else "")
                 + ("" if args.alpha_accept == 0.0 or args.pure_streams else
                    f"_acc{args.alpha_accept:g}" +
                    ("" if args.accept_stream == "global" else "S1")))
-_clip_suffix = _clip_suffix + _fail_suffix + _rw_suffix + _pref_suffix
+_clip_suffix = _beban_suffix + _clip_suffix + _fail_suffix + _rw_suffix + _pref_suffix
 if args.mode == "pretrain_specialist":
     STREAM_NAME = {0: "wait", 1: "gini", 2: "accept"}[args.stream_select]
     TAG_ARM = f"master_hybrid_ppo_specialist{args.stream_select}_{STREAM_NAME}{_horizon_suffix}{_clip_suffix}"
