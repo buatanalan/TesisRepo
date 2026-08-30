@@ -49,6 +49,43 @@ def mode_trust(mode):
         U.TRUST_PENALTY_MODE = asli
 
 
+@contextlib.contextmanager
+def gamma_pengguna(nilai):
+    """Ubah `gamma` -- sensitivitas P_rec terhadap waktu tunggu yang dijanjikan:
+
+        P_rec(j) ∝ exp(-gamma · EstWait_j)
+
+    gamma besar  -> pengguna sangat peka; janji lama membuat rekomendasi tak menarik
+    gamma kecil  -> pengguna cuek terhadap lama tunggu yang dijanjikan
+
+    JEBAKAN yang ditangani di sini: `GAMMA_DEFAULT` dipakai sebagai nilai BAKU ARGUMEN
+    pada `User.decide_spklu`, sehingga terikat sekali saat modul dimuat. Menambal
+    `user.GAMMA_DEFAULT` setelah impor TIDAK berpengaruh apa pun -- sapuan gamma yang
+    ditulis begitu akan berjalan mulus, tak menghasilkan galat, dan seluruh selnya
+    memakai gamma yang sama. Karena itu yang ditambal di sini adalah METODENYA."""
+    import marl_spklu.env.user as U
+    asli = U.User.decide_spklu
+
+    def terbungkus(self, *args, **kwargs):
+        kwargs["gamma"] = float(nilai)
+        return asli(self, *args, **kwargs)
+
+    U.User.decide_spklu = terbungkus
+    try:
+        yield
+    finally:
+        U.User.decide_spklu = asli
+
+
+def gamma_dari_paruh(menit):
+    """Terjemahkan gamma ke satuan yang bisa dibaca: pada berapa MENIT janji tunggu,
+    daya tarik rekomendasi tinggal separuh. gamma = ln(2)/menit.
+
+    Bawaan sistem (0,05590271) setara paruh 12,4 menit."""
+    import math
+    return math.log(2) / float(menit)
+
+
 def metrik_sim(sim):
     """Empat metrik inti + sebaran kepercayaan. SATU definisi dipakai semua skrip --
     disalin dari `_pipeline_hipotesis._metrik` dengan sengaja identik."""
