@@ -70,6 +70,11 @@ p.add_argument("--pref-pair-outcome", action="store_true",
                    "dipakai User.update_trust, jadi `pref_lstm` menduga preferensi DAN "
                    "kepercayaan sekaligus -- `hist_lstm` terpisah jadi mubazir, bukan "
                    "bersaing. WAJIB --pref-feature-mode.")
+p.add_argument("--no-station-attn", action="store_true",
+              help="Matikan `SmallStationAttention` sepenuhnya (2026-08-30, ABLASI) -- "
+                   "utk mengisolasi kontribusi Modul P TANPA atensi antar-stasiun (varian "
+                   "'P saja'), memisahkannya dari kontribusi station attention (varian "
+                   "'attention saja' = BAKU, tanpa --pref-feature-mode).")
 p.add_argument("--reward-preset", type=str, default="raw", choices=["raw", "seimbang4x"],
               help="'raw' (BAKU -- RewardCalculator() mentah, alpha_wait=1.0 alpha_gini=0.5, "
                    "TAK PERNAH dikalibrasi utk rezim 4x) | 'seimbang4x' (RewardCalculator."
@@ -101,12 +106,14 @@ from marl_spklu.rl.master_paper_obs import (STATION_FEAT_DIM_MASTER,
 ACTOR_KW = dict(ACTOR_KW_BASE, pref_feature_mode=args.pref_feature_mode,
                 pref_pair_outcome=args.pref_pair_outcome,
                 pref_gate_init=args.pref_gate_init,
+                use_station_attn=not args.no_station_attn,
                 station_feat_dim=(STATION_FEAT_DIM_MASTER_EV if args.ev_obs
                                   else STATION_FEAT_DIM_MASTER))
 _pref_suffix = (("_preffeat" if args.pref_feature_mode else "")
                 + ("_pairout" if args.pref_pair_outcome else "")
                 + ("" if args.pref_gate_init == 0.0 else f"_pg{args.pref_gate_init:g}")
-                + ("_evobs" if args.ev_obs else ""))
+                + ("_evobs" if args.ev_obs else "")
+                + ("_noattn" if args.no_station_attn else ""))
 _clip_suffix = _clip_suffix + _fail_suffix + _rw_suffix + _pref_suffix
 if args.mode == "pretrain_specialist":
     STREAM_NAME = {0: "wait", 1: "gini"}[args.stream_select]

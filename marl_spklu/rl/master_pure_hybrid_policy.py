@@ -93,8 +93,14 @@ class _PrefStationBackbone(nn.Module):
                 vec_dim: int = 8, bid_hidden: int = 16, pref_d_lstm: int = 8,
                 pref_d_attn: int = 8, station_attn_dim: int = 8,
                 pref_feature_mode: bool = False, pref_pair_outcome: bool = False,
-                pref_gate_init: float = 0.0):
+                pref_gate_init: float = 0.0, use_station_attn: bool = True):
         super().__init__()
+        # `use_station_attn=False` (2026-08-30, ABLASI): lewati `SmallStationAttention`
+        # sepenuhnya di forward() -- utk mengisolasi kontribusi Modul P TANPA atensi
+        # antar-stasiun (varian "P saja"), memisahkan efek station attention (base
+        # hybrid) dari efek P murni pd perbandingan 3-arah: gabungan/attn-saja/P-saja.
+        # Modul TETAP dibuat (checkpoint kompatibel antar-varian), hanya dilewati.
+        self.use_station_attn = bool(use_station_attn)
         # Disimpan agar rollout agent & trainer bisa MENURUNKAN dimensi observasi dari
         # aktor (bukan diteruskan terpisah) -- menjamin obs yang dibangun selalu cocok.
         # 7  = STATION_FEAT_DIM_MASTER    (§3.1 murni, stasiun buta thd pemohon)
@@ -148,7 +154,8 @@ class _PrefStationBackbone(nn.Module):
             attended_pref = torch.zeros(station_obs.shape[0], self.pref_d_attn,
                                         device=station_obs.device)
         vec = self.late_merge(vec, attended_pref)               # opsi (b): P digabung SETELAH vec ada
-        vec = self.station_attn(vec, mask)                       # attention antar-stasiun
+        if self.use_station_attn:
+            vec = self.station_attn(vec, mask)                   # attention antar-stasiun
         return vec
 
 
@@ -163,12 +170,13 @@ class MasterHybridDDPGActor(nn.Module):
                 vec_dim: int = 8, bid_hidden: int = 16, pref_d_lstm: int = 8,
                 pref_d_attn: int = 8, station_attn_dim: int = 8,
                 pref_feature_mode: bool = False, bid_scale: float = 10.0,
-                pref_pair_outcome: bool = False, pref_gate_init: float = 0.0):
+                pref_pair_outcome: bool = False, pref_gate_init: float = 0.0,
+                use_station_attn: bool = True):
         super().__init__()
         self.backbone = _PrefStationBackbone(n_spklu, station_feat_dim, vec_dim, bid_hidden,
                                              pref_d_lstm, pref_d_attn, station_attn_dim,
                                              pref_feature_mode, pref_pair_outcome,
-                                             pref_gate_init)
+                                             pref_gate_init, use_station_attn)
         self.pref_lstm = self.backbone.pref_lstm
         self.station_feat_dim = self.backbone.station_feat_dim   # DIBACA RLRolloutAgent.__init__ (_use_pref)
         self.head = nn.Linear(vec_dim, 1)
@@ -190,12 +198,12 @@ class MasterHybridPPOActor(nn.Module):
                 vec_dim: int = 8, bid_hidden: int = 16, pref_d_lstm: int = 8,
                 pref_d_attn: int = 8, station_attn_dim: int = 8,
                 pref_feature_mode: bool = False, pref_pair_outcome: bool = False,
-                pref_gate_init: float = 0.0):
+                pref_gate_init: float = 0.0, use_station_attn: bool = True):
         super().__init__()
         self.backbone = _PrefStationBackbone(n_spklu, station_feat_dim, vec_dim, bid_hidden,
                                              pref_d_lstm, pref_d_attn, station_attn_dim,
                                              pref_feature_mode, pref_pair_outcome,
-                                             pref_gate_init)
+                                             pref_gate_init, use_station_attn)
         self.pref_lstm = self.backbone.pref_lstm
         self.station_feat_dim = self.backbone.station_feat_dim
         self.head = nn.Linear(vec_dim, 1)
