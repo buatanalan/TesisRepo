@@ -28,7 +28,8 @@ ACTOR_KW_BASE = dict(vec_dim=8, bid_hidden=16, pref_d_lstm=8, pref_d_attn=8, sta
 
 p = argparse.ArgumentParser()
 p.add_argument("--mode", type=str, required=True, choices=["pretrain_specialist", "dgr"])
-p.add_argument("--stream-select", type=int, default=None, choices=[0, 1])
+p.add_argument("--stream-select", type=int, default=None, choices=[0, 1, 2],
+              help="0=wait, 1=gini. 2=acceptance HANYA sah bila --pure-streams.")
 p.add_argument("--n-train-seed", type=int, default=3)
 p.add_argument("--n-updates", type=int, default=300)
 p.add_argument("--rollout-steps", type=int, default=96)
@@ -36,6 +37,17 @@ p.add_argument("--dataset", type=str, default="4x")
 p.add_argument("--horizon", type=str, default="30d")
 p.add_argument("--specialist0-tag", type=str, default=None)
 p.add_argument("--specialist1-tag", type=str, default=None)
+p.add_argument("--specialist2-tag", type=str, default=None,
+              help="Hanya dipakai bila --pure-streams (aliran ke-3 = acceptance).")
+p.add_argument("--pure-streams", action="store_true",
+              help="MODE ALIRAN-MURNI: satu suku per aliran -- 0=wait(+CFR), 1=gini, "
+                   "2=acceptance. `prox` & `flock` DIBUANG. Menghapus kebutuhan "
+                   "kalibrasi `alpha` sepenuhnya: dgn satu suku per aliran, bobotnya "
+                   "merosot jadi penskala seragam yang lenyap BAIK di normalisasi "
+                   "advantage per-aliran MAUPUN di gap-ratio DGR -- seluruh "
+                   "penyeimbangan objektif ditangani `beta` yang dinamis. "
+                   "Butuh 3 tahap spesialis (--stream-select 0,1,2) sebelum --mode dgr. "
+                   "WAJIB --alpha-accept != 0 (aliran 2 kosong tanpa itu).")
 p.add_argument("--specialist-seed", type=int, default=0)
 p.add_argument("--overwrite", action="store_true")
 p.add_argument("--wait-reward-clip", type=float, default=None,
@@ -116,7 +128,15 @@ p.add_argument("--reward-preset", type=str, default="raw", choices=["raw", "seim
 args = p.parse_args()
 
 if args.mode == "pretrain_specialist":
-    assert args.stream_select is not None, "--mode pretrain_specialist WAJIB --stream-select 0|1"
+    assert args.stream_select is not None, "--mode pretrain_specialist WAJIB --stream-select"
+assert not (args.stream_select == 2 and not args.pure_streams), (
+    "--stream-select 2 (acceptance) hanya ada di mode --pure-streams")
+assert not (args.pure_streams and args.alpha_accept == 0.0), (
+    "--pure-streams WAJIB --alpha-accept != 0 -- aliran 2 (acceptance) akan kosong "
+    "sepenuhnya tanpa itu. Nilainya sendiri tak berpengaruh (penskala seragam satu-suku "
+    "lenyap di normalisasi advantage & gap-ratio); pakai 1.0 saja.")
+assert not (args.pure_streams and args.accept_stream != "global"), (
+    "--accept-stream tak berlaku di --pure-streams (acceptance selalu punya aliran sendiri)")
 
 _DATASET_4X = os.path.join(common.ROOT, "scenario_dataset_klaster12_4x.json")
 DATASET = _DATASET_4X if args.dataset == "4x" else os.path.join(common.ROOT, args.dataset)
@@ -150,12 +170,13 @@ _pref_suffix = (("_preffeat" if args.pref_feature_mode else "")
                 + ("_noattn" if args.no_station_attn else "")
                 + ("" if args.pref_hist_k is None else f"_histK{args.pref_hist_k}")
                 + ("_critpref" if args.critic_pref else "")
-                + ("" if args.alpha_accept == 0.0 else
+                + ("_pure3" if args.pure_streams else "")
+                + ("" if args.alpha_accept == 0.0 or args.pure_streams else
                    f"_acc{args.alpha_accept:g}" +
                    ("" if args.accept_stream == "global" else "S1")))
 _clip_suffix = _clip_suffix + _fail_suffix + _rw_suffix + _pref_suffix
 if args.mode == "pretrain_specialist":
-    STREAM_NAME = {0: "wait", 1: "gini"}[args.stream_select]
+    STREAM_NAME = {0: "wait", 1: "gini", 2: "accept"}[args.stream_select]
     TAG_ARM = f"master_hybrid_ppo_specialist{args.stream_select}_{STREAM_NAME}{_horizon_suffix}{_clip_suffix}"
 else:
     TAG_ARM = f"master_hybrid_ppo_dgr{_horizon_suffix}{_clip_suffix}"
@@ -170,7 +191,9 @@ print(f"[{elapsed()}] Anggaran: n_updates={args.n_updates} rollout_steps={args.r
 def _specialist_tag(stream: int, explicit: str):
     if explicit:
         return explicit
-    name = {0: "wait", 1: "gini"}[stream]
+    # Mode aliran-murni menambah aliran ke-3 (acceptance). Nama aliran 0/1 SENGAJA
+    # dipertahankan ("wait"/"gini") supaya tag mode lama tetap cocok apa adanya.
+    name = {0: "wait", 1: "gini", 2: "accept"}[stream]
     return f"master_hybrid_ppo_specialist{stream}_{name}{_horizon_suffix}{_clip_suffix}"
 
 
@@ -186,7 +209,8 @@ def train_one(seed):
              seed=seed, verbose=False, actor_kwargs=ACTOR_KW, critic_pref=args.critic_pref,
              critic_pref_gate_init=args.critic_pref_gate_init,
              accept_stream=(STREAM_GLOBAL if args.accept_stream == "global"
-                            else STREAM_INDIVIDUAL))
+                            else STREAM_INDIVIDUAL),
+             pure_streams=args.pure_streams)
     if (args.wait_reward_clip is not None or args.wait_fail_threshold is not None
             or args.reward_preset != "raw" or args.alpha_accept != 0.0):
         _rc_kw = dict(wait_reward_clip=args.wait_reward_clip,
@@ -198,12 +222,14 @@ def train_one(seed):
     if args.mode == "pretrain_specialist":
         kw["stream_select"] = args.stream_select
     else:
-        tag0 = _specialist_tag(0, args.specialist0_tag)
-        tag1 = _specialist_tag(1, args.specialist1_tag)
-        r0 = _load_r_star(tag0, args.specialist_seed)
-        r1 = _load_r_star(tag1, args.specialist_seed)
-        kw["specialist_r_star"] = [r0, r1]
-        print(f"[{elapsed()}]   r_star dimuat: wait={r0:.4f} gini={r1:.4f}", flush=True)
+        _explicit = [args.specialist0_tag, args.specialist1_tag, args.specialist2_tag]
+        _nama = ["wait", "gini", "accept"]
+        _n = 3 if args.pure_streams else 2
+        r_list = [_load_r_star(_specialist_tag(s, _explicit[s]), args.specialist_seed)
+                  for s in range(_n)]
+        kw["specialist_r_star"] = r_list
+        print(f"[{elapsed()}]   r_star dimuat: "
+             + " ".join(f"{_nama[s]}={r_list[s]:.4f}" for s in range(_n)), flush=True)
 
     tr = MasterHybridPPOTrainer(**kw)
     result = tr.train(n_updates=args.n_updates)

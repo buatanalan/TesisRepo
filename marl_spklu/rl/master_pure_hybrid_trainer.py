@@ -19,7 +19,8 @@ import torch
 import torch.nn as nn
 
 from marl_spklu.rl.rollout import (RLRolloutAgent, RewardCalculatorStub, STREAM_INDIVIDUAL,
-                                   STREAM_GLOBAL, N_REWARD_STREAMS, _gini)
+                                   STREAM_GLOBAL, N_REWARD_STREAMS,
+                                   N_REWARD_STREAMS_PURE, _gini)
 from marl_spklu.rl.master_paper_obs import (build_joint_obs_master, build_joint_obs_master_ev,
                                             STATION_FEAT_DIM_MASTER, STATION_FEAT_DIM_MASTER_EV)
 from marl_spklu.rl.master_pure_hybrid_policy import MasterHybridPPOActor, MasterHybridPPOCritic
@@ -30,7 +31,8 @@ from marl_spklu.rl.rewards import RewardCalculator
 
 
 class MasterHybridPPOTransition:
-    def __init__(self, obs, mask, primary_idx, logp, value, step, pref_hist=None):
+    def __init__(self, obs, mask, primary_idx, logp, value, step, pref_hist=None,
+                 n_streams: int = N_REWARD_STREAMS):
         self.obs = obs; self.mask = mask
         # `pref_hist` WAJIB disimpan (2026-08-29): langkah update PPO menghitung ULANG
         # logit, dan bila di sana `pref_hist=None` maka SELURUH parameter preferensi
@@ -42,7 +44,8 @@ class MasterHybridPPOTransition:
         self.logp = float(logp); self.value = value
         self.step = step
         self.chosen_indices = [int(primary_idx)]
-        self.reward_streams = np.zeros(N_REWARD_STREAMS, dtype=np.float64)
+        # `n_streams`=3 pd mode aliran-murni (wait/gini/acceptance, satu suku per aliran)
+        self.reward_streams = np.zeros(int(n_streams), dtype=np.float64)
         self.done = False
         self.complied = False; self.disp_estwait = 0.0; self.wait_default = 0.0
         self.resolved = False; self.pushed = False; self.flock_penalty = 0.0
@@ -58,8 +61,8 @@ class MasterHybridPPOTransition:
             return np.array([self.reward_streams[self.stream_select]], dtype=np.float64)
         if n_critics == 1:
             return np.array([self.reward_streams.sum()], dtype=np.float64)
-        if n_critics != N_REWARD_STREAMS:
-            raise ValueError(f"n_critics={n_critics} != N_REWARD_STREAMS={N_REWARD_STREAMS}")
+        if n_critics != len(self.reward_streams):
+            raise ValueError(f"n_critics={n_critics} != jumlah aliran={len(self.reward_streams)}")
         return self.reward_streams
 
     def add_reward(self, value: float, stream: int = STREAM_INDIVIDUAL) -> None:
@@ -75,7 +78,8 @@ class MasterHybridPPORolloutAgent(RLRolloutAgent):
     def __init__(self, actor, critic, sim, reward_calc, forecaster=None, k: int = 3,
                 equity_calc=None, stream_select=None, pref_feature_mode: bool = False,
                 pref_pair_outcome: bool = False, deterministic: bool = False,
-                pref_hist_k: int = None, accept_stream: int = STREAM_INDIVIDUAL):
+                pref_hist_k: int = None, accept_stream: int = STREAM_INDIVIDUAL,
+                pure_streams: bool = False):
         # `pref_pad_right=True` WAJIB & tak bersyarat di sini: `_PrefStationBackbone.
         # _encode_pref` memakai `pack_padded_sequence` yg mensyaratkan padding di BELAKANG,
         # sedangkan basis `RLRolloutAgent` mem-padding di DEPAN. Ketidakcocokan inilah bug
@@ -84,7 +88,8 @@ class MasterHybridPPORolloutAgent(RLRolloutAgent):
         super().__init__(actor, sim, reward_calc, forecaster, k=k, equity_calc=equity_calc,
                          pref_feature_mode=pref_feature_mode,
                          pref_pair_outcome=pref_pair_outcome, pref_pad_right=True,
-                         pref_hist_k=pref_hist_k, accept_stream=accept_stream)
+                         pref_hist_k=pref_hist_k, accept_stream=accept_stream,
+                         pure_streams=pure_streams)
         self.actor = actor
         self.critic = critic
         # DUA VERSI OBSERVASI -- lih. catatan identik di MasterPureRolloutAgent.
@@ -152,7 +157,8 @@ class MasterHybridPPORolloutAgent(RLRolloutAgent):
 
         tr = MasterHybridPPOTransition(joint_obs, mask, primary_idx, logp,
                                        value.squeeze(0).numpy().astype(np.float64),
-                                       self.sim.current_step, pref_hist=pref_hist)
+                                       self.sim.current_step, pref_hist=pref_hist,
+                                       n_streams=self.n_streams)
         tr.stream_select = self.stream_select
         tr.disp_estwait = primary_disp
         tr.wait_default = float(self.sim.compute_virtual_wait(
@@ -236,7 +242,12 @@ class MasterHybridPPOTrainer:
                 reward_calc=None, seed: int = 0, verbose: bool = True,
                 equity_calc=None, max_step_gap: int = 4, critic_pref: bool = False,
                 critic_pref_gate_init: float = 0.1,
-                accept_stream: int = STREAM_GLOBAL):
+                accept_stream: int = STREAM_GLOBAL, pure_streams: bool = False):
+        # `pure_streams` (2026-08-30): SATU suku per aliran (wait / gini / acceptance),
+        # `prox` & `flock` dibuang -- menghapus kebutuhan kalibrasi `alpha` sepenuhnya
+        # krn penskalaan seragam satu-suku lenyap baik di normalisasi advantage maupun
+        # di gap-ratio. Lihat catatan lengkap STREAM_PURE_* di rollout.py.
+        self.pure_streams = bool(pure_streams)
         # `accept_stream` BAKU STREAM_GLOBAL di TRAINER (beda dari baku
         # STREAM_INDIVIDUAL di `RLRolloutAgent`, yg sengaja mempertahankan perilaku
         # lengan lama). Alasan: lih. catatan `accept_stream` di rollout.py -- acceptance
@@ -270,17 +281,25 @@ class MasterHybridPPOTrainer:
         self.max_grad_norm = float(max_grad_norm); self.target_kl = target_kl
         self.max_step_gap = max_step_gap
 
+        # Jumlah aliran: 3 pd mode murni (wait/gini/acceptance, satu suku per aliran),
+        # 2 pd mode lama (wait+prox / gini+flock). Lihat catatan STREAM_PURE_* di rollout.py.
+        self.n_streams = N_REWARD_STREAMS_PURE if self.pure_streams else N_REWARD_STREAMS
+        _nama_aliran = (["wait", "gini", "acceptance"] if self.pure_streams
+                        else ["wait(+prox)", "gini(+flock)"])
         if mode == "pretrain_specialist":
-            assert stream_select in (0, 1), "mode='pretrain_specialist' WAJIB --stream-select 0|1"
+            assert stream_select in range(self.n_streams), (
+                f"mode='pretrain_specialist' WAJIB --stream-select 0..{self.n_streams - 1} "
+                f"({', '.join(f'{i}={n}' for i, n in enumerate(_nama_aliran))})")
             self.stream_select = int(stream_select)
             self.n_critics = 1
             self._ret_best = np.full(1, -np.inf, dtype=np.float64)
             self._fixed_ret_best = False
         else:
-            assert specialist_r_star is not None and len(specialist_r_star) == 2, (
-                "mode='dgr' WAJIB --specialist-r-star: [r_star_wait, r_star_gini]")
+            assert (specialist_r_star is not None
+                    and len(specialist_r_star) == self.n_streams), (
+                f"mode='dgr' WAJIB {self.n_streams} r_star: [{', '.join(_nama_aliran)}]")
             self.stream_select = None
-            self.n_critics = N_REWARD_STREAMS
+            self.n_critics = self.n_streams
             self._ret_best = np.array(specialist_r_star, dtype=np.float64)
             self._fixed_ret_best = True
 
@@ -510,7 +529,8 @@ class MasterHybridPPOTrainer:
                                             pref_feature_mode=getattr(_bb, "pref_feature_mode", False),
                                             pref_pair_outcome=getattr(_bb, "pref_pair_outcome", False),
                                             pref_hist_k=getattr(_bb, "pref_hist_k", None),
-                                            accept_stream=self.accept_stream)
+                                            accept_stream=self.accept_stream,
+                                            pure_streams=self.pure_streams)
         step = 0
         for _ in range(n_updates):
             it = self._it_global

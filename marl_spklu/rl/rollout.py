@@ -37,6 +37,29 @@ N_REWARD_STREAMS = 2
 STREAM_INDIVIDUAL = 0   # Prox (kecocokan preferensi) + wait -- konsekuensi bagi PENGGUNA
 STREAM_GLOBAL = 1       # Gini (pemerataan) + flock (anti-herding) -- konsekuensi bagi JARINGAN
 
+# --- MODE ALIRAN-MURNI (2026-08-30, opt-in `pure_streams=True`) -------------------
+# SATU suku per aliran, TANPA penggabungan di dalam aliran:
+#     aliran 0 = wait (termasuk circuit-breaker CFR)  -- tertunda, individual
+#     aliran 1 = gini                                  -- agregat, populasi
+#     aliran 2 = acceptance                            -- segera, individual
+# `prox` & `flock` SENGAJA DIBUANG di mode ini (lihat catatan di `on_decision`).
+#
+# ALASAN: bila satu aliran hanya berisi satu suku, `alpha` suku itu merosot jadi
+# penskala SERAGAM aliran -- dan penskalaan seragam lenyap DI DUA TEMPAT sekaligus:
+#   (i)  normalisasi advantage per-aliran : (c*adv - mean)/std == (adv - mean)/std
+#   (ii) gap-ratio DGR                    : (c*r* - c*ret)/|c*r*| == (r* - ret)/|r*|
+# sehingga `alpha` menjadi BENAR-BENAR tanpa efek, bukan sekadar kecil. Tidak ada
+# lagi proporsi antar-suku yang perlu dikalibrasi; SELURUH penyeimbangan objektif
+# ditangani `beta` (gap-ratio) yang dinamis. Ini membalik sifat scale-invariance yang
+# dulu membuat `alpha_gini`/CMDP mati menjadi properti desain yang menguntungkan.
+#
+# TIDAK mengubah `N_REWARD_STREAMS` (=2) yang dipakai 6 lengan lain -- mode ini
+# hanya aktif bila diminta eksplisit.
+N_REWARD_STREAMS_PURE = 3
+STREAM_PURE_WAIT = 0
+STREAM_PURE_GINI = 1
+STREAM_PURE_ACCEPT = 2
+
 
 # Manfaat struktural tambahan: krn advantage dinormalisasi PER ALIRAN di PPOTrainer,
 # ketimpangan skala antar-suku (terukur 13,7x, Rumusan_Masalah_Teknis_RL.md §3.2) hilang
@@ -125,7 +148,8 @@ class RLRolloutAgent:
                  equity_calc=None, pref_feature_mode: bool = False,
                  epsilon: float = 0.0, threshold: float = 0.20,
                  pref_pair_outcome: bool = False, pref_pad_right: bool = False,
-                 pref_hist_k: int = None, accept_stream: int = STREAM_INDIVIDUAL):
+                 pref_hist_k: int = None, accept_stream: int = STREAM_INDIVIDUAL,
+                 pure_streams: bool = False):
         self.policy = policy
         self.sim = sim
         self.rc = reward_calc
@@ -213,6 +237,17 @@ class RLRolloutAgent:
         # menaruhnya di GLOBAL, sekaligus lebih selaras konseptual bila acceptance
         # diperlakukan sbg PRASYARAT tujuan pemerataan (bukan kenyamanan individual).
         self.accept_stream = int(accept_stream)
+        # Mode aliran-murni (lihat catatan STREAM_PURE_* di kepala modul). Indeks tujuan
+        # tiap suku disimpan sbg atribut supaya hook `on_*` di bawah tak perlu bercabang
+        # di setiap pemanggilan -- cukup `self.s_wait`/`self.s_gini`/`self.s_accept`.
+        self.pure_streams = bool(pure_streams)
+        self.n_streams = N_REWARD_STREAMS_PURE if self.pure_streams else N_REWARD_STREAMS
+        if self.pure_streams:
+            self.s_wait, self.s_gini = STREAM_PURE_WAIT, STREAM_PURE_GINI
+            self.s_accept = STREAM_PURE_ACCEPT
+        else:
+            self.s_wait, self.s_gini = STREAM_INDIVIDUAL, STREAM_GLOBAL
+            self.s_accept = int(accept_stream)
         self._pref_hist = {}   # user_id -> deque[pair], onehot-idx ATAU vektor fitur tergantung mode
 
     def _pref_station_feat(self, sid, user, wait_hat):
@@ -501,22 +536,32 @@ class RLRolloutAgent:
         # mengubah reward sama sekali). SIMETRIS (+patuh/-tolak), beda dari Prox/wait
         # yg tak pernah menghukum penolakan -- lihat RewardCalculator.acceptance_reward.
         if self.rc.alpha_accept != 0.0:
-            tr.add_reward(self.rc.acceptance_reward(complied), self.accept_stream)
+            tr.add_reward(self.rc.acceptance_reward(complied), self.s_accept)
         # Suku Prox (segera): kedekatan fitur fisik SPKLU rekomendasi PRIMER vs SPKLU
         # terpilih. Terdefinisi baik saat diterima maupun ditolak (tidak dikalikan
         # indikator kepatuhan).
-        feat_rec = self._station_feat(self.sids[primary_idx], wait_hat)
-        feat_chosen = self._station_feat(chosen_spklu_id, wait_hat)
-        prox_value = self.rc.prox(feat_rec, feat_chosen)
-        tr.add_reward(self.rc.decision_reward(prox_value), STREAM_INDIVIDUAL)
+        # DIBUANG di mode aliran-murni: menaruhnya bersama `wait` akan mengembalikan
+        # kebutuhan `alpha` (proporsi wait:prox) yang justru ingin dihapus mode ini.
+        # Kerugiannya kecil -- prox nyaris konstan scr struktural (rasio mean/std ~6,5),
+        # sehingga kontribusinya ke advantage TERNORMALISASI memang hampir nol.
+        if not self.pure_streams:
+            feat_rec = self._station_feat(self.sids[primary_idx], wait_hat)
+            feat_chosen = self._station_feat(chosen_spklu_id, wait_hat)
+            prox_value = self.rc.prox(feat_rec, feat_chosen)
+            tr.add_reward(self.rc.decision_reward(prox_value), STREAM_INDIVIDUAL)
         # Anti-herding JENDELA BERGULIR (Tahap 0.1) -- dihitung di sini (per KEPUTUSAN,
         # bukan per langkah) krn `recent_rec_count` (jendela 24 jam berjalan) sudah
         # tersedia dari `get_recommendation`. Menggantikan penalti per-langkah lama
         # (dulu di on_step_end) yg cuma aktif 10,1% transisi -- herding di sistem ini
         # bersifat TEMPORAL, bukan simultan-per-langkah.
+        # DIBUANG di mode aliran-murni (alasan sama spt prox): menaruh flock bersama gini
+        # mengembalikan kebutuhan `alpha` (proporsi gini:flock). Perannya sbg objektif
+        # JARINGAN tumpang tindih dgn gini -- ini perubahan desain yang WAJIB dinyatakan
+        # eksplisit saat melaporkan mode ini (anti-herding Tahap 0.1 tak lagi aktif).
         flock_term = self.rc.flock_reward_rolling(recent_rec_count)
-        tr.add_reward(flock_term, STREAM_GLOBAL)   # anti-herding melayani tujuan JARINGAN
-        tr.flock_penalty = self.rc.flocking_penalty_rolling(recent_rec_count)
+        if not self.pure_streams:
+            tr.add_reward(flock_term, STREAM_GLOBAL)   # anti-herding melayani tujuan JARINGAN
+        tr.flock_penalty = self.rc.flocking_penalty_rolling(recent_rec_count)   # diagnostik, tetap
         # Suku reward PEMERATAAN ala PDQN diskrit (opsional, TAMBAHAN) -- segera,
         # bebas derau kepatuhan, langsung proporsional thd utilisasi saat keputusan.
         if self.equity_calc is not None:
@@ -526,7 +571,7 @@ class RLRolloutAgent:
                 feasible_idx = np.nonzero(tr.mask)[0]
                 tr.add_reward(self.equity_calc.decision_reward_equity(
                     utils, feasible_idx, primary_idx, default_idx, chosen_idx_eq,
-                    recent_rec_count=recent_rec_count), STREAM_GLOBAL)
+                    recent_rec_count=recent_rec_count), self.s_gini)
         if self._use_pref:
             chosen_idx = self.sid_to_idx.get(chosen_spklu_id)
             if chosen_idx is not None:
@@ -562,7 +607,7 @@ class RLRolloutAgent:
         utils = np.array([s.get_utilization() for s in self.sim.spklus.values()])
         gini_term = self.rc.gini_reward(utils)
         for tr in transitions_this_step:
-            tr.add_reward(gini_term, STREAM_GLOBAL)   # pemerataan = konsekuensi JARINGAN
+            tr.add_reward(gini_term, self.s_gini)   # pemerataan = konsekuensi JARINGAN
 
     def on_charge_complete(self, user):
         """Sesi user selesai -> emit suku wait-improvement & honesty (delayed) ke transisi
@@ -585,7 +630,7 @@ class RLRolloutAgent:
             if tr.complied:
                 tr.add_reward(
                     self.rc.wait_reward(tr.wait_default, user.wait_time, tr.disp_estwait),
-                    STREAM_INDIVIDUAL)   # perbaikan wait = konsekuensi bagi PENGGUNA
+                    self.s_wait)   # perbaikan wait = konsekuensi bagi PENGGUNA
                 # Suku shaping trust (opsional, BAKU MATI -- rc.alpha_trust=0.0 tak
                 # mengubah reward sama sekali, murni penjumlahan +0.0). `User.update_trust`
                 # SUDAH dipanggil simulator SEBELUM hook ini (simulator.py) bila
@@ -593,7 +638,7 @@ class RLRolloutAgent:
                 if self.rc.alpha_trust != 0.0:
                     delta_trust = float(user.trust) - tr.trust_before
                     tr.add_reward(self.rc.trust_shaping_reward(delta_trust),
-                                 STREAM_INDIVIDUAL)
+                                 self.s_wait)
             tr.resolved = True
             if tr.complied and user.interaction_history:
                 complied_v, disp_v, wdef_v, _ = user.interaction_history[-1]
