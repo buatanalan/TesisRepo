@@ -2,7 +2,7 @@
 # Evaluasi metrik kaya utk retrain_hybrid_ppo_3arah.sh (3 varian x 2 horizon = 6 tag).
 #   nohup bash Eksekusi_RL/eval_hybrid_ppo_3arah_metrik.sh > Eksekusi_RL/outputs/eval_hybrid_ppo_3arah_metrik.log 2>&1 &
 set -e
-PY=.venv/Scripts/python.exe
+PY=.venv/bin/python
 UJI=Eksekusi_RL/_uji_master_pure_hybrid_ppo_metrik.py
 
 eval_arm () {

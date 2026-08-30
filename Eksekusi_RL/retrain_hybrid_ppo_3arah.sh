@@ -11,7 +11,7 @@
 # Jalankan dari root repo di server:
 #   nohup bash Eksekusi_RL/retrain_hybrid_ppo_3arah.sh > Eksekusi_RL/outputs/retrain_hybrid_ppo_3arah.log 2>&1 &
 set -e
-PY=.venv/Scripts/python.exe
+PY=.venv/bin/python
 PIPE=Eksekusi_RL/_run_master_pure_hybrid_ppo_pipeline.py
 DS30=4x
 DS90=scenario_dataset_klaster12_4x_90d.json
