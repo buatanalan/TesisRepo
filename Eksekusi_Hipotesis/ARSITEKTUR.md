@@ -122,14 +122,50 @@ memandang sebelum diskor.
              │  per stasiun      │
              └─────────┬─────────┘
                        │
-          ┌────────────┴────────────┐
-          ▼                         ▼
-   ┌─────────────┐           ┌─────────────┐
-   │ kepala PPO  │           │ kepala DDPG │
-   │ → skor      │           │ → tawaran   │
-   │ → softmax   │           │   kontinu   │
-   └─────────────┘           └─────────────┘
+                       ▼
+             ┌───────────────────┐
+             │   KEPALA AKHIR    │   ← satu saja, ditentukan
+             │                   │      algoritma yang dipakai
+             └───────────────────┘
 ```
+
+### Kepala akhir: satu model, satu kepala
+
+Kepala akhirnya **berbeda menurut algoritma latih**, dan sebuah model hanya punya
+**salah satu** — bukan keduanya sekaligus.
+
+```
+                    tulang punggung
+                (vektor → P → atensi antar-stasiun)
+                    RANCANGANNYA IDENTIK
+                            │
+              ┌─────────────┴─────────────┐
+              │                           │
+      varian PPO                    varian DDPG
+              │                           │
+              ▼                           ▼
+   ┌────────────────────┐      ┌────────────────────┐
+   │ skor → softmax     │      │ tawaran kontinu    │
+   │ (kategorikal)      │      │ (argmax menang)    │
+   └────────────────────┘      └────────────────────┘
+              │                           │
+              ▼                           ▼
+     dilatih dgn PPO             dilatih dgn DDPG
+```
+
+Keduanya **kelas terpisah** yang masing-masing membangun tulang punggungnya sendiri.
+Bobotnya tidak dibagi; yang identik adalah **rancangan** tulang punggungnya, supaya
+perbandingan antar-algoritma adil — perbedaan hasil bisa diatribusikan ke algoritmanya,
+bukan ke arsitektur yang kebetulan berbeda.
+
+Varian DDPG mempertahankan tawaran kontinu dengan argmax, yaitu mekanisme asli MASTER —
+sengaja **tidak** dipaksa menjadi kategorikal. Tiap algoritma memakai bentuk keluaran yang
+sesuai kodratnya.
+
+> **Jangan tertukar dengan kepala nilai ganda.** Kepala akhir aktor: **satu per model**,
+> dipilih menurut algoritma. Kepala nilai di kritik: **beberapa sekaligus dalam satu
+> model**, satu per objektif atau aliran imbalan. Keduanya sama-sama disebut "kepala",
+> tetapi yang pertama alternatif dan yang kedua serentak.
 
 Sisi kritiknya sama dengan MASTER-Pure-PPO. Ada varian kritik yang **juga** melihat
 riwayat preferensi, karena kritik buta-P tidak bisa menjelaskan hasil yang didorong
@@ -155,7 +191,8 @@ preferensi — sumber variansi tambahan pada pendugaan keuntungan.
   antar-stasiun   tidak ada di aktor           atensi antar-stasiun
                        │                            │
                        ▼                            ▼
-  kepala akhir    tawaran / skor               tawaran / skor
+  kepala akhir    tawaran (DDPG)               tawaran (DDPG)
+                  atau skor (PPO)              atau skor (PPO)
                        │                            │
   kritik          ber-atensi + DGR             sama (+ varian ber-P)
 ```
@@ -223,9 +260,12 @@ Modul tambahannya **sengaja kecil** supaya tidak mendominasi tulang punggung.
 | Atensi antar-stasiun — bobot | `q·kᵀ/√8 → mask −∞ → softmax` | N×N |
 | Atensi antar-stasiun — keluaran | `bobot · v → LIN(8→8)` | 8 |
 | Atensi antar-stasiun — bentuk | `vec + sigmoid(g) × attended` | residual |
-| Kepala akhir PPO | `LIN(8→1) → mask −∞ → softmax` | skor per stasiun |
-| Kepala akhir DDPG | `LIN(8→1) → tanh → × 10` | tawaran kontinu |
+| Kepala akhir — **varian PPO** | `LIN(8→1) → mask −∞ → softmax` | skor per stasiun |
+| Kepala akhir — **varian DDPG** | `LIN(8→1) → tanh → × 10` | tawaran kontinu |
 | Kritik | sama persis dengan §4.1 | 2 |
+
+Baris kepala akhir adalah **alternatif**, bukan dua keluaran sekaligus: sebuah model
+memakai salah satunya menurut algoritma latihnya. Lihat §2.
 
 Dua catatan yang mudah terlewat:
 
