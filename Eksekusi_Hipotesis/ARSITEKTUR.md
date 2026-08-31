@@ -1,260 +1,267 @@
-# Arsitektur: MASTER Murni vs Usulan
+# Arsitektur: MASTER-Pure-PPO vs Hybrid
 
-Gambaran tingkat tinggi. Ukuran lapisan dan dimensi ada di tabel terpisah di bagian akhir.
+Gambaran tingkat tinggi. Ukuran ada di tabel terpisah di bagian akhir.
 
----
-
-## 1. MASTER Murni
-
-Unit agennya **stasiun**. Setiap stasiun mengajukan tawaran untuk tiap permintaan yang
-masuk, dan tawaran tertinggi memenangkan permintaan itu.
-
-```
-                          ┌─────────────────────────────┐
-                          │   Observasi per stasiun      │
-                          │   (§3.1 paper MASTER)        │
-                          └─────────────┬───────────────┘
-                                        │
-                 ┌──────────────────────┴──────────────────────┐
-                 │                                             │
-                 ▼                                             ▼
-        ╔════════════════╗                          ╔════════════════════╗
-        ║     AKTOR      ║                          ║       KRITIK       ║
-        ║ (bobot dibagi  ║                          ║   (terpusat)       ║
-        ║  antar stasiun)║                          ╚════════╤═══════════╝
-        ╚════════╤═══════╝                                   │
-                 │                          Delayed Access ──┤
-                 ▼                          Strategy         │
-          ┌─────────────┐                        │           │
-          │  MLP tawar  │                        ▼           ▼
-          └──────┬──────┘                   ┌─────────────────────┐
-                 │                          │  gabung obs seluruh │
-                 ▼                          │  stasiun + penanda  │
-        ┌─────────────────┐                 │  keterlambatan      │
-        │ tawaran stasiun │                 └──────────┬──────────┘
-        │  (satu skalar   │                            │
-        │   per stasiun)  │                            ▼
-        └────────┬────────┘                 ┌─────────────────────┐
-                 │                          │  Penggabung         │
-                 ▼                          │  ber-ATENSI         │
-        ┌─────────────────┐                 │  (invarian urutan)  │
-        │  GAME LELANG    │                 └──────────┬──────────┘
-        │  tawaran        │                            │
-        │  tertinggi      │                            ▼
-        │  menang         │                 ┌─────────────────────┐
-        └────────┬────────┘                 │  Kepala nilai       │
-                 │                          │  GANDA (multi-      │
-                 ▼                          │  critic)            │
-        ┌─────────────────┐                 └──────────┬──────────┘
-        │  penugasan EV   │                            │
-        │  ke stasiun     │                            ▼
-        │  pemenang       │                 ┌─────────────────────┐
-        └─────────────────┘                 │  DGR — bobot antar  │
-                                            │  kepala menyesuaikan│
-                                            │  diri              │
-                                            └─────────────────────┘
-```
-
-**Ciri utamanya:**
-
-| | |
-|---|---|
-| Unit agen | Stasiun |
-| Aksi | Tawaran kontinu, satu skalar per stasiun |
-| Pemilihan | Lelang — tawaran tertinggi menang |
-| Kritik | Terpusat, melihat seluruh stasiun sekaligus |
-| Atensi | Di **kritik**, untuk meringkas keadaan bersama |
-| Info pemohon | **Tidak ada** — stasiun buta terhadap siapa yang dilayani |
+Keduanya memakai **tulang punggung latih yang sama** (PPO) dan **observasi stasiun yang
+sama** (7 fitur §3.1 murni). Yang ditambahkan Hybrid: modul preferensi dan atensi
+antar-stasiun di sisi aktor.
 
 ---
 
-## 2. Usulan
+## 1. MASTER-Pure-PPO
 
-Unit agennya **permintaan pengisian EV**. Satu permintaan melihat seluruh stasiun
-kandidat sekaligus, lalu memilih beberapa teratas.
+Aktor mengubah fitur stasiun langsung menjadi tawaran. Tidak ada memori, tidak ada
+informasi pemohon.
 
 ```
-   ┌──────────────────┐   ┌──────────────────┐   ┌──────────────────┐
-   │ Observasi tiap   │   │ Riwayat          │   │ Riwayat          │
-   │ stasiun kandidat │   │ interaksi        │   │ preferensi       │
-   │ + keadaan EV     │   │ (kepatuhan)      │   │ (rekomendasi vs  │
-   │   pemohon        │   │                  │   │  pilihan nyata)  │
-   └────────┬─────────┘   └────────┬─────────┘   └────────┬─────────┘
-            │                      │                      │
-            │                      ▼                      ▼
-            │             ┌────────────────┐    ┌──────────────────┐
-            │             │ Penyandi       │    │ Penyandi         │
-            │             │ rekuren        │    │ rekuren          │
-            │             │ riwayat        │    │ preferensi       │
-            │             └────────┬───────┘    └────────┬─────────┘
-            │                      │                     │
-            ├──────────────────────┼─────────────────────┤
-            │                      │                     ▼
-            │                      │           ┌──────────────────┐
-            │                      │           │ ATENSI           │
-            ├──────────────────────┼──────────►│ PREFERENSI       │
-            │  (stasiun sbg        │           │ preferensi = ku- │
-            │   kunci & nilai)     │           │ nci pencarian    │
-            │                      │           └────────┬─────────┘
-            │                      │                    │
-            │                      │                    ▼
-            │                      │           ┌──────────────────┐
-            │                      │           │ GERBANG          │
-            │                      │           │ (mulai dari nol) │
-            │                      │           └────────┬─────────┘
-            │                      │                    │
-            │                      └─────────┬──────────┘
-            │                                ▼
-            │                       ┌──────────────────┐
-            │                       │ KONTEKS gabungan │
-            │                       └────────┬─────────┘
-            │                                │
-            ├────────────────┬───────────────┤
-            │                │               │
-            ▼                ▼               ▼
-   ╔════════════════╗    (konteks disiarkan ke tiap stasiun)
-   ║     AKTOR      ║                        │
-   ╚════════╤═══════╝                        │
-            │                                │
-            ▼                                ▼
-   ┌──────────────────┐            ╔══════════════════╗
-   │ Penyandi stasiun │            ║      KRITIK      ║
-   │ (bobot dibagi)   │            ╚═════════╤════════╝
-   └────────┬─────────┘                      │
-            │                                ▼
-            ▼                       ┌──────────────────┐
-   ┌──────────────────┐             │ Penyandi stasiun │
-   │ Kepala pemilihan │             │ (bobot dibagi)   │
-   └────────┬─────────┘             └────────┬─────────┘
-            │                                │
-            ▼                                ▼
-   ┌──────────────────┐             ┌──────────────────┐
-   │ skor per stasiun │             │ Penggabung       │
-   └────────┬─────────┘             │ ber-ATENSI       │
-            │                       └────────┬─────────┘
-            ▼                                │
-   ┌──────────────────┐                      ▼
-   │ tapis kelayakan  │             ┌──────────────────┐
-   │ → ambang         │             │ Kepala nilai     │
-   │ → ambil top-k    │             │ TERPISAH         │
-   └────────┬─────────┘             │ per aliran tujuan│
-            │                       └──────────────────┘
-            ▼
-   ┌──────────────────┐
-   │ k rekomendasi    │
-   └──────────────────┘
+   ┌───────────────────────┐
+   │  Observasi stasiun    │
+   │  (§3.1 murni)         │
+   └───────────┬───────────┘
+               │
+       ┌───────┴────────┐
+       │                │
+       ▼                ▼
+ ╔═══════════╗    ╔═══════════════╗
+ ║   AKTOR   ║    ║    KRITIK     ║
+ ╚═════╤═════╝    ╚═══════╤═══════╝
+       │                  │
+       ▼                  │   Delayed Access
+ ┌───────────┐            │   Strategy
+ │    MLP    │            │        │
+ │  (bobot   │            ▼        ▼
+ │  dibagi)  │       ┌──────────────────┐
+ └─────┬─────┘       │  gabung obs +    │
+       │             │  penanda tunda   │
+       ▼             └────────┬─────────┘
+ ┌───────────┐                │
+ │  tawaran  │                ▼
+ │ per       │       ┌──────────────────┐
+ │ stasiun   │       │  Penggabung      │
+ └─────┬─────┘       │  ber-ATENSI      │
+       │             └────────┬─────────┘
+       ▼                      │
+ ┌───────────┐                ▼
+ │  tapis    │       ┌──────────────────┐
+ │  kelayakan│       │  Kepala nilai    │
+ └─────┬─────┘       │  GANDA           │
+       │             └────────┬─────────┘
+       ▼                      │
+ ┌───────────┐                ▼
+ │  softmax  │       ┌──────────────────┐
+ │  → pilih  │       │  DGR — bobot     │
+ └─────┬─────┘       │  antar kepala    │
+       │             │  menyesuaikan    │
+       ▼             └──────────────────┘
+ ┌───────────┐
+ │  stasiun  │
+ │ terpilih  │
+ └───────────┘
 ```
 
-**Ciri utamanya:**
+---
 
-| | |
-|---|---|
-| Unit agen | Permintaan pengisian EV |
-| Aksi | Pemilihan diskrit — beberapa stasiun teratas |
-| Pemilihan | Ambang lalu potong di $k$ |
-| Kritik | Terpusat, melihat seluruh stasiun kandidat |
-| Atensi | Di **dua tempat**: penggabung kritik, dan pencocokan preferensi |
-| Info pemohon | **Ada** — disisipkan ke tiap baris kandidat |
+## 2. Hybrid — atensi antar-stasiun + modul P
+
+Aktor tidak lagi langsung menghasilkan tawaran. Ia membentuk **vektor** per stasiun,
+menyisipkan preferensi setelah vektor terbentuk, lalu membiarkan stasiun saling
+memandang sebelum diskor.
+
+```
+   ┌───────────────────────┐        ┌───────────────────────┐
+   │  Observasi stasiun    │        │  Riwayat preferensi   │
+   │  (§3.1 murni — SAMA)  │        │  (rekomendasi vs      │
+   └───────────┬───────────┘        │   pilihan nyata)      │
+               │                    └───────────┬───────────┘
+               │                                │
+        ┌──────┴──────┐                         ▼
+        │             │               ┌───────────────────┐
+        │             │               │  Penyandi rekuren │
+        │             │               │  preferensi       │
+        │             │               └─────────┬─────────┘
+        │             │                         │
+        │             └────────────┐            │
+        │                          ▼            ▼
+        │                 ┌────────────────────────────┐
+        │                 │   ATENSI PREFERENSI        │
+        │                 │   preferensi = kunci cari  │
+        │                 │   stasiun  = yang dicari   │
+        │                 └────────────┬───────────────┘
+        │                              │
+        ▼                              ▼
+ ┌──────────────┐              ┌───────────────┐
+ │ Kepala       │              │  GERBANG      │
+ │ vektor       │              │  preferensi   │
+ │ stasiun      │              └───────┬───────┘
+ │ (bobot       │                      │
+ │  dibagi)     │                      │
+ └──────┬───────┘                      │
+        │                              │
+        │  vektor per stasiun,         │
+        │  MURNI fitur sendiri         │
+        │                              │
+        └──────────────┬───────────────┘
+                       ▼
+             ┌───────────────────┐
+             │  PENGGABUNG AKHIR │   ← P masuk SETELAH vektor
+             │  (gerbang)        │      terbentuk (late-merge)
+             └─────────┬─────────┘
+                       │
+                       ▼
+             ┌───────────────────┐
+             │  ATENSI ANTAR-    │   ← stasiun saling
+             │  STASIUN          │      memandang
+             │  (gerbang,        │
+             │   residual)       │
+             └─────────┬─────────┘
+                       │
+                       ▼
+             ┌───────────────────┐
+             │  vektor akhir     │
+             │  per stasiun      │
+             └─────────┬─────────┘
+                       │
+          ┌────────────┴────────────┐
+          ▼                         ▼
+   ┌─────────────┐           ┌─────────────┐
+   │ kepala PPO  │           │ kepala DDPG │
+   │ → skor      │           │ → tawaran   │
+   │ → softmax   │           │   kontinu   │
+   └─────────────┘           └─────────────┘
+```
+
+Sisi kritiknya sama dengan MASTER-Pure-PPO. Ada varian kritik yang **juga** melihat
+riwayat preferensi, karena kritik buta-P tidak bisa menjelaskan hasil yang didorong
+preferensi — sumber variansi tambahan pada pendugaan keuntungan.
 
 ---
 
 ## 3. Perbedaan pokoknya
 
 ```
-                  MASTER MURNI                    USULAN
-                  ────────────                    ──────
+                  MASTER-PURE-PPO              HYBRID
+                  ───────────────              ──────
 
-  agen            stasiun                         permintaan EV
-                       │                                │
-  aksi            tawaran kontinu                  pilih beberapa stasiun
-                       │                                │
-  penentuan       lelang antar-stasiun            ambang + top-k
-                       │                                │
-  atensi          kritik saja                      kritik + preferensi
-                       │                                │
-  preferensi      tidak ada                        modul terpisah + gerbang
-                       │                                │
-  riwayat         tidak ada                        penyandi rekuren
-                       │                                │
-  keadaan EV      tidak terlihat                   masuk tiap baris kandidat
-                       │                                │
-  kepala nilai    ganda + DGR                      terpisah per aliran tujuan
+  observasi       7 fitur §3.1                 7 fitur §3.1   ← SAMA
+                       │                            │
+  keluaran        skalar langsung              vektor per stasiun
+  aktor tahap 1        │                            │
+                       │                            ▼
+  preferensi      tidak ada                    disisipkan SETELAH
+                       │                       vektor terbentuk
+                       │                            │
+                       │                            ▼
+  antar-stasiun   tidak ada di aktor           atensi antar-stasiun
+                       │                            │
+                       ▼                            ▼
+  kepala akhir    tawaran / skor               tawaran / skor
+                       │                            │
+  kritik          ber-atensi + DGR             sama (+ varian ber-P)
 ```
 
-**Tiga hal yang berpindah tempat:**
+**Tiga tambahan Hybrid, dan alasan urutannya:**
 
-1. **Siapa yang memutuskan.** Dari stasiun berebut permintaan, menjadi permintaan memilih
-   stasiun. Ini yang membuat riwayat pengguna jadi bermakna — pada MASTER murni tidak ada
-   "pengguna" yang bisa diingat, karena agennya stasiun.
+1. **Keluaran aktor jadi vektor, bukan skalar.** Skalar tak menyisakan ruang untuk
+   disisipi apa pun. Vektor memberi tempat bagi preferensi dan atensi antar-stasiun
+   bekerja sebelum keputusan dipadatkan jadi satu angka.
 
-2. **Atensi mendapat pekerjaan kedua.** Pada MASTER murni, atensi hanya meringkas keadaan
-   bersama untuk kritik. Pada usulan, ada atensi kedua yang mencocokkan preferensi dengan
-   ciri stasiun.
+2. **Preferensi disisipkan belakangan.** Vektor stasiun dibentuk lebih dulu dari fitur
+   stasiun **sendiri**, baru preferensi digabungkan. Kalau preferensi ikut sejak awal,
+   representasi stasiun dan preferensi berebut kapasitas yang sama.
 
-3. **Kepala nilai ganda dipakai berbeda.** MASTER murni memakainya untuk beberapa objektif
-   dengan bobot yang menyesuaikan diri (DGR). Usulan memakainya untuk memisahkan aliran
-   tujuan yang berbeda watak — tertunda vs segera, jarang vs sering.
+3. **Atensi antar-stasiun di sisi aktor.** MASTER murni hanya punya atensi di kritik —
+   untuk menilai, bukan memutuskan. Di Hybrid, stasiun saling memandang sebelum diskor,
+   sehingga keputusan tiap stasiun memperhitungkan tetangganya.
+
+**Semua tambahan memakai gerbang.** Di awal pelatihan, ketiganya nyaris tak berkontribusi
+dan jaringan berperilaku mendekati MASTER murni.
+
+## Kesetiaan terhadap paper
+
+Menambahkan modul P **melanggar Pers. 11 MASTER** — stasiun seharusnya buta terhadap
+pemohon. Deviasi ini disengaja dan terdokumentasi.
+
+Yang **dijaga**: observasi stasiun tetap 7 fitur §3.1 murni. Preferensi masuk lewat kanal
+**terpisah**, tidak mencemari observasi stasiun itu sendiri. Jadi pelanggarannya terbatas
+pada satu titik yang bisa ditunjuk, bukan menyebar ke seluruh arsitektur.
 
 ---
 
 ## 4. Ukuran
 
-### 4.1 MASTER murni
+### 4.1 MASTER-Pure-PPO
 
 | Bagian | Ukuran |
 |---|---|
 | Fitur per stasiun | 7 |
 | Aktor — lapis tersembunyi | 64 |
 | Aktor — keluaran | 1 per stasiun |
-| Sebaran tawaran | 1 parameter, dibagi seluruh stasiun |
+| Sebaran tawaran (varian DDPG) | 1 parameter, dibagi |
 | Penanda keterlambatan → sandi | 1 → 64 |
 | Masukan kritik per stasiun | 7 + 64 |
-| Atensi kritik — lapis tersembunyi | 64 |
+| Atensi kritik — tersembunyi | 64 |
 | Kepala nilai | 2 |
 
-### 4.2 Usulan
+### 4.2 Hybrid
+
+Modul tambahannya **sengaja dibuat kecil** supaya tidak mendominasi tulang punggung.
 
 | Bagian | Ukuran |
 |---|---|
-| Fitur per stasiun kandidat | 10 |
-| — dari §3.1 MASTER | 7 |
-| — keadaan EV pemohon | 3 |
-| Riwayat interaksi | 10 langkah × 4 fitur |
-| Penyandi riwayat — keluaran | 16 |
-| Riwayat preferensi | 10 langkah × 10 fitur |
-| Penyandi preferensi — keluaran | 16 |
-| Atensi preferensi — keluaran | 16 |
-| Gerbang preferensi | 1 parameter |
-| Konteks gabungan | 16 + 16 = 32 |
-| Penyandi stasiun aktor — tersembunyi | 64 |
-| Penyandi stasiun kritik — tersembunyi | 128 |
-| Kepala pemilihan — keluaran | 1 per stasiun |
-| Kepala nilai | 3 |
-| Rekomendasi per permintaan | 3 |
+| Fitur per stasiun | 7 (sama) |
+| Kepala vektor — tersembunyi | 16 |
+| Vektor per stasiun | 8 |
+| Riwayat preferensi | 10 langkah |
+| Penyandi preferensi — keluaran | 8 |
+| Atensi preferensi — keluaran | 8 |
+| Atensi antar-stasiun | 8 |
+| Kepala akhir | 1 per stasiun |
+| Kritik | sama dengan MASTER-Pure-PPO |
 
-### 4.3 Fitur riwayat
+Bandingkan: aktor MASTER murni memakai lapis tersembunyi **64**, sedangkan seluruh jalur
+tambahan Hybrid bekerja pada dimensi **8**. Tambahannya jauh lebih ramping daripada yang
+ditambahi.
 
-| Riwayat | Isi tiap langkah |
-|---|---|
-| Interaksi | patuh, janji tunggu, tunggu bawaan, galat terealisasi |
-| Preferensi | ciri stasiun yang direkomendasikan (5) + ciri stasiun yang dipilih (5) |
+### 4.3 Gerbang
 
-Ciri stasiun untuk riwayat preferensi: jarak, tunggu, antrean, konektor, utilisasi.
+| Gerbang | Nilai awal | Bentuk |
+|---|---|---|
+| Preferensi | 0 (atau kecil bukan-nol) | bebas tanda |
+| Penggabung akhir | sigmoid(−2) ≈ 0,12 | sigmoid |
+| Atensi antar-stasiun | sigmoid(−2) ≈ 0,12 | sigmoid |
+
+Gerbang preferensi **bebas tanda**, bukan sigmoid seperti dua lainnya. Konsekuensinya ia
+bisa konvergen ke tanda berbeda antar-seed.
+
+### 4.4 Fitur riwayat preferensi
+
+| Mode | Isi tiap langkah | Ukuran |
+|---|---|---|
+| Identitas | one-hot rekomendasi + one-hot pilihan | 2 × jumlah stasiun |
+| Ciri | ciri stasiun direkomendasikan + ciri stasiun dipilih | 10 |
+| Ciri + hasil | ditambah patuh dan galat terealisasi | 12 |
+
+Mode ciri memakai jarak, tunggu, antrean, konektor, utilisasi. Mode ciri-plus-hasil
+membuat penyandi preferensi menduga **preferensi dan kepercayaan sekaligus**, sehingga
+penyandi riwayat terpisah tak lagi diperlukan.
 
 ---
 
 ## 5. Catatan
 
-**Penyandi riwayat interaksi dimatikan** pada seluruh lengan yang diuji. Modulnya tetap
-ada di jaringan dan ukurannya tak berubah, tetapi kontribusinya dinolkan. Akibatnya pada
-lengan tanpa modul preferensi, konteksnya kosong seluruhnya.
+**Gerbang tepat nol menciptakan kebuntuan.** Pada gerbang preferensi persis 0, gradien
+yang sampai ke modul preferensi adalah persis nol — modul tak bisa mulai belajar sampai
+gerbangnya bergeser, padahal gerbang itu sendiri bergerak lambat. Nilai awal kecil
+bukan-nol memutus kebuntuan tanpa meninggalkan semangat "mulai hampir tak berkontribusi".
 
-**Gerbang preferensi dimulai dari nol**, sehingga di awal pelatihan jaringan berperilaku
-seolah tak punya modul preferensi. Kontribusinya masuk bertahap.
+**Atensi antar-stasiun bisa dimatikan** lewat ablasi, untuk memisahkan kontribusinya dari
+modul preferensi. Modulnya tetap dibangun agar model tetap dapat dimuat lintas varian,
+hanya dilewati saat maju.
 
-**Bobot dibagi antar stasiun** di kedua arsitektur — tiap stasiun diproses lewat jaringan
-yang sama. Menukar urutan stasiun menghasilkan keluaran yang tertukar identik, bukan
-keluaran berbeda.
+**Kepala akhir berbeda per algoritma.** DDPG mempertahankan tawaran kontinu dengan argmax
+— mekanisme asli MASTER. PPO memakai skor dan softmax. Tulang punggungnya identik supaya
+perbandingannya adil.
 
-*Sumber: `marl_spklu/rl/master_pure_ppo_policy.py`, `marl_spklu/rl/master_ev_ppo_policy.py`,
-`marl_spklu/rl/policy.py`, `marl_spklu/rl/pdqn_policy.py`, `marl_spklu/rl/master_paper_obs.py`.*
+*Sumber: `marl_spklu/rl/master_pure_ppo_policy.py`,
+`marl_spklu/rl/master_pure_hybrid_policy.py`, `marl_spklu/rl/pdqn_policy.py`,
+`marl_spklu/rl/master_paper_obs.py`.*
