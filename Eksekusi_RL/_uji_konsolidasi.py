@@ -226,6 +226,33 @@ def ringkas_pengaruh_janji(sim):
         o[f"{pref}_n"] = len(sub)
         return o
 
+    # --- SEBERAPA JAUH AGEN MEMAHAMI PREFERENSI (2026-08-31) ---
+    # `acc` hanya mengukur apakah saran DIIKUTI; ia tak membedakan "agen menebak
+    # preferensi dgn tepat" dari "pengguna kebetulan menurut". Blok ini memakai
+    # kontrafaktual `sid_pref` (stasiun yg AKAN dipilih tanpa rekomendasi) untuk
+    # menguji pemahaman preferensi secara langsung:
+    #   pref_primer  = agen menaruh stasiun preferensi di slot PERTAMA
+    #   pref_dalam   = stasiun preferensi ADA di himpunan rekomendasi (slot mana pun)
+    # Agen buta-pengguna (greedy) memberi TINGKAT KEBETULAN sbg pembanding: ia tak
+    # pernah melihat pemohon, sehingga nilainya = peluang acak stasiun populer
+    # kebetulan cocok. Selisih terhadap itu = pemahaman preferensi yang sesungguhnya.
+    D_rec = [e for e in D if e.get("recs")]
+    if D_rec:
+        out["pref_primer"] = float(np.mean([e["recs"][0] == e["sid_pref"] for e in D_rec]))
+        out["pref_dalam"] = float(np.mean([e["sid_pref"] in e["recs"] for e in D_rec]))
+        pr = np.array([e.get("peringkat_pilih", -1) for e in D_rec], float)
+        out["pilih_slot0"] = float(np.mean(pr == 0))
+        out["pilih_slot1"] = float(np.mean(pr == 1))
+        out["pilih_slot2plus"] = float(np.mean(pr >= 2))
+        out["pilih_tolak"] = float(np.mean(pr < 0))
+        # Bila preferensi ADA di rekomendasi, seberapa sering ia yg akhirnya dipilih?
+        ada = [e for e in D_rec if e["sid_pref"] in e["recs"]]
+        if ada:
+            out["patuh_bila_pref_ada"] = float(np.mean([e["patuh"] for e in ada]))
+        tak = [e for e in D_rec if e["sid_pref"] not in e["recs"]]
+        if tak:
+            out["patuh_bila_pref_tiada"] = float(np.mean([e["patuh"] for e in tak]))
+
     out.update(_blok(B, "jn"))                                    # seluruh keputusan
     out.update(_blok([e for e in B if e["patuh"]], "jnpatuh"))     # yang menuruti
     out.update(_blok([e for e in B if not e["patuh"]], "jntolak")) # yang menolak
