@@ -1,6 +1,7 @@
 # Arsitektur: MASTER-Pure-PPO vs Hybrid
 
-Gambaran tingkat tinggi. Ukuran ada di tabel terpisah di bagian akhir.
+Gambaran tingkat tinggi pada diagram; ukuran dan susunan lapisan tiap komponen ada di
+tabel §4.
 
 Keduanya memakai **tulang punggung latih yang sama** (PPO) dan **observasi stasiun yang
 sama** (7 fitur §3.1 murni). Yang ditambahkan Hybrid: modul preferensi dan atensi
@@ -187,53 +188,80 @@ pada satu titik yang bisa ditunjuk, bukan menyebar ke seluruh arsitektur.
 
 ---
 
-## 4. Ukuran
+## 4. Ukuran dan susunan lapisan
+
+Notasi: `LIN(masuk→keluar)`. Penanda `−b` berarti tanpa bias.
 
 ### 4.1 MASTER-Pure-PPO
 
-| Bagian | Ukuran |
-|---|---|
-| Fitur per stasiun | 7 |
-| Aktor — lapis tersembunyi | 64 |
-| Aktor — keluaran | 1 per stasiun |
-| Sebaran tawaran (varian DDPG) | 1 parameter, dibagi |
-| Penanda keterlambatan → sandi | 1 → 64 |
-| Masukan kritik per stasiun | 7 + 64 |
-| Atensi kritik — tersembunyi | 64 |
-| Kepala nilai | 2 |
+| Komponen | Susunan lapisan | Keluaran |
+|---|---|---|
+| Aktor (bobot dibagi) | `LIN(7→64) → ReLU → LIN(64→64) → ReLU → LIN(64→1)` | 1 per stasiun, mentah |
+| Sebaran tawaran (DDPG) | `skala = exp(log_std)` → `Normal(rerata, skala)` | 1 parameter, dibagi |
+| Penyandi keterlambatan | `LIN(1→64) → ReLU` | 64 |
+| Gabungan masukan kritik | `concat[ obs(7), p(64) ]` | 71 |
+| Atensi kritik — skor | `LIN(71→64, −b) → tanh → LIN(64→1, −b)` | 1 per stasiun |
+| Atensi kritik — bobot | `mask −∞ → softmax` | N, jumlah 1 |
+| Atensi kritik — keluaran | `bobot · raw → LIN(71→64) → ReLU` | 64 |
+| Kepala nilai | `LIN(64→2)` | 2 |
 
 ### 4.2 Hybrid
 
-Modul tambahannya **sengaja dibuat kecil** supaya tidak mendominasi tulang punggung.
+Modul tambahannya **sengaja kecil** supaya tidak mendominasi tulang punggung.
 
-| Bagian | Ukuran |
-|---|---|
-| Fitur per stasiun | 7 (sama) |
-| Kepala vektor — tersembunyi | 16 |
-| Vektor per stasiun | 8 |
-| Riwayat preferensi | 10 langkah |
-| Penyandi preferensi — keluaran | 8 |
-| Atensi preferensi — keluaran | 8 |
-| Atensi antar-stasiun | 8 |
-| Kepala akhir | 1 per stasiun |
-| Kritik | sama dengan MASTER-Pure-PPO |
-
-Bandingkan: aktor MASTER murni memakai lapis tersembunyi **64**, sedangkan seluruh jalur
-tambahan Hybrid bekerja pada dimensi **8**. Tambahannya jauh lebih ramping daripada yang
-ditambahi.
-
-### 4.3 Gerbang
-
-| Gerbang | Nilai awal | Bentuk |
+| Komponen | Susunan lapisan | Keluaran |
 |---|---|---|
-| Preferensi | 0 (atau kecil bukan-nol) | bebas tanda |
-| Penggabung akhir | sigmoid(−2) ≈ 0,12 | sigmoid |
-| Atensi antar-stasiun | sigmoid(−2) ≈ 0,12 | sigmoid |
+| Kepala vektor stasiun | `LIN(7→16) → ReLU → LIN(16→8)` | 8 per stasiun |
+| Penyandi preferensi | `pack_padded → LSTM(10 atau 12 → 8)` → keadaan terakhir | 8 |
+| Atensi preferensi — kunci/nilai | `LIN(7→8)` | 8 per stasiun |
+| Atensi preferensi — pencari | `LIN(8→8)` | 8 |
+| Atensi preferensi — bobot | `kv·q/√8 → softmax` | N, jumlah 1 |
+| Atensi preferensi — keluaran | `bobot · kv` lalu `× pref_gate` | 8 |
+| Penggabung akhir | `concat[vec(8), pref(8)] → LIN(16→8) → ReLU` | 8 |
+| Penggabung akhir — bentuk | `vec + sigmoid(g) × (merged − vec)` | interpolasi |
+| Atensi antar-stasiun — q/k/v | `LIN(8→8)` × 3 | 8 masing-masing |
+| Atensi antar-stasiun — bobot | `q·kᵀ/√8 → mask −∞ → softmax` | N×N |
+| Atensi antar-stasiun — keluaran | `bobot · v → LIN(8→8)` | 8 |
+| Atensi antar-stasiun — bentuk | `vec + sigmoid(g) × attended` | residual |
+| Kepala akhir PPO | `LIN(8→1) → mask −∞ → softmax` | skor per stasiun |
+| Kepala akhir DDPG | `LIN(8→1) → tanh → × 10` | tawaran kontinu |
+| Kritik | sama persis dengan §4.1 | 2 |
 
-Gerbang preferensi **bebas tanda**, bukan sigmoid seperti dua lainnya. Konsekuensinya ia
+Dua catatan yang mudah terlewat:
+
+**Kepala vektor berakhir tanpa aktivasi.** Vektornya sengaja dibiarkan linear supaya
+penggabungan berikutnya tidak dibatasi tanda.
+
+**Kedua gerbang berbentuk berbeda.** Penggabung akhir memakai *interpolasi* — pada gerbang
+0 keluarannya persis vektor semula. Atensi antar-stasiun memakai *residual* — pada gerbang
+0 tambahannya nol. Serupa akibatnya di awal, tetapi tidak sama setelah gerbang membuka.
+
+### 4.3 Ringkasan aktivasi
+
+| Komponen | Aktivasi | Catatan |
+|---|---|---|
+| Aktor MASTER murni | ReLU × 2 | keluaran mentah, tanpa `tanh` |
+| Kepala vektor Hybrid | ReLU × 1 | keluaran linear, disengaja |
+| Penyandi preferensi | `tanh`/`sigmoid` internal LSTM | baku PyTorch |
+| Atensi preferensi | — | hanya `softmax` |
+| Penggabung akhir | ReLU + gerbang `sigmoid` | interpolasi |
+| Atensi antar-stasiun | gerbang `sigmoid` | residual |
+| Atensi kritik | `tanh` di skor, ReLU di keluaran | dua tempat berbeda |
+| Kepala PPO | `softmax` | atas kandidat layak |
+| Kepala DDPG | `tanh` | diskalakan × 10 |
+
+### 4.4 Gerbang
+
+| Gerbang | Nilai awal | Bentuk | Rentang |
+|---|---|---|---|
+| Preferensi | 0 (atau kecil bukan-nol) | bebas tanda | tak terbatas |
+| Penggabung akhir | `sigmoid(−2)` ≈ 0,12 | `sigmoid` | (0, 1) |
+| Atensi antar-stasiun | `sigmoid(−2)` ≈ 0,12 | `sigmoid` | (0, 1) |
+
+Gerbang preferensi **bebas tanda**, bukan `sigmoid` seperti dua lainnya. Konsekuensinya ia
 bisa konvergen ke tanda berbeda antar-seed.
 
-### 4.4 Fitur riwayat preferensi
+### 4.5 Fitur riwayat preferensi
 
 | Mode | Isi tiap langkah | Ukuran |
 |---|---|---|
@@ -241,9 +269,10 @@ bisa konvergen ke tanda berbeda antar-seed.
 | Ciri | ciri stasiun direkomendasikan + ciri stasiun dipilih | 10 |
 | Ciri + hasil | ditambah patuh dan galat terealisasi | 12 |
 
-Mode ciri memakai jarak, tunggu, antrean, konektor, utilisasi. Mode ciri-plus-hasil
-membuat penyandi preferensi menduga **preferensi dan kepercayaan sekaligus**, sehingga
-penyandi riwayat terpisah tak lagi diperlukan.
+Ciri stasiun: jarak, tunggu, antrean, konektor, utilisasi. Panjang jendela 10 langkah.
+
+Mode ciri-plus-hasil membuat penyandi preferensi menduga **preferensi dan kepercayaan
+sekaligus**, sehingga penyandi riwayat terpisah tak lagi diperlukan.
 
 ---
 
