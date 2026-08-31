@@ -47,6 +47,13 @@ p.add_argument("--gamma", type=float, default=0.99,
                    "(bukan lingkungan). CATATAN: efeknya teredam oleh `max_step_gap=4` "
                    "yang memutus rantai bootstrap antar-transisi berjauhan waktu, jadi "
                    "horizon efektif sudah pendek terlepas dari gamma.")
+p.add_argument("--gamma-est-wait", type=float, default=None,
+              help="Sensitivitas P_rec pengguna thd estimasi waktu tunggu (baku None -> "
+                   "GAMMA_DEFAULT=0.05590271 bawaan `user.py`). BUKAN `--gamma` di atas -- "
+                   "itu diskon PPO/GAE (algoritma), ini parameter LINGKUNGAN/perilaku "
+                   "pengguna. `user.py::GAMMA_SWEEP` = (0.02795135, 0.05590271, "
+                   "0.11180542) = x0.5/x1/x2 titik sapuan baku. Dipakai saat LATIH "
+                   "maupun UJI.")
 p.add_argument("--beta-denom", type=str, default=None, choices=["r_star", "ret_std"],
               help="Penyebut gap-ratio DGR. 'r_star' = |r_star| (perilaku lama). "
                    "'ret_std' = simpangan baku return -- WAJIB bila ada aliran yang "
@@ -208,6 +215,7 @@ _pref_suffix = (("_preffeat" if args.pref_feature_mode else "")
                 + ("_pure3" if args.pure_streams else "")
                 + ("" if args.initial_trust is None else f"_it{args.initial_trust:g}")
                 + ("" if args.gamma == 0.99 else f"_g{args.gamma:g}")
+                + ("" if args.gamma_est_wait is None else f"_gw{args.gamma_est_wait:g}")
                 + ("" if args.alpha_accept == 0.0 or args.pure_streams else
                    f"_acc{args.alpha_accept:g}" +
                    ("" if args.accept_stream == "global" else "S1")))
@@ -306,17 +314,22 @@ except FileNotFoundError:
 # di tiap batas horizon (`_carry_forward`), sehingga konteks dibentangkan menutupi
 # SELURUH loop pelatihan, bukan dipasang per-pemanggilan.
 import contextlib
+_env_stack = contextlib.ExitStack()
 if args.initial_trust is not None:
     from marl_spklu.experiments.ablations import initial_trust as _initial_trust
-    _env_ctx = _initial_trust(args.initial_trust)
+    _env_stack.enter_context(_initial_trust(args.initial_trust))
     print(f"[{elapsed()}] Lingkungan: initial_trust={args.initial_trust:g} "
          f"(trust tetap DINAMIS sesudahnya)", flush=True)
-else:
-    _env_ctx = contextlib.nullcontext()
+if args.gamma_est_wait is not None:
+    from marl_spklu.experiments.ablations import gamma_est_wait as _gamma_est_wait
+    _env_stack.enter_context(_gamma_est_wait(args.gamma_est_wait))
+    print(f"[{elapsed()}] Lingkungan: gamma_est_wait={args.gamma_est_wait:g} "
+         f"(sensitivitas P_rec thd estimasi waktu tunggu, BUKAN diskon PPO/GAE)",
+         flush=True)
 if args.gamma != 0.99:
     print(f"[{elapsed()}] Algoritma: gamma={args.gamma:g} (baku 0.99)", flush=True)
 
-with _env_ctx:
+with _env_stack:
     for seed in range(args.n_train_seed):
         if seed in existing:
             print(f"[{elapsed()}]   seed={seed} -- SKIP (checkpoint sudah ada)", flush=True)

@@ -44,6 +44,10 @@ _m_histk = _re.search(r"_histK(\d+)", TAG_ARM)
 # yang sudah berulang di repo ini (pref_hist saat uji, station_feat_dim, dst).
 _m_it = _re.search(r"_it([0-9.]+)", TAG_ARM)
 INIT_TRUST = float(_m_it.group(1)) if _m_it else None
+# `_gw{value}`: sensitivitas P_rec thd estimasi waktu tunggu (BUKAN diskon PPO/GAE
+# `--gamma` -- lihat catatan di `marl_spklu/experiments/ablations.py::gamma_est_wait`).
+_m_gw = _re.search(r"_gw([0-9.]+)", TAG_ARM)
+GAMMA_EST_WAIT = float(_m_gw.group(1)) if _m_gw else None
 ACTOR_KW = dict(vec_dim=8, bid_hidden=16, pref_d_lstm=8, pref_d_attn=8, station_attn_dim=8,
                 pref_feature_mode="_preffeat" in TAG_ARM,
                 pref_pair_outcome="_pairout" in TAG_ARM,
@@ -112,6 +116,8 @@ def main():
     print(f"seed: {SEEDS}", flush=True)
     if INIT_TRUST is not None:
         print(f"lingkungan: initial_trust={INIT_TRUST:g} (diturunkan dari tag)", flush=True)
+    if GAMMA_EST_WAIT is not None:
+        print(f"lingkungan: gamma_est_wait={GAMMA_EST_WAIT:g} (diturunkan dari tag)", flush=True)
     n_spklu = len(_fresh_sim_common(K.DS).spklus)
 
     per_seed = {}
@@ -150,10 +156,12 @@ if __name__ == "__main__":
     # tiap run, dan `initial_trust` menambal `User.__init__` -- jadi harus aktif saat
     # setiap simulator dibentuk, bukan sekali di awal.
     import contextlib
+    _ctx = contextlib.ExitStack()
     if INIT_TRUST is not None:
         from marl_spklu.experiments.ablations import initial_trust as _initial_trust
-        _ctx = _initial_trust(INIT_TRUST)
-    else:
-        _ctx = contextlib.nullcontext()
+        _ctx.enter_context(_initial_trust(INIT_TRUST))
+    if GAMMA_EST_WAIT is not None:
+        from marl_spklu.experiments.ablations import gamma_est_wait as _gamma_est_wait
+        _ctx.enter_context(_gamma_est_wait(GAMMA_EST_WAIT))
     with _ctx:
         main()

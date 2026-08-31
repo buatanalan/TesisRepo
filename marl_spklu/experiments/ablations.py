@@ -221,6 +221,40 @@ def initial_trust(value: float):
 
 
 @contextlib.contextmanager
+def gamma_est_wait(value: float):
+    """Ganti sensitivitas P_rec terhadap waktu tunggu yang dijanjikan sistem --
+    gamma pada P_rec = softmax(exp(-gamma*wait)) (`user.py::GAMMA_DEFAULT`, dipakai
+    `User.decide_spklu`). BUKAN faktor diskon PPO/GAE (`--gamma` CLI pipeline RL,
+    parameter ALGORITMA berbeda meski kebetulan sama-sama disebut "gamma" -- lihat
+    catatan di `_run_master_pure_hybrid_ppo_pipeline.py`). Semakin besar nilainya,
+    semakin tajam pengguna membedakan SPKLU berdasar selisih kecil pada estimasi
+    waktu tunggu (mendekati keputusan hampir-deterministik ke SPKLU tercepat);
+    semakin kecil, semakin longgar/acak (mendekati acuh thd perbedaan waktu tunggu).
+    `user.py::GAMMA_SWEEP` sudah menyediakan titik sapuan baku (x0.5/x1/x2 dari
+    GAMMA_DEFAULT, half-life = wait_mean baseline).
+
+    `decide_spklu` dipanggil TANPA argumen `gamma` eksplisit oleh `Simulator`
+    (mengandalkan default parameter `gamma: float = GAMMA_DEFAULT` yang terikat
+    pada saat fungsi didefinisikan) -- override modul `GAMMA_DEFAULT` SETELAH impor
+    karena itu TIDAK berpengaruh. Context manager ini membungkus `User.decide_spklu`
+    agar `gamma=value` selalu disuntikkan, terlepas dari apa yang dipanggil caller."""
+    orig_decide = User.decide_spklu
+
+    def patched_decide(self, recommendations, estimated_waits, spklu_features,
+                       speed_kmh: float = 40.0, gamma: float = None,  # noqa: unused, dipaksa `value`
+                       soc_percent: float = 50.0, **kwargs):
+        return orig_decide(self, recommendations, estimated_waits, spklu_features,
+                           speed_kmh=speed_kmh, gamma=value, soc_percent=soc_percent,
+                           **kwargs)
+
+    User.decide_spklu = patched_decide
+    try:
+        yield
+    finally:
+        User.decide_spklu = orig_decide
+
+
+@contextlib.contextmanager
 def amplify_preference_weights(pop_mult: float = 2.0, conn_mult: float = 2.0):
     """Perbesar KOEFISIEN preferensi populasi (BETA_POP/BETA_CONN, mean draw individual
     Mixed Logit) sebesar `pop_mult`/`conn_mult` -- BUKAN mengubah kapasitas/popularitas
