@@ -1,0 +1,72 @@
+===== Uji A, langkah 1/3: ekstraksi P-MASTER =====
+lengan=master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_pg0.1_pure3  horizon=90d (/home/iskandar/Alan/TesisRepo/scenario_dataset_klaster12_4x_90d.json)
+checkpoint tersedia: [0, 1, 2]
+  [seed=0, checkpoint 0] tertangkap=16717 tergabung=16717 hilang(tak cocok log)=0
+  [seed=1, checkpoint 1] tertangkap=16718 tergabung=16718 hilang(tak cocok log)=0
+  [seed=2, checkpoint 2] tertangkap=16718 tergabung=16718 hilang(tak cocok log)=0
+
+SAVED -> outputs/representasi_master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_pg0.1_pure3.npz  (total 50,153 keputusan)
+
+===== Uji A, langkah 2/3: ekstraksi MASTER (pembanding negatif) =====
+lengan=master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_noattn_pure3  horizon=90d (/home/iskandar/Alan/TesisRepo/scenario_dataset_klaster12_4x_90d.json)
+checkpoint tersedia: [0, 1, 2]
+  [seed=0, checkpoint 0] tertangkap=16718 tergabung=16718 hilang(tak cocok log)=0
+  [seed=1, checkpoint 1] tertangkap=16717 tergabung=16717 hilang(tak cocok log)=0
+  [seed=2, checkpoint 2] tertangkap=16715 tergabung=16715 hilang(tak cocok log)=0
+
+SAVED -> outputs/representasi_master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_noattn_pure3.npz  (total 50,150 keputusan)
+
+===== Uji A, langkah 3/3: analisis representasi laten =====
+UJI A -- representasi laten pref_lstm (2026-09-01)
+lengan                                                        n  akurasi pref  kebetulan  silhouette  R2(trust)
+master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_pg0.1_pure3  50,153        0.278±0.007      0.167     -0.0427     0.1506
+   -> akurasi PREF DI ATAS kebetulan; R^2(trust) bermakna (>0.1)
+master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_noattn_pure3  50,150        0.319±0.005      0.167     -0.0458     0.2347
+   -> akurasi PREF DI ATAS kebetulan; R^2(trust) bermakna (>0.1)
+
+Pembacaan: bila lengan P-MASTER (gate aktif) menunjukkan akurasi PREF di atas
+kebetulan DAN/ATAU R2(trust) bermakna, sementara MASTER (gate~0) TIDAK --
+itu representasi laten TERSTRUKTUR akibat pelatihan, bukan artefak LSTM semata.
+Bila KEDUANYA gagal pd sisi preferensi -- konsisten dgn temuan §5.7 Bab V
+(pref_dalam/pref_primer tak terpisah dari agen buta-user) pd tingkat REPRESENTASI,
+bukan cuma tingkat KELUARAN -- argumen 'cuma LSTM' makin sulit dibantah utk sisi itu.
+
+===== Uji B: intervensi trust terkontrol (P-MASTER) =====
+lengan=master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_pg0.1_pure3  horizon=90d (/home/iskandar/Alan/TesisRepo/scenario_dataset_klaster12_4x_90d.json)
+hari intervensi=45  n/kelompok=200  trust turun->0.1 naik->0.9
+
+  [seed=0] intervensi @ hari 45 (step 4320): turun=200 naik=200 kontrol=200 dari 1446 pengguna aktif
+  [seed=0] turun    PRA  n= 322 patuh=0.727 geser_p=-0.069
+  [seed=0] turun    PASCA n= 294 patuh=0.609 geser_p=-0.075
+  [seed=0] naik     PRA  n= 342 patuh=0.743 geser_p=-0.041
+  [seed=0] naik     PASCA n= 356 patuh=0.840 geser_p=+0.123
+  [seed=0] kontrol  PRA  n= 300 patuh=0.753 geser_p=-0.045
+  [seed=0] kontrol  PASCA n= 289 patuh=0.682 geser_p=-0.083
+  [seed=1] intervensi @ hari 45 (step 4320): turun=200 naik=200 kontrol=200 dari 1416 pengguna aktif
+  [seed=1] turun    PRA  n= 347 patuh=0.798 geser_p=-0.062
+  [seed=1] turun    PASCA n= 342 patuh=0.620 geser_p=-0.069
+  [seed=1] naik     PRA  n= 364 patuh=0.739 geser_p=-0.066
+  [seed=1] naik     PASCA n= 367 patuh=0.858 geser_p=+0.195
+  [seed=1] kontrol  PRA  n= 332 patuh=0.678 geser_p=-0.109
+  [seed=1] kontrol  PASCA n= 333 patuh=0.703 geser_p=-0.077
+  [seed=2] intervensi @ hari 45 (step 4320): turun=200 naik=200 kontrol=200 dari 1346 pengguna aktif
+  [seed=2] turun    PRA  n= 357 patuh=0.728 geser_p=-0.090
+  [seed=2] turun    PASCA n= 386 patuh=0.536 geser_p=-0.067
+  [seed=2] naik     PRA  n= 346 patuh=0.772 geser_p=-0.042
+  [seed=2] naik     PASCA n= 315 patuh=0.892 geser_p=+0.177
+  [seed=2] kontrol  PRA  n= 440 patuh=0.723 geser_p=-0.056
+  [seed=2] kontrol  PASCA n= 426 patuh=0.718 geser_p=-0.062
+
+======================================================================
+RINGKASAN (rerata lintas seed, delta = PASCA - PRA)
+======================================================================
+kelompok     d_patuh   d_geser_p  prediksi
+turun         -0.163      +0.004  keduanya TURUN
+naik          +0.112      +0.214  keduanya NAIK
+kontrol       -0.017      -0.003  keduanya ~0 (tren alami)
+
+Prediksi mekanisme TERKONFIRMASI pd arah delta kepatuhan (turun < kontrol < naik).
+
+SAVED -> outputs/intervensi_trust_master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_pg0.1_pure3.json
+
+=== SELESAI (Uji A + Uji B) ===
