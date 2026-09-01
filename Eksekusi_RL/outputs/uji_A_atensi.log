@@ -1,0 +1,78 @@
+===== Ekstraksi 1/4: P-MASTER (bobot + collision) =====
+lengan=master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_pg0.1_pure3  horizon=90d (/home/iskandar/Alan/TesisRepo/scenario_dataset_klaster12_4x_90d.json)  punya_atensi=True
+mode=penuh (bobot + collision)
+
+  [seed=0] collision_rate=0.7319  atensi_tertangkap=16717
+  [seed=1] collision_rate=0.6917  atensi_tertangkap=16718
+  [seed=2] collision_rate=0.7577  atensi_tertangkap=16718
+
+SAVED -> outputs/collision_master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_pg0.1_pure3.json  (rerata=0.7271)
+SAVED -> outputs/attensi_master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_pg0.1_pure3.npz  (total 50,153 keputusan)
+
+===== Ekstraksi 2/4: MASTER+Atensi (bobot + collision) =====
+lengan=master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_pure3  horizon=90d (/home/iskandar/Alan/TesisRepo/scenario_dataset_klaster12_4x_90d.json)  punya_atensi=True
+mode=penuh (bobot + collision)
+
+  [seed=0] collision_rate=0.8103  atensi_tertangkap=16718
+  [seed=1] collision_rate=0.7504  atensi_tertangkap=16717
+  [seed=2] collision_rate=0.7930  atensi_tertangkap=16717
+
+SAVED -> outputs/collision_master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_pure3.json  (rerata=0.7846)
+SAVED -> outputs/attensi_master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_pure3.npz  (total 50,152 keputusan)
+
+===== Ekstraksi 3/4: MASTER (collision saja -- tak punya attention) =====
+lengan=master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_noattn_pure3  horizon=90d (/home/iskandar/Alan/TesisRepo/scenario_dataset_klaster12_4x_90d.json)  punya_atensi=False
+mode=collision-saja
+
+  [seed=0] collision_rate=0.8042
+  [seed=1] collision_rate=0.8086
+  [seed=2] collision_rate=0.8106
+
+SAVED -> outputs/collision_master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_noattn_pure3.json  (rerata=0.8078)
+
+===== Ekstraksi 4/4: greedy (collision saja, pembanding) =====
+lengan=greedy  horizon=90d (/home/iskandar/Alan/TesisRepo/scenario_dataset_klaster12_4x_90d.json)  punya_atensi=False
+mode=collision-saja
+
+  [seed=0] collision_rate=0.8765
+  [seed=1] collision_rate=0.8739
+  [seed=2] collision_rate=0.8743
+
+SAVED -> outputs/collision_greedy.json  (rerata=0.8749)
+
+===== Analisis Uji A' =====
+UJI A' -- attention antar-stasiun (2026-09-01)
+
+SINYAL 1 -- korelasi bobot attention vs utilisasi kandidat yang dituju
+
+lengan                                                        n pasangan       r         p  arah
+master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_pg0.1_pure3   1,504,590  0.0055  1.29e-11  POSITIF (berlawanan prediksi)
+master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_pure3   1,504,560  0.0593  0.00e+00  POSITIF (berlawanan prediksi)
+master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_noattn_pure3  (tak ada data attensi -- mungkin `use_station_attn=False`)
+
+SINYAL 3 -- rasio varians ANTAR-komposisi vs DALAM-komposisi (>>1 = peka konteks)
+
+lengan                                                       n stasiun  rasio (mean)  rasio (median)
+master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_pg0.1_pure3  (tak ada data cukup)
+master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_pure3  (tak ada data cukup)
+master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_noattn_pure3  (tak ada data cukup)
+
+SINYAL 2 -- collision rate (proporsi rekomendasi berbagi stasiun tujuan dgn rekomendasi lain pd langkah yang sama)
+
+lengan                                                                 collision_rate
+master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_pg0.1_pure3         0.7271
+master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_pure3               0.7846
+master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_noattn_pure3         0.8078
+greedy                                                                         0.8749
+
+Selisih thd greedy (negatif = attention MENGURANGI tabrakan):
+   master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_pg0.1_pure3 -0.1478
+   master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_pure3 -0.0903
+   master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_noattn_pure3 -0.0670
+
+Pembacaan: Sinyal 1 negatif & signifikan (p<0.05) DAN Sinyal 3 rasio >> 1
+mendukung klaim Bab IV bahwa attention peka thd persaingan antar-kandidat.
+Sinyal 2 mengonfirmasi/menyanggah pd level PERILAKU AGREGAT (independen dari
+Sinyal 1/3 -- tak butuh bobot attention sama sekali, jadi bisa jadi silang-cek).
+
+=== SELESAI (Uji A') ===
