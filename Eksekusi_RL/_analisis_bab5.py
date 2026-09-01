@@ -483,6 +483,23 @@ def _gini(x) -> float:
 # CATATAN: `util_mean` adalah rerata-waktu dari cuplikan per jam (`station_log`),
 # sedangkan reward memakai utilisasi SESAAT tiap langkah. Keduanya besaran yang sama,
 # beda resolusi -- sah sebagai padanan saat evaluasi, dan wajib disebut demikian.
+#
+# DEFINISI (diverifikasi 2026-09-01). `util_mean` SUDAH setara "waktu pakai dibagi waktu
+# pakai maksimum", yaitu definisi utilisasi yang dituntut Tujuan Kinerja 1:
+#
+#     (1/T) SUM_t [terpakai_s(t)/kap_s]  ==  [SUM_t terpakai_s(t)] / (kap_s * T)
+#
+# Kesetaraan berlaku karena kapasitas TETAP sepanjang waktu, sehingga dapat dikeluarkan
+# dari penjumlahan. Terverifikasi angka-demi-angka pd keenam stasiun sampai 6 desimal.
+# Jadi TIDAK perlu metrik "waktu pakai" tak-ternormalkan: membiarkan kapasitas tak
+# ternormalkan justru mengukur ketimpangan INFRASTRUKTUR, bukan ketimpangan PEMAKAIAN.
+#
+# BATAS TAFSIR. Besaran ini rasio berplafon 1,0, dan Gini kebal skala tetapi TIDAK kebal
+# geser: G = MAD/(2*rerata), sehingga rerata yang tinggi mengecilkan G secara mekanis
+# walau jarak antar-stasiun tak berubah. Pd beban 6x seluruh stasiun terdorong ke plafon
+# (util ~0,99, antre 24-47 EV) -> G=0,0019 pd sel4 adalah kesetaraan DEGENERAT.
+# ATURAN PELAPORAN: selalu cantumkan tingkat utilisasi rata-rata di samping Gini-nya.
+# Pd rezim 4x utilisasi 0,41-0,78 (jauh dari plafon), jadi angka di sana sah.
 KUNCI_STASIUN = {"gini_utilisasi": "util_mean", "gini_antrean": "queue_mean"}
 
 
