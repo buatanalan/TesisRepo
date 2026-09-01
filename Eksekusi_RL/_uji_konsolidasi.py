@@ -38,7 +38,11 @@ from marl_spklu.env.user import (DELTAW_TOL_LOW as LO, DELTAW_TOL_HIGH as HI,
                                  TRUST_EPS_ALPHA as EA, TRUST_EPS_BETA as EB)
 
 HORIZON = {"30d": "scenario_dataset_klaster12_4x.json",
-           "90d": "scenario_dataset_klaster12_4x_90d.json"}
+           "90d": "scenario_dataset_klaster12_4x_90d.json",
+           # Rezim beban 6x. Kunci TERPISAH (bukan diturunkan dari tag lengan) supaya
+           # berkas hasil lama -- yang dievaluasi di 4x dan karenanya merupakan uji
+           # TRANSFER -- tidak tertimpa diam-diam oleh evaluasi 6x yang sebenarnya.
+           "90d6x": "scenario_dataset_klaster12_6x_90d.json"}
 SEEDS = ([int(s) for s in sys.argv[1].replace(" ", "").split(",") if s]
          if len(sys.argv) > 1 else [0, 1, 2])
 TAG = sys.argv[2] if len(sys.argv) > 2 else "30d"

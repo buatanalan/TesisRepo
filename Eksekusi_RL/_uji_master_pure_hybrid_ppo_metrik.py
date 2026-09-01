@@ -56,6 +56,31 @@ ACTOR_KW = dict(vec_dim=8, bid_hidden=16, pref_d_lstm=8, pref_d_attn=8, station_
                 station_feat_dim=(10 if "_evobs" in TAG_ARM else 7))
 K.DS = os.path.join(common.ROOT, K.HORIZON[TAG])
 
+# `_load6x` menandai kebijakan yang DILATIH pada dataset beban 6x. Berbeda dari `_it`
+# dan `_gw`, ia TIDAK dapat diturunkan menjadi ablasi: yang berubah adalah datasetnya,
+# dan dataset dipilih lewat argumen `TAG` (`90d` vs `90d6x`). Kesenjangan latih/uji
+# karena itu mungkin terjadi tanpa disadari -- dan memang sudah terjadi:
+# `eval_pure3_beban6x_metrik.sh` meneruskan `90d`, sehingga seluruh lengan 6x
+# dievaluasi pada dataset 4x (terverifikasi lewat `served` 16.392 vs 25.106 permintaan
+# di dataset 6x).
+#
+# Kombinasi itu TIDAK dilarang -- dilatih-6x/diuji-4x adalah uji transfer yang sah dan
+# hasilnya sudah dipakai di Blok E. Yang dilarang adalah menjalankannya tanpa sadar,
+# jadi di sini ia dinyatakan dengan lantang.
+_LATIH6X = "_load6x" in TAG_ARM
+_UJI6X = TAG == "90d6x"
+if _LATIH6X != _UJI6X:
+    print("=" * 78, flush=True)
+    print("PERINGATAN: rezim beban LATIH != UJI.", flush=True)
+    print(f"  dilatih pada : {'6x' if _LATIH6X else '4x'}  (dari TAG_ARM)", flush=True)
+    print(f"  diuji pada   : {'6x' if _UJI6X else '4x'}  (dari argumen TAG={TAG!r})",
+          flush=True)
+    print("  -> hasilnya adalah UJI TRANSFER, bukan kinerja pada rezimnya sendiri.",
+          flush=True)
+    print("     Untuk menguji pada rezim 6x yang sebenarnya, pakai TAG '90d6x'.",
+          flush=True)
+    print("=" * 78, flush=True)
+
 
 def _checkpoint_tersedia():
     """Daftar indeks seed checkpoint yang BENAR-BENAR ada, terurut."""
