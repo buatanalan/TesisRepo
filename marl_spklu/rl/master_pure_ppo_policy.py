@@ -49,6 +49,35 @@ class MasterPurePPOActor(nn.Module):
         return torch.distributions.Normal(bid_mean, std)
 
 
+class MasterPurePPOActorV2(nn.Module):
+    """Varian V2 (2026-09-12) -- memakai `StationVectorHead` (encoder kecil
+    per-stasiun, SAMA dgn yg dipakai backbone hybrid) alih-alih MLP polos,
+    TANPA atensi/Modul P -- dipakai KHUSUS pipeline PURE3 baru, TIDAK
+    menggantikan `MasterPurePPOActor` asli (kompatibilitas checkpoint lama).
+
+    Pola forward/dist IDENTIK `MasterPurePPOActor` (bid_mean MENTAH tanpa
+    tanh, std lewat `bid_log_std` dibagi seluruh stasiun) -- HANYA `self.net`
+    diganti jadi `vec_head` (encoder 7->16->8, `StationVectorHead`) + `head`
+    (Linear(8,1)) proyeksi akhir ke bid_mean skalar per stasiun."""
+
+    def __init__(self, station_feat_dim: int = STATION_FEAT_DIM_MASTER, vec_dim: int = 8,
+                hidden: int = 16, bid_log_std_init: float = 0.0):
+        super().__init__()
+        from marl_spklu.rl.master_pure_hybrid_policy import StationVectorHead
+        self.vec_head = StationVectorHead(station_feat_dim, vec_dim=vec_dim, hidden=hidden)
+        self.head = nn.Linear(vec_dim, 1)
+        self.bid_log_std = nn.Parameter(torch.full((1,), float(bid_log_std_init)))
+
+    def forward(self, station_obs):
+        """station_obs: (B,N,F) -> bid_mean: (B,N)."""
+        vec = self.vec_head(station_obs)
+        return self.head(vec).squeeze(-1)
+
+    def dist(self, bid_mean):
+        std = torch.exp(self.bid_log_std).expand_as(bid_mean)
+        return torch.distributions.Normal(bid_mean, std)
+
+
 class MasterPurePPOAttentivePooling(nn.Module):
     """Pers. (4)-(6), TANPA suku aksi `a^i_t` (V(s), bukan Q(o,a,p) -- lih. docstring
     modul). e^i_t = v^T tanh(W_a(o^i_t⊕p^i_t)); alpha=softmax; x_t=ReLU(W_c·Sum(alpha·raw))."""

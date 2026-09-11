@@ -30,6 +30,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import torch
 import common
 from marl_spklu.rl.master_pure_ppo_trainer import MasterPurePPOTrainer
+from marl_spklu.rl.master_pure_ppo_policy import MasterPurePPOActorV2
 from marl_spklu.rl.rewards import RewardCalculator
 from marl_spklu.rl.rollout import STREAM_INDIVIDUAL, STREAM_GLOBAL
 
@@ -99,11 +100,14 @@ _rw_suffix = "" if args.reward_preset == "raw" else f"_{args.reward_preset}"
 _acc_suffix = f"_acc{args.alpha_accept:g}"
 _clip_suffix = _clip_suffix + _fail_suffix + _rw_suffix + _acc_suffix
 
+# `_svh` (2026-09-12): penanda arsitektur aktor `StationVectorHead` (BUKAN MLP polos
+# lama) -- WAJIB beda dari tag pure3 lama supaya checkpoint arsitektur-beda tak
+# saling menimpa (bentuk state_dict genuinely berbeda).
 if args.mode == "pretrain_specialist":
     STREAM_NAME = {0: "wait", 1: "gini", 2: "accept"}[args.stream_select]
-    TAG_ARM = f"master_pure_ppo_pure3_specialist{args.stream_select}_{STREAM_NAME}{_horizon_suffix}{_clip_suffix}"
+    TAG_ARM = f"master_pure_ppo_pure3_svh_specialist{args.stream_select}_{STREAM_NAME}{_horizon_suffix}{_clip_suffix}"
 else:
-    TAG_ARM = f"master_pure_ppo_pure3_dgr{_horizon_suffix}{_clip_suffix}"
+    TAG_ARM = f"master_pure_ppo_pure3_svh_dgr{_horizon_suffix}{_clip_suffix}"
 
 print(f"[{elapsed()}] Dataset: {DATASET}", flush=True)
 print(f"[{elapsed()}] Lengan: tag={TAG_ARM} mode={args.mode} stream_select={args.stream_select}",
@@ -117,7 +121,7 @@ def _specialist_tag(stream: int, explicit: str):
     if explicit:
         return explicit
     name = {0: "wait", 1: "gini", 2: "accept"}[stream]
-    return f"master_pure_ppo_pure3_specialist{stream}_{name}{_horizon_suffix}{_clip_suffix}"
+    return f"master_pure_ppo_pure3_svh_specialist{stream}_{name}{_horizon_suffix}{_clip_suffix}"
 
 
 def _load_r_star(tag: str, seed: int) -> float:
@@ -141,7 +145,8 @@ def _build_reward_calc():
 def train_one(seed):
     kw = dict(dataset_path=DATASET, mode=args.mode, rollout_steps=args.rollout_steps,
              seed=seed, verbose=False, pure_streams=True, beta_denom=args.beta_denom,
-             accept_stream=STREAM_GLOBAL, reward_calc=_build_reward_calc())
+             accept_stream=STREAM_GLOBAL, reward_calc=_build_reward_calc(),
+             actor_cls=MasterPurePPOActorV2)
     if args.mode == "pretrain_specialist":
         kw["stream_select"] = args.stream_select
     else:

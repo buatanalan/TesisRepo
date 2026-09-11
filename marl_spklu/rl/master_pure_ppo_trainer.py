@@ -218,7 +218,7 @@ class MasterPurePPOTrainer:
                 reward_calc=None, seed: int = 0, verbose: bool = True,
                 equity_calc=None, max_step_gap: int = 4,
                 accept_stream: int = STREAM_GLOBAL, pure_streams: bool = False,
-                beta_denom: str = "r_star"):
+                beta_denom: str = "r_star", actor_cls=None):
         # `beta_denom`/`pure_streams`/`accept_stream` (2026-09-12): pola PERSIS sama
         # `MasterHybridPPOTrainer` -- lih. catatan lengkap di sana. Baku TAK BERUBAH
         # (beta_denom="r_star", pure_streams=False) -> checkpoint & pipeline lama
@@ -275,7 +275,16 @@ class MasterPurePPOTrainer:
         self._slot_log = _SlotRawLog(maxlen=self.rollout_steps + self.delay_steps + 4)
         self.N = len(sim0.spklus)
 
-        self.actor = MasterPurePPOActor(STATION_FEAT_DIM_MASTER, hidden=hidden)
+        # `actor_cls` (2026-09-12): override kelas aktor -- BAKU None -> `MasterPurePPOActor`
+        # (MLP polos dim `hidden`, perilaku LAMA tak berubah). Pipeline PURE3-SVH baru
+        # meneruskan `MasterPurePPOActorV2` (StationVectorHead, dim internal 16/8 BAKU
+        # miliknya sendiri -- TAK memakai `hidden` trainer ini, lih. docstring kelas)
+        # lewat parameter ini TANPA menyentuh pipeline lama (Tabel VI.1/VI.2) yang tak
+        # pernah memberi argumen ini.
+        if actor_cls is None:
+            self.actor = MasterPurePPOActor(STATION_FEAT_DIM_MASTER, hidden=hidden)
+        else:
+            self.actor = actor_cls(STATION_FEAT_DIM_MASTER)
         self.critic = MasterPurePPOCritic(STATION_FEAT_DIM_MASTER, hidden=hidden,
                                           n_critics=self.n_critics)
         self.opt = torch.optim.Adam(

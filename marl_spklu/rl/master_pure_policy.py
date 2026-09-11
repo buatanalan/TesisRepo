@@ -57,6 +57,31 @@ class MasterPureActor(nn.Module):
         return torch.tanh(raw) * self.bid_scale
 
 
+class MasterPureActorV2(nn.Module):
+    """Varian V2 (2026-09-12) -- memakai `StationVectorHead` (encoder kecil
+    per-stasiun, SAMA dgn yg dipakai backbone hybrid) alih-alih MLP polos,
+    TANPA atensi/Modul P -- dipakai KHUSUS pipeline PURE3 baru (DDPG), TIDAK
+    menggantikan `MasterPureActor` asli (kompatibilitas checkpoint lama).
+
+    Pola forward IDENTIK `MasterPureActor` (tanh*bid_scale di keluaran akhir,
+    lih. docstring kelas asli) -- HANYA `self.net` diganti jadi `vec_head`
+    (encoder 7->16->8, `StationVectorHead`) + `head` (Linear(8,1))."""
+
+    def __init__(self, station_feat_dim: int = STATION_FEAT_DIM_MASTER, vec_dim: int = 8,
+                hidden: int = 16, bid_scale: float = 10.0):
+        super().__init__()
+        from marl_spklu.rl.master_pure_hybrid_policy import StationVectorHead
+        self.bid_scale = float(bid_scale)
+        self.vec_head = StationVectorHead(station_feat_dim, vec_dim=vec_dim, hidden=hidden)
+        self.head = nn.Linear(vec_dim, 1)
+
+    def forward(self, station_obs):
+        """station_obs: (B,N,F). Return bid: (B,N) di [-bid_scale, bid_scale]."""
+        vec = self.vec_head(station_obs)
+        raw = self.head(vec).squeeze(-1)
+        return torch.tanh(raw) * self.bid_scale
+
+
 class MasterPureAttentivePooling(nn.Module):
     """Persis Pers. (4)-(6) -- BUKAN reinterpretasi `AttentiveJointPooling` lama.
 

@@ -34,7 +34,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import torch
 import common
 from marl_spklu.rl.master_pure_trainer import MasterPureTrainer
-from marl_spklu.rl.master_pure_policy import MasterPureActor, MasterPureCritic
+from marl_spklu.rl.master_pure_policy import MasterPureActorV2, MasterPureCritic
 from marl_spklu.rl.master_paper_obs import STATION_FEAT_DIM_MASTER
 from marl_spklu.rl.rewards import RewardCalculator
 from marl_spklu.rl.rollout import STREAM_GLOBAL
@@ -98,11 +98,14 @@ _acc_suffix = f"_acc{args.alpha_accept:g}"
 _upc_suffix = "" if args.updates_per_chunk == 20 else f"_upc{args.updates_per_chunk}"
 _clip_suffix = _clip_suffix + _fail_suffix + _rw_suffix + _acc_suffix + _upc_suffix
 
+# `_svh` (2026-09-12): penanda arsitektur aktor `StationVectorHead` (BUKAN MLP polos
+# lama) -- WAJIB beda dari tag pure3 lama supaya checkpoint arsitektur-beda tak
+# saling menimpa (bentuk state_dict genuinely berbeda).
 if args.mode == "pretrain_specialist":
     STREAM_NAME = {0: "wait", 1: "gini", 2: "accept"}[args.stream_select]
-    TAG_ARM = f"master_pure_ddpg_pure3_specialist{args.stream_select}_{STREAM_NAME}{_horizon_suffix}{_clip_suffix}"
+    TAG_ARM = f"master_pure_ddpg_pure3_svh_specialist{args.stream_select}_{STREAM_NAME}{_horizon_suffix}{_clip_suffix}"
 else:
-    TAG_ARM = f"master_pure_ddpg_pure3_dgr{_horizon_suffix}{_clip_suffix}"
+    TAG_ARM = f"master_pure_ddpg_pure3_svh_dgr{_horizon_suffix}{_clip_suffix}"
 
 print(f"[{elapsed()}] Dataset: {DATASET}", flush=True)
 print(f"[{elapsed()}] Lengan: tag={TAG_ARM} mode={args.mode} stream_select={args.stream_select}",
@@ -116,11 +119,13 @@ def _specialist_tag(stream: int, explicit: str):
     if explicit:
         return explicit
     name = {0: "wait", 1: "gini", 2: "accept"}[stream]
-    return f"master_pure_ddpg_pure3_specialist{stream}_{name}{_horizon_suffix}{_clip_suffix}"
+    return f"master_pure_ddpg_pure3_svh_specialist{stream}_{name}{_horizon_suffix}{_clip_suffix}"
 
 
 def _load_specialist(tag: str, seed: int):
-    actor = MasterPureActor(STATION_FEAT_DIM_MASTER)
+    # `MasterPureActorV2` (StationVectorHead) -- spesialis pipeline SVH baru ini SELALU
+    # arsitektur V2, konsisten dgn aktor `train_one` di bawah (actor_cls=MasterPureActorV2).
+    actor = MasterPureActorV2(STATION_FEAT_DIM_MASTER)
     critic = MasterPureCritic(STATION_FEAT_DIM_MASTER, n_critics=1)
     a_path = os.path.join(common.OUTDIR, f"{tag}_actor_seed{seed}.pt")
     c_path = os.path.join(common.OUTDIR, f"{tag}_critic_seed{seed}.pt")
@@ -142,11 +147,20 @@ def _build_reward_calc():
            else RewardCalculator(**_rc_kw))
 
 
+def _actor_cls_svh(n_spklu, **kw):
+    # Trainer memanggil `actor_cls(self.N, **actor_kwargs)` (pola LAMA utk aktor
+    # Hybrid yg argumen pertamanya `n_spklu`) -- `MasterPureActorV2` argumen
+    # pertamanya `station_feat_dim` (SAMA pola `MasterPureActor` asli), jadi `n_spklu`
+    # DIABAIKAN sengaja di sini (bukan bug), pola wrapper minimal-invasif drpd
+    # mengubah signature trainer generik yg juga dipakai lengan Hybrid lain.
+    return MasterPureActorV2(STATION_FEAT_DIM_MASTER, **kw)
+
+
 def train_one(seed):
     kw = dict(dataset_path=DATASET, mode=args.mode, rollout_steps=args.rollout_steps,
              seed=seed, verbose=False, updates_per_chunk=args.updates_per_chunk,
              pure_streams=True, beta_denom=args.beta_denom, accept_stream=STREAM_GLOBAL,
-             reward_calc=_build_reward_calc())
+             reward_calc=_build_reward_calc(), actor_cls=_actor_cls_svh)
     if args.mode == "pretrain_specialist":
         kw["stream_select"] = args.stream_select
     else:

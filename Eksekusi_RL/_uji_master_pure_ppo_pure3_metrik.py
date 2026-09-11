@@ -37,12 +37,24 @@ LABEL_ARM = f"MASTER-{'PPO' if BACKBONE == 'ppo' else 'DDPG'}-PURE3[{TAG_ARM}]"
 K_REC = 3
 K.DS = os.path.join(common.ROOT, K.HORIZON[TAG])
 
+# Deteksi arsitektur dari TAG (2026-09-12): tag pipeline SVH baru selalu memuat
+# `_svh` (lih. `_run_master_pure_ppo_pure3_pipeline.py`/`_run_master_ddpg_pure3_
+# pipeline.py`) -- pendekatan PALING SEDIKIT mengubah script ini & PALING TIDAK
+# AMBIGU (satu sumber kebenaran = nama tag, bukan argumen CLI terpisah yg bisa
+# lupa disertakan/salah ketik dan diam2 memuat state_dict shape salah).
+IS_SVH = "_svh" in TAG_ARM
 if BACKBONE == "ppo":
-    from marl_spklu.rl.master_pure_ppo_policy import MasterPurePPOActor as _Actor
     from marl_spklu.rl.master_pure_ppo_trainer import MasterPurePPOInferenceAgent as _InferAgent
+    if IS_SVH:
+        from marl_spklu.rl.master_pure_ppo_policy import MasterPurePPOActorV2 as _Actor
+    else:
+        from marl_spklu.rl.master_pure_ppo_policy import MasterPurePPOActor as _Actor
 else:
-    from marl_spklu.rl.master_pure_policy import MasterPureActor as _Actor
     from marl_spklu.rl.master_pure_trainer import MasterPureInferenceAgent as _InferAgent
+    if IS_SVH:
+        from marl_spklu.rl.master_pure_policy import MasterPureActorV2 as _Actor
+    else:
+        from marl_spklu.rl.master_pure_policy import MasterPureActor as _Actor
 
 
 def _checkpoint_tersedia():
