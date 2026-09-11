@@ -124,11 +124,42 @@ p.add_argument("--accept-stream", type=str, default="global", choices=["global",
                    "SEGERA menumpuk dgn wait yg kecil & tertunda -> r_bar aliran meledak "
                    "10-30x. Sediakan hanya utk pembanding bila ingin mereplikasi diagnosis.")
 p.add_argument("--critic-pref", action="store_true",
-              help="Pakai `MasterHybridPPOCritic` (menerima pref_hist, param P TERPISAH "
-                   "dari aktor) menggantikan `MasterPurePPOCritic` (SELALU buta P) -- uji "
-                   "hipotesis kritik jadi sumber variansi advantage tambahan khusus utk "
-                   "keputusan berbasis P. WAJIB --pref-feature-mode (P tak berarti kalau "
-                   "aktor sendiri tak memakainya).")
+              help="PAKSA AKTIF `MasterHybridPPOCritic` (menerima pref_hist, param P "
+                   "TERPISAH dari aktor) menggantikan `MasterPurePPOCritic` (buta P). "
+                   "WAJIB --pref-feature-mode. Tanpa flag ini MAUPUN --no-critic-pref, "
+                   "berlaku mode OTOMATIS (lihat --no-critic-pref).")
+p.add_argument("--no-critic-pref", action="store_true",
+              help="PAKSA MATI kritik ber-P. BAKU (bila kedua flag ini tak diberikan) = "
+                   "OTOMATIS: kritik ber-P diaktifkan PERSIS ketika aktor memakai P "
+                   "(--pref-feature-mode dan --pref-gate-init != 0). Alasannya: kritik "
+                   "yang buta P tak dapat 'menjelaskan' hasil yang didorong preferensi, "
+                   "sehingga selisihnya masuk ke advantage sebagai derau -- beban yang "
+                   "HANYA ditanggung lengan ber-P dan membuat perbandingan faktorial "
+                   "timpang. Menyamakan cakupan informasi kedua sisi menghapus "
+                   "ketimpangan itu. Tag keluaran ikut menandai hasil resolusinya "
+                   "(_critpref), jadi lengan lama tak tertimpa.")
+p.add_argument("--pref-feat-set", choices=("v2", "v1"), default="v2",
+              help="Isi vektor fitur stasiun pada pasangan riwayat preferensi (LSTM P). "
+                   "'v2' (BAKU sejak 2026-09-09) = [jarak, est_wait, kapasitas_tersedia, "
+                   "konektor, power]. 'v1' = perilaku LAMA [jarak, est_wait, antrean, "
+                   "konektor, utilisasi]. PENTING: dimensi kedua versi SAMA (5), sehingga "
+                   "checkpoint v1 akan dimuat tanpa galat namun fiturnya bermakna lain -- "
+                   "karena itu versinya ikut menandai tag keluaran (_pfeatv2) dan "
+                   "disimpan pada aktor supaya evaluasi tak bisa memakai versi berbeda "
+                   "dari pelatihannya.")
+p.add_argument("--critic-priv", choices=("queue_trust", "I"), default="queue_trust",
+              help="Variabel ISTIMEWA kritik. 'queue_trust' (BAKU sejak 2026-09-09) = "
+                   "[panjang antrean per stasiun, trust PEMOHON yang sedang diputuskan], "
+                   "KEDUANYA diukur pada saat keputusan; tak memakai informasi masa depan, "
+                   "sehingga nilai yang sama dipakai baik sebagai baseline saat bertindak "
+                   "maupun saat pembaruan -- tetapi Delayed Access Strategy MASTER TIDAK "
+                   "aktif dan itu WAJIB dinyatakan bila hasilnya dilaporkan. 'I' = "
+                   "perilaku LAMA, ketersediaan slot mentah di t+30menit (Pers. 10 "
+                   "MASTER); satu-satunya mode yang kompatibel dengan checkpoint yang "
+                   "dilatih sebelum tanggal tsb, dan berkasnya TIDAK bersuffix supaya run "
+                   "lama tetap dapat dilanjutkan. Kedua mode menulis ke nama berkas yang "
+                   "BERBEDA, jadi tak ada yang tertimpa; bentuk W_p ikut berubah sehingga "
+                   "memuat checkpoint mode lain GAGAL KERAS (disengaja).")
 p.add_argument("--critic-pref-gate-init", type=float, default=0.1,
               help="Gerbang P KRITIK, TERPISAH dari --pref-gate-init aktor (baku 0.1, "
                    "BUKAN 0.0 -- kalau ikut default aktor 0.0, kritik terjebak deadlock "
@@ -193,9 +224,27 @@ _rw_suffix = "" if args.reward_preset == "raw" else f"_{args.reward_preset}"
 assert not (args.pref_pair_outcome and not args.pref_feature_mode), (
     "--pref-pair-outcome WAJIB disertai --pref-feature-mode (blok hasil tak bermakna "
     "di mode one-hot identitas)")
+assert not (args.critic_pref and args.no_critic_pref), (
+    "--critic-pref dan --no-critic-pref saling bertentangan; pilih salah satu atau "
+    "biarkan keduanya kosong untuk mode OTOMATIS")
 assert not (args.critic_pref and not args.pref_feature_mode), (
     "--critic-pref WAJIB disertai --pref-feature-mode (P kritik tak berarti kalau "
     "aktor sendiri tak memakainya)")
+# Resolusi kritik-ber-P (2026-09-09). Mode OTOMATIS menyamakan cakupan informasi aktor
+# dan kritik: begitu aktor memakai P, kritik ikut memakainya. Tanpa ini, hanya sel
+# faktorial ber-P yang menanggung derau advantage akibat kritik yang tak dapat
+# menjelaskan hasil berbasis preferensi -- ketimpangan struktural antar sel yang bisa
+# disalahartikan sebagai kelemahan Modul P itu sendiri.
+# Diselesaikan DI SINI (bukan di trainer) supaya hasilnya ikut menentukan tag keluaran.
+if args.critic_pref:
+    CRITIC_PREF = True
+elif args.no_critic_pref:
+    CRITIC_PREF = False
+else:
+    CRITIC_PREF = bool(args.pref_feature_mode and args.pref_gate_init != 0.0)
+    print(f"[{elapsed()}] critic-pref OTOMATIS -> {CRITIC_PREF} "
+          f"(pref_feature_mode={args.pref_feature_mode}, "
+          f"pref_gate_init={args.pref_gate_init:g})", flush=True)
 from marl_spklu.rl.master_paper_obs import (STATION_FEAT_DIM_MASTER,
                                             STATION_FEAT_DIM_MASTER_EV)
 ACTOR_KW = dict(ACTOR_KW_BASE, pref_feature_mode=args.pref_feature_mode,
@@ -203,6 +252,7 @@ ACTOR_KW = dict(ACTOR_KW_BASE, pref_feature_mode=args.pref_feature_mode,
                 pref_gate_init=args.pref_gate_init,
                 use_station_attn=not args.no_station_attn,
                 pref_hist_k=args.pref_hist_k,
+                pref_feat_set=args.pref_feat_set,
                 station_feat_dim=(STATION_FEAT_DIM_MASTER_EV if args.ev_obs
                                   else STATION_FEAT_DIM_MASTER))
 _pref_suffix = (("_preffeat" if args.pref_feature_mode else "")
@@ -211,7 +261,9 @@ _pref_suffix = (("_preffeat" if args.pref_feature_mode else "")
                 + ("_evobs" if args.ev_obs else "")
                 + ("_noattn" if args.no_station_attn else "")
                 + ("" if args.pref_hist_k is None else f"_histK{args.pref_hist_k}")
-                + ("_critpref" if args.critic_pref else "")
+                + ("_critpref" if CRITIC_PREF else "")
+                + ("" if args.critic_priv == "I" else f"_priv{args.critic_priv}")
+                + ("" if args.pref_feat_set == "v1" else f"_pfeat{args.pref_feat_set}")
                 + ("_pure3" if args.pure_streams else "")
                 + ("" if args.initial_trust is None else f"_it{args.initial_trust:g}")
                 + ("" if args.gamma == 0.99 else f"_g{args.gamma:g}")
@@ -255,8 +307,9 @@ def _load_r_star(tag: str, seed: int) -> float:
 def train_one(seed):
     from marl_spklu.rl.rollout import STREAM_INDIVIDUAL, STREAM_GLOBAL
     kw = dict(dataset_path=DATASET, mode=args.mode, rollout_steps=args.rollout_steps,
-             seed=seed, verbose=False, actor_kwargs=ACTOR_KW, critic_pref=args.critic_pref,
+             seed=seed, verbose=False, actor_kwargs=ACTOR_KW, critic_pref=CRITIC_PREF,
              critic_pref_gate_init=args.critic_pref_gate_init,
+             critic_priv=args.critic_priv,
              accept_stream=(STREAM_GLOBAL if args.accept_stream == "global"
                             else STREAM_INDIVIDUAL),
              pure_streams=args.pure_streams, beta_denom=args.beta_denom,

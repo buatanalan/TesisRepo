@@ -51,6 +51,8 @@ class MasterHybridPPOTransition:
         self.resolved = False; self.pushed = False; self.flock_penalty = 0.0
         self.I_raw = None
         self.stream_select = None
+        # Diisi hook warisan `RLRolloutAgent.on_decision`.
+        self.trust_before = 0.5
 
     @property
     def reward(self) -> float:
@@ -79,7 +81,7 @@ class MasterHybridPPORolloutAgent(RLRolloutAgent):
                 equity_calc=None, stream_select=None, pref_feature_mode: bool = False,
                 pref_pair_outcome: bool = False, deterministic: bool = False,
                 pref_hist_k: int = None, accept_stream: int = STREAM_INDIVIDUAL,
-                pure_streams: bool = False):
+                pure_streams: bool = False, critic_priv: str = "queue_trust"):
         # `pref_pad_right=True` WAJIB & tak bersyarat di sini: `_PrefStationBackbone.
         # _encode_pref` memakai `pack_padded_sequence` yg mensyaratkan padding di BELAKANG,
         # sedangkan basis `RLRolloutAgent` mem-padding di DEPAN. Ketidakcocokan inilah bug
@@ -89,19 +91,53 @@ class MasterHybridPPORolloutAgent(RLRolloutAgent):
                          pref_feature_mode=pref_feature_mode,
                          pref_pair_outcome=pref_pair_outcome, pref_pad_right=True,
                          pref_hist_k=pref_hist_k, accept_stream=accept_stream,
-                         pure_streams=pure_streams)
+                         pure_streams=pure_streams,
+                         # Versi fitur stasiun DITURUNKAN dari aktor -- pola sama
+                         # `pref_feature_mode`/`pref_hist_k`, menjamin latih & uji tak
+                         # bisa memakai versi berbeda. Fallback "v1" utk aktor lama yang
+                         # belum punya atribut ini.
+                         pref_feat_set=getattr(getattr(actor, "backbone", None),
+                                               "pref_feat_set", "v1"))
         self.actor = actor
         self.critic = critic
         # DUA VERSI OBSERVASI -- lih. catatan identik di MasterPureRolloutAgent.
         self._ev_obs = (getattr(actor, "station_feat_dim", STATION_FEAT_DIM_MASTER)
                         == STATION_FEAT_DIM_MASTER_EV)
         self.stream_select = stream_select
+        # Mode variabel istimewa kritik -- lihat catatan di MasterHybridPPOTrainer.__init__.
+        self.critic_priv = str(critic_priv)
         # `deterministic=True` -> argmax logit, TANPA sampling (evaluasi bersih). Dipakai
         # `MasterHybridPPOInferenceAgent` yg kini MENDELEGASIKAN ke kelas ini supaya
         # `pref_hist` sungguhan ikut terbangun saat uji -- lihat catatan di kelas itu.
         self.deterministic = bool(deterministic)
         # Hanya dipakai sbg bentuk placeholder `value` saat critic=None (jalur inferensi).
         self.n_critics_hint = int(getattr(critic, "n_critics", N_REWARD_STREAMS))
+
+    def _priv_queue_trust(self, user) -> np.ndarray:
+        """(N,2) variabel istimewa kritik mode `queue_trust`, SELURUHNYA keadaan SEKARANG:
+            kolom 0 = panjang antrean stasiun itu (ternormalisasi `q_scale`) -- BERVARIASI
+                      antar stasiun, sehingga ikut membentuk bobot atensi kritik
+            kolom 1 = `trust_effective` PEMOHON YANG SEDANG DIPUTUSKAN -- di-broadcast sama
+                      ke tiap baris (sifat pengguna, bukan sifat stasiun)
+
+        Kolom 1 memakai trust PEMOHON, bukan rerata populasi (2026-09-09). Alasannya:
+        transisi ini dievaluasi UNTUK pengguna spesifik, sehingga baseline nilainya
+        seharusnya berbeda antara pemohon berkepercayaan tinggi dan rendah. Rerata
+        populasi bergerak lambat dan nyaris konstan antar keputusan berdekatan, jadi ia
+        praktis tak membawa informasi yang membedakan satu transisi dari transisi lain --
+        justru pembedaan itulah yang dibutuhkan baseline untuk menurunkan varians.
+        Pola & alasan identik `RLRolloutAgent._build_critic_obs`, yang juga memuat
+        `user_trust` pemohon aktif DI SAMPING statistik populasi.
+
+        `trust_effective` (bukan `trust` mentah) DISENGAJA: itulah variabel yang secara
+        kausal memengaruhi `User.decide_spklu`, jadi itu pula yang relevan bagi kritik.
+
+        Tetap BUKAN kebocoran: trust sudah bernilai tetap saat keputusan diambil, dan
+        `User.update_trust` baru dipanggil setelah sesi selesai."""
+        q = np.array([self.sim.spklus[s].get_queue_length() for s in self.sids],
+                     dtype=np.float32) / self.q_scale
+        t_user = float(user.trust_effective)
+        return np.stack([q, np.full(len(self.sids), t_user, dtype=np.float32)], axis=-1)
 
     def get_recommendation(self, feasible_spklus: dict):
         user = self.sim._current_spawn_user
@@ -129,12 +165,23 @@ class MasterHybridPPORolloutAgent(RLRolloutAgent):
             # tak dipakai sama sekali di sana krn transisi dibuang tiap langkah. Dilewati
             # supaya kelas ini bisa dipakai ulang utk evaluasi tanpa memuat kritik.
             if self.critic is not None:
-                zero_I = torch.zeros_like(mask_t, dtype=torch.float32)
-                if hasattr(self.critic, "pref_lstm"):
-                    value, _ = self.critic(obs_t, mask_t, zero_I, pref_hist_t)
+                if self.critic_priv == "queue_trust":
+                    # Seluruh komponen tersedia SEKARANG, jadi nilai yang sama dipakai di
+                    # sini (baseline) dan nanti saat pembaruan -- tak ada ketaksesuaian.
+                    priv_np = self._priv_queue_trust(user)
+                    priv_t = torch.as_tensor(priv_np, dtype=torch.float32).unsqueeze(0)
                 else:
-                    value, _ = self.critic(obs_t, mask_t, zero_I)
+                    # Mode "I": I^i_t baru diketahui di t+delay, sehingga baseline saat
+                    # bertindak WAJIB memakai placeholder nol -- kalau tidak, informasi
+                    # masa depan bocor ke kebijakan lewat advantage.
+                    priv_np = None
+                    priv_t = torch.zeros_like(mask_t, dtype=torch.float32)
+                if hasattr(self.critic, "pref_lstm"):
+                    value, _ = self.critic(obs_t, mask_t, priv_t, pref_hist_t)
+                else:
+                    value, _ = self.critic(obs_t, mask_t, priv_t)
             else:
+                priv_np = None
                 value = torch.zeros(1, self.n_critics_hint)
         logits_np = logits.squeeze(0).numpy()
         primary_idx = int(primary_t.item())
@@ -160,6 +207,12 @@ class MasterHybridPPORolloutAgent(RLRolloutAgent):
                                        self.sim.current_step, pref_hist=pref_hist,
                                        n_streams=self.n_streams)
         tr.stream_select = self.stream_select
+        # Mode `queue_trust`: variabel istimewa dikunci di sini, nilai yang PERSIS SAMA
+        # dgn yang dipakai baseline di atas -- menjamin V(s) saat bertindak dan V(s) saat
+        # pembaruan mengevaluasi fungsi yang sama. Mode "I" mengisinya belakangan di
+        # `_push_ready_pairs` (nilainya baru ada di t+delay).
+        if priv_np is not None:
+            tr.I_raw = priv_np
         tr.disp_estwait = primary_disp
         tr.wait_default = float(self.sim.compute_virtual_wait(
             user, self.sim.spklus[self.sids[default_idx]], time_now)
@@ -204,6 +257,10 @@ class MasterHybridPPOInferenceAgent:
             pref_pair_outcome=getattr(_bb, "pref_pair_outcome", False),
             pref_hist_k=getattr(_bb, "pref_hist_k", None),
             deterministic=True)
+        # Diturunkan dari aktor (fallback "v1" utk checkpoint lama) -- lihat catatan di
+        # `_PrefStationBackbone.pref_feat_set`. Diset SETELAH konstruksi krn agen hybrid
+        # sudah menurunkannya sendiri dari `actor`; baris ini hanya penegasan eksplisit.
+        self._roll.pref_feat_set = getattr(_bb, "pref_feat_set", "v1")
         self.sim = sim
 
     def get_recommendation(self, feasible_spklus: dict):
@@ -241,7 +298,7 @@ class MasterHybridPPOTrainer:
                 beta_mode: str = "gap_ratio", beta_sigma: float = 0.2,
                 reward_calc=None, seed: int = 0, verbose: bool = True,
                 equity_calc=None, max_step_gap: int = 4, critic_pref: bool = False,
-                critic_pref_gate_init: float = 0.1,
+                critic_pref_gate_init: float = 0.1, critic_priv: str = "queue_trust",
                 accept_stream: int = STREAM_GLOBAL, pure_streams: bool = False,
                 beta_denom: str = "r_star"):
         # `beta_denom` (2026-08-30): penyebut gap-ratio DGR.
@@ -325,6 +382,33 @@ class MasterHybridPPOTrainer:
         self._slot_log = _SlotRawLog(maxlen=self.rollout_steps + self.delay_steps + 4)
         self.N = len(sim0.spklus)
 
+        # ---- Variabel ISTIMEWA kritik (2026-09-09) ------------------------------------
+        # "queue_trust" : BAKU sejak 2026-09-09. [panjang antrean PER STASIUN, trust
+        #                 PEMOHON yang sedang diputuskan] -- KEDUANYA diukur PADA SAAT
+        #                 KEPUTUSAN, bukan di masa depan.
+        # "I"           : I^i_t = ketersediaan slot MENTAH di t+delay (Pers. 10 MASTER).
+        #                 Perilaku LAMA; satu-satunya mode yang kompatibel dgn seluruh
+        #                 checkpoint yang dilatih sebelum tanggal tsb. Berkas keluarannya
+        #                 TIDAK bersuffix (lihat `_pref_suffix` di pipeline) supaya run
+        #                 lama tetap dapat dilanjutkan & direproduksi apa adanya.
+        #
+        # Perbedaan penting dgn "I": tak ada informasi masa depan sama sekali, sehingga
+        # nilai yang sama dapat dipakai BAIK saat bertindak MAUPUN saat memperbarui. Ini
+        # menghapus ketaksesuaian baseline yang melekat pada "I" (di sana V(s) saat rollout
+        # terpaksa memakai placeholder nol krn I^i_t belum diketahui). Konsekuensinya
+        # Delayed Access Strategy MASTER TIDAK aktif di mode ini -- WAJIB dinyatakan bila
+        # hasilnya dilaporkan, krn itu penyimpangan dari §4.3 paper acuan.
+        #
+        # Kolom 0 (antrean) bervariasi antar stasiun sehingga ikut membentuk bobot atensi;
+        # kolom 1 (trust pemohon) di-broadcast sama ke tiap baris -- ia sifat PENGGUNA,
+        # bukan sifat stasiun. Trust tak pernah masuk observasi aktor (aktor hanya bisa
+        # MENGINFERENSINYA lewat Modul P dari riwayat), jadi inilah komponen yang
+        # benar-benar istimewa di mode ini.
+        if critic_priv not in ("I", "queue_trust"):
+            raise ValueError(f"critic_priv={critic_priv!r} tak dikenal (pilih 'I'/'queue_trust')")
+        self.critic_priv = str(critic_priv)
+        self.n_priv = 1 if self.critic_priv == "I" else 2
+
         self.actor = MasterHybridPPOActor(self.N, **(actor_kwargs or {}))
         _sfd = getattr(self.actor, "station_feat_dim", STATION_FEAT_DIM_MASTER)
         _bb = getattr(self.actor, "backbone", None)
@@ -337,10 +421,12 @@ class MasterHybridPPOTrainer:
                 pref_feature_mode=getattr(_bb, "pref_feature_mode", False),
                 pref_pair_outcome=getattr(_bb, "pref_pair_outcome", False),
                 pref_gate_init=self.critic_pref_gate_init,
-                pref_hist_k=getattr(_bb, "pref_hist_k", None))
+                pref_hist_k=getattr(_bb, "pref_hist_k", None),
+                n_priv=self.n_priv)
         else:
             self.critic = MasterPurePPOCritic(_sfd, hidden=hidden,
-                                              n_critics=self.n_critics)
+                                              n_critics=self.n_critics,
+                                              n_priv=self.n_priv)
         self.opt = torch.optim.Adam(
             list(self.actor.parameters()) + list(self.critic.parameters()), lr=lr)
 
@@ -378,6 +464,12 @@ class MasterHybridPPOTrainer:
             t = trs[i]
             if t.pushed or not t.resolved:
                 continue
+            if self.critic_priv == "queue_trust":
+                # `I_raw` SUDAH diisi saat keputusan (lihat rollout agent) -- tak ada
+                # yang perlu ditunggu, karena tak ada komponen masa depan.
+                t.pushed = True
+                ready.append(t)
+                continue
             target_step = t.step + self.delay_steps
             I_snap = self._slot_log.get(target_step)
             if I_snap is None and not boundary:
@@ -394,7 +486,10 @@ class MasterHybridPPOTrainer:
             ready.append(t)
         if boundary and trs:
             last = trs[-1]
-            if last.resolved and not last.pushed:
+            if last.resolved and not last.pushed and self.critic_priv == "queue_trust":
+                last.pushed = True
+                ready.append(last)
+            elif last.resolved and not last.pushed:
                 I_snap = dict(self._slot_log.get(current_step) or {})
                 if last.complied and last.chosen_indices:
                     winner_sid = agent.sids[last.chosen_indices[0]]
@@ -567,7 +662,8 @@ class MasterHybridPPOTrainer:
                                             pref_pair_outcome=getattr(_bb, "pref_pair_outcome", False),
                                             pref_hist_k=getattr(_bb, "pref_hist_k", None),
                                             accept_stream=self.accept_stream,
-                                            pure_streams=self.pure_streams)
+                                            pure_streams=self.pure_streams,
+                                            critic_priv=self.critic_priv)
         step = 0
         for _ in range(n_updates):
             it = self._it_global

@@ -76,17 +76,26 @@ class MasterPurePPOCritic(nn.Module):
     kritik."""
 
     def __init__(self, station_feat_dim: int = STATION_FEAT_DIM_MASTER, hidden: int = 64,
-                n_critics: int = 2, p_dim: int = 64):
+                n_critics: int = 2, p_dim: int = 64, n_priv: int = 1):
         super().__init__()
         self.n_critics = int(n_critics)
-        self.W_p = nn.Linear(1, p_dim)
+        # `n_priv` (2026-09-09): jumlah fitur ISTIMEWA per stasiun yang masuk W_p.
+        #   n_priv=1 -> I^i_t saja (Pers. 10 MASTER, perilaku BAKU & satu-satunya yang
+        #               kompatibel dgn seluruh checkpoint yang sudah ada)
+        #   n_priv=2 -> mode `wait_trust`: [wait_actual_norm, trust_saat_keputusan]
+        # Mengubah nilai ini mengubah bentuk W_p sehingga checkpoint lama TIDAK dapat
+        # dimuat -- disengaja, supaya percampuran konfigurasi gagal keras, bukan diam2.
+        self.n_priv = int(n_priv)
+        self.W_p = nn.Linear(self.n_priv, p_dim)
         in_dim = station_feat_dim + p_dim   # obs + p^i_t (TANPA aksi)
         self.pool = MasterPurePPOAttentivePooling(in_dim, hidden)
         self.head = nn.Linear(hidden, self.n_critics)
 
     def forward(self, joint_obs, mask, I_raw):
-        """joint_obs:(B,N,F) mask:(B,N) I_raw:(B,N) MENTAH -> V:(B,K)."""
-        p = torch.relu(self.W_p(I_raw.unsqueeze(-1)))
+        """joint_obs:(B,N,F) mask:(B,N) I_raw:(B,N) atau (B,N,n_priv) MENTAH -> V:(B,K)."""
+        if I_raw.dim() == 2:
+            I_raw = I_raw.unsqueeze(-1)
+        p = torch.relu(self.W_p(I_raw))
         raw = torch.cat([joint_obs, p], dim=-1)
         x_t, attn_weights = self.pool(raw, mask)
         return self.head(x_t), attn_weights

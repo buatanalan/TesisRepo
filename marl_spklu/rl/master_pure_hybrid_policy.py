@@ -95,7 +95,7 @@ class _PrefStationBackbone(nn.Module):
                 pref_d_attn: int = 8, station_attn_dim: int = 8,
                 pref_feature_mode: bool = False, pref_pair_outcome: bool = False,
                 pref_gate_init: float = 0.0, use_station_attn: bool = True,
-                pref_hist_k: int = None):
+                pref_hist_k: int = None, pref_feat_set: str = "v2"):
         super().__init__()
         # `pref_hist_k` (2026-08-30, ABLASI): override panjang jendela riwayat P
         # (baku None -> ikut PDQN_HIST_K=10 global). Disimpan di sini (bukan tensor,
@@ -103,6 +103,13 @@ class _PrefStationBackbone(nn.Module):
         # MENURUNKANNYA dari aktor -- pola SAMA `station_feat_dim`, menjamin latih & uji
         # selalu memakai jendela yg sama tanpa perlu diteruskan terpisah di tiap panggilan.
         self.pref_hist_k = pref_hist_k
+        # `pref_feat_set` (2026-09-09): versi ISI vektor fitur stasiun pada pasangan
+        # riwayat preferensi (v1 lama / v2 baku) -- lihat `RLRolloutAgent.
+        # _pref_station_feat`. Disimpan DI SINI (bukan diteruskan terpisah ke trainer)
+        # supaya agen rollout LATIH maupun UJI sama-sama menurunkannya dari aktor, pola
+        # identik `pref_feature_mode`/`pref_hist_k`. DIMENSI kedua versi SAMA (5),
+        # sehingga tanpa mekanisme ini checkpoint v1 akan dievaluasi sbg v2 tanpa gejala.
+        self.pref_feat_set = str(pref_feat_set)
         # `use_station_attn=False` (2026-08-30, ABLASI): lewati `SmallStationAttention`
         # sepenuhnya di forward() -- utk mengisolasi kontribusi Modul P TANPA atensi
         # antar-stasiun (varian "P saja"), memisahkan efek station attention (base
@@ -179,12 +186,14 @@ class MasterHybridDDPGActor(nn.Module):
                 pref_d_attn: int = 8, station_attn_dim: int = 8,
                 pref_feature_mode: bool = False, bid_scale: float = 10.0,
                 pref_pair_outcome: bool = False, pref_gate_init: float = 0.0,
-                use_station_attn: bool = True, pref_hist_k: int = None):
+                use_station_attn: bool = True, pref_hist_k: int = None,
+                pref_feat_set: str = "v2"):
         super().__init__()
         self.backbone = _PrefStationBackbone(n_spklu, station_feat_dim, vec_dim, bid_hidden,
                                              pref_d_lstm, pref_d_attn, station_attn_dim,
                                              pref_feature_mode, pref_pair_outcome,
-                                             pref_gate_init, use_station_attn, pref_hist_k)
+                                             pref_gate_init, use_station_attn, pref_hist_k,
+                                             pref_feat_set)
         self.pref_lstm = self.backbone.pref_lstm
         self.station_feat_dim = self.backbone.station_feat_dim   # DIBACA RLRolloutAgent.__init__ (_use_pref)
         self.head = nn.Linear(vec_dim, 1)
@@ -207,12 +216,13 @@ class MasterHybridPPOActor(nn.Module):
                 pref_d_attn: int = 8, station_attn_dim: int = 8,
                 pref_feature_mode: bool = False, pref_pair_outcome: bool = False,
                 pref_gate_init: float = 0.0, use_station_attn: bool = True,
-                pref_hist_k: int = None):
+                pref_hist_k: int = None, pref_feat_set: str = "v2"):
         super().__init__()
         self.backbone = _PrefStationBackbone(n_spklu, station_feat_dim, vec_dim, bid_hidden,
                                              pref_d_lstm, pref_d_attn, station_attn_dim,
                                              pref_feature_mode, pref_pair_outcome,
-                                             pref_gate_init, use_station_attn, pref_hist_k)
+                                             pref_gate_init, use_station_attn, pref_hist_k,
+                                             pref_feat_set)
         self.pref_lstm = self.backbone.pref_lstm
         self.station_feat_dim = self.backbone.station_feat_dim
         self.head = nn.Linear(vec_dim, 1)
@@ -244,11 +254,14 @@ class MasterHybridPPOCritic(nn.Module):
                 n_critics: int = 2, p_dim: int = 64, n_spklu: int = None,
                 pref_d_lstm: int = 8, pref_d_attn: int = 8,
                 pref_feature_mode: bool = False, pref_pair_outcome: bool = False,
-                pref_gate_init: float = 0.0, pref_hist_k: int = None):
+                pref_gate_init: float = 0.0, pref_hist_k: int = None,
+                n_priv: int = 1):
         super().__init__()
         self.n_critics = int(n_critics)
         self.pref_hist_k = pref_hist_k
-        self.W_p = nn.Linear(1, p_dim)
+        # Lihat catatan `n_priv` pada MasterPurePPOCritic (semantik identik).
+        self.n_priv = int(n_priv)
+        self.W_p = nn.Linear(self.n_priv, p_dim)
         self.pref_feature_mode = bool(pref_feature_mode)
         self.pref_pair_outcome = bool(pref_pair_outcome) and self.pref_feature_mode
         if self.pref_pair_outcome:
@@ -274,9 +287,11 @@ class MasterHybridPPOCritic(nn.Module):
         return h_n[-1]
 
     def forward(self, joint_obs, mask, I_raw, pref_hist=None):
-        """joint_obs:(B,N,F) mask:(B,N) I_raw:(B,N) MENTAH pref_hist:(B,K,d) opsional
-        -> V:(B,K_kritik)."""
-        p = torch.relu(self.W_p(I_raw.unsqueeze(-1)))
+        """joint_obs:(B,N,F) mask:(B,N) I_raw:(B,N) atau (B,N,n_priv) MENTAH
+        pref_hist:(B,K,d) opsional -> V:(B,K_kritik)."""
+        if I_raw.dim() == 2:
+            I_raw = I_raw.unsqueeze(-1)
+        p = torch.relu(self.W_p(I_raw))
         if pref_hist is not None:
             c_pref = self._encode_pref(pref_hist)
             attended_pref, _ = self.pref_attn(joint_obs, c_pref)

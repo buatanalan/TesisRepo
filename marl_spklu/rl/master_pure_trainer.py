@@ -34,7 +34,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from marl_spklu.rl.rollout import RLRolloutAgent, STREAM_INDIVIDUAL, STREAM_GLOBAL, N_REWARD_STREAMS, _gini
+from marl_spklu.rl.rollout import (RLRolloutAgent, STREAM_INDIVIDUAL, STREAM_GLOBAL,
+                                   N_REWARD_STREAMS, N_REWARD_STREAMS_PURE, _gini)
 from marl_spklu.rl.master_paper_obs import (build_joint_obs_master, build_joint_obs_master_ev,
                                             STATION_FEAT_DIM_MASTER, STATION_FEAT_DIM_MASTER_EV)
 from marl_spklu.rl.master_pure_policy import MasterPureActor, MasterPureCritic
@@ -83,7 +84,8 @@ class MasterPureTransition:
     """Duck-type Transition (rollout.py), field-demi-field spy hook RLRolloutAgent
     bekerja tanpa modifikasi. `obs`=joint (N,7) §3.1 MURNI (TANPA +EV)."""
 
-    def __init__(self, obs, mask, action, step, primary_idx, pref_hist=None):
+    def __init__(self, obs, mask, action, step, primary_idx, pref_hist=None,
+                n_streams: int = N_REWARD_STREAMS):
         self.obs = obs; self.mask = mask; self.action = action
         # WAJIB disimpan (2026-08-29) -- lih. catatan identik di MasterHybridPPOTransition:
         # tanpa ini langkah `_update` memanggil aktor TANPA pref_hist, sehingga parameter
@@ -91,7 +93,9 @@ class MasterPureTransition:
         self.pref_hist = pref_hist
         self.step = step
         self.chosen_indices = [int(primary_idx)]
-        self.reward_streams = np.zeros(N_REWARD_STREAMS, dtype=np.float64)
+        # `n_streams`=3 pd mode aliran-murni (wait/gini/acceptance, lihat `pure_streams`
+        # di rollout.py) -- pola sama `MasterHybridPPOTransition`/`MasterPurePPOTransition`.
+        self.reward_streams = np.zeros(int(n_streams), dtype=np.float64)
         self.done = False
         self.complied = False; self.disp_estwait = 0.0; self.wait_default = 0.0
         self.resolved = False; self.pushed = False; self.flock_penalty = 0.0
@@ -106,8 +110,11 @@ class MasterPureTransition:
             return np.array([self.reward_streams[stream_select]], dtype=np.float64)
         if n_critics == 1:
             return np.array([self.reward_streams.sum()], dtype=np.float64)
-        if n_critics != N_REWARD_STREAMS:
-            raise ValueError(f"n_critics={n_critics} != N_REWARD_STREAMS={N_REWARD_STREAMS}")
+        # 2026-09-12: bukan hardcode N_REWARD_STREAMS lagi -- lih. catatan identik di
+        # `MasterPurePPOTransition.reward_vec` (mode `pure_streams` melewatkan n_critics
+        # =3=N_REWARD_STREAMS_PURE, harus cocok dgn jumlah aliran transisi ITU SENDIRI).
+        if n_critics != len(self.reward_streams):
+            raise ValueError(f"n_critics={n_critics} != jumlah aliran={len(self.reward_streams)}")
         return self.reward_streams
 
     def add_reward(self, value: float, stream: int = STREAM_INDIVIDUAL) -> None:
@@ -121,13 +128,18 @@ class MasterPureRolloutAgent(RLRolloutAgent):
 
     def __init__(self, actor, sim, reward_calc, forecaster=None, noise_std: float = 8.0,
                 k: int = 3, equity_calc=None, pref_feature_mode: bool = False,
-                pref_pair_outcome: bool = False):
+                pref_pair_outcome: bool = False, accept_stream: int = STREAM_INDIVIDUAL,
+                pure_streams: bool = False):
         # `pref_pad_right=True` -- lihat catatan identik di `MasterHybridPPORolloutAgent`
         # (bug padding vs pack_padded_sequence, ditemukan 2026-08-29). Tak berpengaruh
         # bila aktor tanpa modul P (jalur pref tak dieksekusi sama sekali).
+        # `pure_streams`/`accept_stream` (2026-09-12): diteruskan APA ADANYA ke basis --
+        # lih. catatan identik di `MasterPurePPORolloutAgent` (versi PPO), logika reward
+        # per-aliran SUDAH generik di `RLRolloutAgent`, tak perlu ditulis ulang di sini.
         super().__init__(actor, sim, reward_calc, forecaster, k=k, equity_calc=equity_calc,
                          pref_feature_mode=pref_feature_mode,
-                         pref_pair_outcome=pref_pair_outcome, pref_pad_right=True)
+                         pref_pair_outcome=pref_pair_outcome, pref_pad_right=True,
+                         accept_stream=accept_stream, pure_streams=pure_streams)
         self.actor = actor
         # DUA VERSI OBSERVASI (2026-08-29). Diturunkan dari aktor, bukan flag terpisah:
         #   7  -> `build_joint_obs_master`     (MASTER murni, Pers.11 -- buta thd pemohon)
@@ -193,7 +205,8 @@ class MasterPureRolloutAgent(RLRolloutAgent):
         recs = [self.sids[i] for i in chosen_order]
 
         tr = MasterPureTransition(joint_obs, mask, raw_bids.astype(np.float32),
-                                  self.sim.current_step, primary_idx, pref_hist=pref_hist)
+                                  self.sim.current_step, primary_idx, pref_hist=pref_hist,
+                                  n_streams=self.n_streams)
         tr.disp_estwait = primary_disp
         tr.wait_default = float(self.sim.compute_virtual_wait(
             user, self.sim.spklus[self.sids[default_idx]], time_now)
@@ -310,10 +323,22 @@ class MasterPureTrainer:
                 delay_minutes: float = 30.0, hidden: int = 64,
                 beta_mode: str = "gap_ratio", beta_sigma: float = 0.2,
                 n_critics: int = None, stream_select: int = None, specialists: list = None,
-                actor_cls=None, actor_kwargs: dict = None):
+                actor_cls=None, actor_kwargs: dict = None,
+                accept_stream: int = STREAM_GLOBAL, pure_streams: bool = False,
+                beta_denom: str = "r_star"):
         """`actor_cls`/`actor_kwargs` (2026-08-29, Master-Hybrid): opsional, ganti
         `MasterPureActor` baku dgn kelas lain (mis. `MasterHybridDDPGActor`, modul
-        P+attention) -- TAMBAHAN murni, BAKU `None` = perilaku lama TAK BERUBAH."""
+        P+attention) -- TAMBAHAN murni, BAKU `None` = perilaku lama TAK BERUBAH.
+
+        `pure_streams`/`accept_stream`/`beta_denom` (2026-09-12): dukungan mode
+        aliran-murni (wait/gini/acceptance, 3 aliran) -- pola PERSIS sama
+        `MasterHybridPPOTrainer`/`MasterPurePPOTrainer`. Baku (pure_streams=False,
+        beta_denom="r_star") = perilaku lama TAK BERUBAH sama sekali."""
+        assert beta_denom in ("r_star", "ret_std"), f"beta_denom={beta_denom!r} tak dikenal"
+        self.beta_denom = str(beta_denom)
+        self._q_std_ema = None
+        self.pure_streams = bool(pure_streams)
+        self.accept_stream = int(accept_stream)
         assert mode in ("pretrain_specialist", "dgr"), f"mode={mode!r} tak dikenal"
         self.mode = mode
         self.dataset_path = dataset_path
@@ -334,18 +359,24 @@ class MasterPureTrainer:
         self.seed = seed
         torch.manual_seed(seed); np.random.seed(seed); random.seed(seed)
 
+        # Jumlah aliran: 3 pd mode murni (wait/gini/acceptance), 2 pd mode lama
+        # (wait/CWT-analog, gini/pemerataan) -- lih. catatan STREAM_PURE_* di rollout.py.
+        self.n_streams = N_REWARD_STREAMS_PURE if self.pure_streams else N_REWARD_STREAMS
+        _nama_aliran = (["wait", "gini", "acceptance"] if self.pure_streams
+                        else ["wait/CWT-analog", "gini/pemerataan"])
         if mode == "pretrain_specialist":
-            assert stream_select in (0, 1), (
-                "mode='pretrain_specialist' WAJIB --stream-select 0 (wait/CWT-analog) "
-                "atau 1 (gini/pemerataan, pengganti CP)")
+            assert stream_select in range(self.n_streams), (
+                f"mode='pretrain_specialist' WAJIB --stream-select 0..{self.n_streams - 1} "
+                f"({', '.join(f'{i}={n}' for i, n in enumerate(_nama_aliran))})")
             self.n_critics = 1
             self.stream_select = int(stream_select)
             self.specialists = None
         else:
-            assert specialists is not None and len(specialists) == 2, (
-                "mode='dgr' WAJIB --specialists: list 2 (aktor_beku,kritik_beku) "
-                "hasil mode='pretrain_specialist' (stream 0 & 1)")
-            self.n_critics = 2
+            assert specialists is not None and len(specialists) == self.n_streams, (
+                f"mode='dgr' WAJIB --specialists: list {self.n_streams} "
+                f"(aktor_beku,kritik_beku) hasil mode='pretrain_specialist' "
+                f"(stream {', '.join(str(i) for i in range(self.n_streams))})")
+            self.n_critics = self.n_streams
             self.stream_select = None
             self.specialists = specialists
             for act_s, crit_s in specialists:
@@ -495,6 +526,7 @@ class MasterPureTrainer:
         if self.mode != "dgr":
             return np.ones(1, dtype=np.float64)
         gaps = []
+        q_star_list, q_now_list = [], []
         with torch.no_grad():
             for k, (act_s, crit_s) in enumerate(self.specialists):
                 a_star = self._actor_fwd(act_s, obs_t, mask_t, pref_t)                              # b*_k(o^i_t)
@@ -503,8 +535,34 @@ class MasterPureTrainer:
                 q_now, _ = self.critic(obs_t, a_now, mask_t, I_t)    # Q_k(x_t) dgn kritik MULTI-obj
                 q_star_m = q_star.mean().item()
                 q_now_k = q_now[:, k].mean().item()
-                gap = (q_star_m - q_now_k) / (abs(q_star_m) + 1e-8)   # Pers.13
-                gaps.append(gap)
+                q_star_list.append(q_star_m); q_now_list.append(q_now_k)
+                if self.beta_denom == "r_star":
+                    gap = (q_star_m - q_now_k) / (abs(q_star_m) + 1e-8)   # Pers.13 (BAKU)
+                    gaps.append(gap)
+        if self.beta_denom == "ret_std":
+            # Penyebut berbasis simpangan-baku Q SPESIALIS lintas-batch (2026-09-12) --
+            # ADAPTASI konsep `ret_std` (`MasterHybridPPOTrainer`/`MasterPurePPOTrainer`)
+            # ke mekanisme Pers.13 asli (gap Q, bukan gap return): penyebut `|Q*_k|` bisa
+            # mendekati nol bila suatu aliran (mis. gini `use_delta_gini`) reratanya nyaris
+            # nol secara struktural, membuat `beta` melompat drastis hanya krn derau.
+            # `std(Q*_k(x*_t))` DALAM SATU BATCH dipakai sbg proksi skala aliran tsb --
+            # BUKAN identik penurunan Pers.13, tapi menahan properti kebal-skala yg sama
+            # (Q*_k & std-nya sama-sama ikut skala c bila reward diskalakan c).
+            with torch.no_grad():
+                q_std_list = []
+                for act_s, crit_s in self.specialists:
+                    a_star = self._actor_fwd(act_s, obs_t, mask_t, pref_t)
+                    q_star, _ = crit_s(obs_t, a_star, mask_t, I_t)
+                    q_std_list.append(float(q_star.squeeze(-1).std().item()))
+            std = np.array(q_std_list, dtype=np.float64)
+            if self._q_std_ema is None:
+                self._q_std_ema = std.copy()
+            else:
+                self._q_std_ema = 0.8 * self._q_std_ema + 0.2 * std
+            denom = np.maximum(self._q_std_ema, 1e-8)
+            q_star_a = np.array(q_star_list, dtype=np.float64)
+            q_now_a = np.array(q_now_list, dtype=np.float64)
+            gaps = ((q_star_a - q_now_a) / denom).tolist()
         gap = np.clip(np.array(gaps, dtype=np.float64), 0.0, 10.0)
         z = gap / max(self.beta_sigma, 1e-8)
         z -= z.max()
@@ -603,7 +661,9 @@ class MasterPureTrainer:
         agent = MasterPureRolloutAgent(self.actor, sim, self.rc, noise_std=self._noise_std(),
                                        equity_calc=self.equity_calc,
                                        pref_feature_mode=getattr(_bb, "pref_feature_mode", False),
-                                       pref_pair_outcome=getattr(_bb, "pref_pair_outcome", False))
+                                       pref_pair_outcome=getattr(_bb, "pref_pair_outcome", False),
+                                       accept_stream=self.accept_stream,
+                                       pure_streams=self.pure_streams)
         step = 0
         for _ in range(n_updates):
             it = self._it_global

@@ -149,7 +149,14 @@ class RLRolloutAgent:
                  epsilon: float = 0.0, threshold: float = 0.20,
                  pref_pair_outcome: bool = False, pref_pad_right: bool = False,
                  pref_hist_k: int = None, accept_stream: int = STREAM_INDIVIDUAL,
-                 pure_streams: bool = False):
+                 pure_streams: bool = False, pref_feat_set: str = "v2"):
+        # `pref_feat_set` (2026-09-09): isi vektor fitur per-stasiun pada pasangan
+        # preferensi (lihat `_pref_station_feat`). DIMENSINYA SAMA (5) di kedua versi,
+        # sehingga checkpoint lama TETAP DAPAT DIMUAT meski maknanya berbeda -- itulah
+        # sebabnya versinya WAJIB ikut menandai tag keluaran, kalau tidak dua eksperimen
+        # yang tak sebanding akan tercampur tanpa gejala apa pun.
+        assert pref_feat_set in ("v1", "v2"), f"pref_feat_set={pref_feat_set!r} tak dikenal"
+        self.pref_feat_set = str(pref_feat_set)
         self.policy = policy
         self.sim = sim
         self.rc = reward_calc
@@ -252,17 +259,44 @@ class RLRolloutAgent:
 
     def _pref_station_feat(self, sid, user, wait_hat):
         """Vektor fitur (PREF_STATION_FEAT_DIM=5) 1 stasiun utk pasangan preferensi mode
-        FITUR: [jarak, est_wait, antrean, konektor, utilisasi] -- deskriptif, bukan
-        identitas, sehingga preferensi bisa digeneralisasi lintas stasiun BERKARAKTER
-        SERUPA (bukan cuma dihafal per-indeks seperti one-hot paper asli)."""
+        FITUR -- deskriptif, bukan identitas, sehingga preferensi bisa digeneralisasi
+        lintas stasiun BERKARAKTER SERUPA (bukan dihafal per-indeks spt one-hot paper).
+
+        v1 (lama)  : [jarak, est_wait, antrean, konektor, utilisasi]
+        v2 (BAKU)  : [jarak, est_wait, kapasitas_tersedia, konektor, power]
+
+        Beda v1->v2: `antrean` diganti `kapasitas_tersedia` dan `utilisasi` diganti
+        `power`. Dua slot yang diganti sebelumnya berisi besaran BEBAN SESAAT yang
+        sangat berkorelasi dgn `est_wait` (slot ke-2) -- praktis mengulang informasi yang
+        sama tiga kali. Penggantinya bersifat KAPASITAS: `kapasitas_tersedia` (rasio slot
+        menganggur) dan `power` (daya efektif) menerangkan MENGAPA suatu stasiun cepat
+        atau lambat, bukan sekadar seberapa padat ia saat ini. Untuk riwayat preferensi
+        ini lebih tepat: yang hendak dipelajari LSTM adalah karakter stasiun yang menarik
+        pengguna, bukan kondisi sesaatnya pada satu kunjungan lampau.
+
+        DIMENSI TETAP 5 di kedua versi -> checkpoint lama TETAP dapat dimuat walau
+        maknanya berbeda. Karena itu versinya WAJIB menandai tag keluaran."""
         feat = self.sim.spklu_features.get(sid, {})
         loc = feat.get('loc', (0.0, 0.0))
+        spklu = self.sim.spklus[sid]
         dist = math.dist(user.location, loc) / self.dist_scale
         wait = wait_hat.get(sid, 0.0) / self.wait_scale
-        q = self.sim.spklus[sid].get_queue_length() / self.q_scale
         conn = feat.get('conn', 1.0) / self.conn_scale
-        util = self.sim.spklus[sid].get_utilization()
-        return np.array([dist, wait, q, conn, util], dtype=np.float32)
+        if self.pref_feat_set == "v1":
+            slot2 = spklu.get_queue_length() / self.q_scale
+            slot5 = spklu.get_utilization()
+        else:
+            # Rasio slot MENGANGGUR (bukan terpakai) -- 1.0 = seluruhnya kosong.
+            # Skala & rumus disamakan dgn `master_paper_obs.snapshot_slots_avail`.
+            cap_total = sum(spklu.capacities.values())
+            charging_total = sum(len(c) for c in spklu.charging.values())
+            slot2 = ((max(0, cap_total - charging_total) / cap_total)
+                     if cap_total > 0 else 0.0)
+            # Daya efektif (kW). Skala 150 kW & fallback AC 7 kW disamakan dgn
+            # `master_paper_obs.build_station_obs::power_norm`.
+            power_kw = spklu.daya_efektif_dc if spklu.daya_efektif_dc > 0 else 7.0
+            slot5 = min(power_kw / 150.0, 1.0)
+        return np.array([dist, wait, slot2, conn, slot5], dtype=np.float32)
 
     def _build_pref_hist(self, user):
         """Riwayat T=PDQN_HIST_K pasangan (a_hat,a) terakhir pengguna ini -> (K, dim)

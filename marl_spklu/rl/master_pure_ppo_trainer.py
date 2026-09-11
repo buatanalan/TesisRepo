@@ -17,7 +17,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from marl_spklu.rl.rollout import RLRolloutAgent, STREAM_INDIVIDUAL, STREAM_GLOBAL, N_REWARD_STREAMS, _gini
+from marl_spklu.rl.rollout import (RLRolloutAgent, STREAM_INDIVIDUAL, STREAM_GLOBAL,
+                                   N_REWARD_STREAMS, N_REWARD_STREAMS_PURE, _gini)
 from marl_spklu.rl.master_paper_obs import build_joint_obs_master, STATION_FEAT_DIM_MASTER
 from marl_spklu.rl.master_pure_ppo_policy import MasterPurePPOActor, MasterPurePPOCritic
 from marl_spklu.rl.master_pure_trainer import snapshot_slots_raw, _SlotRawLog
@@ -30,12 +31,15 @@ class MasterPurePPOTransition:
     V(s) SAAT KEPUTUSAN utk GAE). `logp`=log-prob bid tersampel (stasiun feasible saja,
     pola `_BiddingMixin`)."""
 
-    def __init__(self, obs, mask, bids, logp, value, step, primary_idx):
+    def __init__(self, obs, mask, bids, logp, value, step, primary_idx,
+                n_streams: int = N_REWARD_STREAMS):
         self.obs = obs; self.mask = mask; self.bids = bids
         self.logp = float(logp); self.value = value
         self.step = step
         self.chosen_indices = [int(primary_idx)]
-        self.reward_streams = np.zeros(N_REWARD_STREAMS, dtype=np.float64)
+        # `n_streams`=3 pd mode aliran-murni (wait/gini/acceptance, satu suku per aliran,
+        # lihat `pure_streams` di rollout.py) -- pola sama `MasterHybridPPOTransition`.
+        self.reward_streams = np.zeros(int(n_streams), dtype=np.float64)
         self.done = False
         self.complied = False; self.disp_estwait = 0.0; self.wait_default = 0.0
         self.resolved = False; self.pushed = False; self.flock_penalty = 0.0
@@ -56,8 +60,12 @@ class MasterPurePPOTransition:
             return np.array([self.reward_streams[self.stream_select]], dtype=np.float64)
         if n_critics == 1:
             return np.array([self.reward_streams.sum()], dtype=np.float64)
-        if n_critics != N_REWARD_STREAMS:
-            raise ValueError(f"n_critics={n_critics} != N_REWARD_STREAMS={N_REWARD_STREAMS}")
+        # 2026-09-12: BUKAN hardcode N_REWARD_STREAMS lagi -- mode `pure_streams` (3
+        # aliran wait/gini/acceptance) melewatkan n_critics=3 (N_REWARD_STREAMS_PURE),
+        # jadi syaratnya HARUS cocok dgn jumlah aliran transisi ITU SENDIRI, bukan
+        # konstanta 2-aliran tetap (pola sama `MasterHybridPPOTransition.reward_vec`).
+        if n_critics != len(self.reward_streams):
+            raise ValueError(f"n_critics={n_critics} != jumlah aliran={len(self.reward_streams)}")
         return self.reward_streams
 
     def add_reward(self, value: float, stream: int = STREAM_INDIVIDUAL) -> None:
@@ -70,11 +78,19 @@ class MasterPurePPORolloutAgent(RLRolloutAgent):
     TERTINGGI (argmax, §3.1) -- sama arah versi DDPG."""
 
     def __init__(self, actor, critic, sim, reward_calc, forecaster=None, k: int = 3,
-                equity_calc=None, stream_select=None):
-        super().__init__(actor, sim, reward_calc, forecaster, k=k, equity_calc=equity_calc)
+                equity_calc=None, stream_select=None, accept_stream: int = STREAM_INDIVIDUAL,
+                pure_streams: bool = False):
+        # `pure_streams`/`accept_stream` (2026-09-12): diteruskan APA ADANYA ke basis
+        # `RLRolloutAgent` -- logika reward per-aliran (wait/gini/acceptance) SUDAH
+        # generik di sana (lih. STREAM_PURE_* & `on_decision`/`on_step_end`/
+        # `on_charge_complete`), jadi TAK ADA kode tambahan yg perlu ditulis ulang di
+        # sini, pola identik `MasterHybridPPORolloutAgent`.
+        super().__init__(actor, sim, reward_calc, forecaster, k=k, equity_calc=equity_calc,
+                         accept_stream=accept_stream, pure_streams=pure_streams)
         self.actor = actor
         self.critic = critic
-        # mode="pretrain_specialist": 0 (wait) / 1 (gini); mode="dgr": None (K=2 penuh).
+        # mode="pretrain_specialist": 0/1/2 (wait/gini/acceptance bila pure_streams);
+        # mode="dgr": None (K penuh, self.n_streams -- diwariskan basis).
         self.stream_select = stream_select
 
     def get_recommendation(self, feasible_spklus: dict):
@@ -121,7 +137,8 @@ class MasterPurePPORolloutAgent(RLRolloutAgent):
 
         tr = MasterPurePPOTransition(joint_obs, mask, bids, logp,
                                      value.squeeze(0).numpy().astype(np.float64),
-                                     self.sim.current_step, primary_idx)
+                                     self.sim.current_step, primary_idx,
+                                     n_streams=self.n_streams)
         tr.stream_select = self.stream_select
         tr.disp_estwait = primary_disp
         tr.wait_default = float(self.sim.compute_virtual_wait(
@@ -199,7 +216,18 @@ class MasterPurePPOTrainer:
                 delay_minutes: float = 30.0, hidden: int = 64,
                 beta_mode: str = "gap_ratio", beta_sigma: float = 0.2,
                 reward_calc=None, seed: int = 0, verbose: bool = True,
-                equity_calc=None, max_step_gap: int = 4):
+                equity_calc=None, max_step_gap: int = 4,
+                accept_stream: int = STREAM_GLOBAL, pure_streams: bool = False,
+                beta_denom: str = "r_star"):
+        # `beta_denom`/`pure_streams`/`accept_stream` (2026-09-12): pola PERSIS sama
+        # `MasterHybridPPOTrainer` -- lih. catatan lengkap di sana. Baku TAK BERUBAH
+        # (beta_denom="r_star", pure_streams=False) -> checkpoint & pipeline lama
+        # (`_run_master_pure_ppo_pipeline.py`, Tabel VI.1/VI.2) TETAP identik.
+        assert beta_denom in ("r_star", "ret_std"), f"beta_denom={beta_denom!r} tak dikenal"
+        self.beta_denom = str(beta_denom)
+        self._ret_std_ema = None
+        self.pure_streams = bool(pure_streams)
+        self.accept_stream = int(accept_stream)
         assert mode in ("pretrain_specialist", "dgr"), f"mode={mode!r} tak dikenal"
         self.mode = mode
         self.dataset_path = dataset_path
@@ -211,19 +239,25 @@ class MasterPurePPOTrainer:
         self.max_grad_norm = float(max_grad_norm); self.target_kl = target_kl
         self.max_step_gap = max_step_gap
 
+        # Jumlah aliran: 3 pd mode murni (wait/gini/acceptance), 2 pd mode lama
+        # (wait(+prox)/gini(+flock) -- lih. catatan STREAM_PURE_* di rollout.py).
+        self.n_streams = N_REWARD_STREAMS_PURE if self.pure_streams else N_REWARD_STREAMS
+        _nama_aliran = (["wait", "gini", "acceptance"] if self.pure_streams
+                        else ["wait(+prox)", "gini(+flock)"])
         if mode == "pretrain_specialist":
-            assert stream_select in (0, 1), (
-                "mode='pretrain_specialist' WAJIB --stream-select 0 (wait) atau 1 (gini)")
+            assert stream_select in range(self.n_streams), (
+                f"mode='pretrain_specialist' WAJIB --stream-select 0..{self.n_streams - 1} "
+                f"({', '.join(f'{i}={n}' for i, n in enumerate(_nama_aliran))})")
             self.stream_select = int(stream_select)
             self.n_critics = 1
             self._ret_best = np.full(1, -np.inf, dtype=np.float64)   # running-max, spesialis SENDIRI
             self._fixed_ret_best = False
         else:
-            assert specialist_r_star is not None and len(specialist_r_star) == 2, (
-                "mode='dgr' WAJIB --specialist-r-star: [r_star_wait, r_star_gini] "
-                "hasil mode='pretrain_specialist' (stream 0 & 1)")
+            assert (specialist_r_star is not None
+                    and len(specialist_r_star) == self.n_streams), (
+                f"mode='dgr' WAJIB {self.n_streams} r_star: [{', '.join(_nama_aliran)}]")
             self.stream_select = None
-            self.n_critics = N_REWARD_STREAMS   # 2
+            self.n_critics = self.n_streams
             self._ret_best = np.array(specialist_r_star, dtype=np.float64)   # TETAP, bukan running-max
             self._fixed_ret_best = True
 
@@ -325,13 +359,32 @@ class MasterPurePPOTrainer:
         r_star` di __init__, TAK diperbarui lagi (acuan pra-latih convergent, bukan
         running-max training gabungan)."""
         K = self.n_critics
-        ret_mean = np.asarray(returns, dtype=np.float64).mean(axis=0)
+        R = np.asarray(returns, dtype=np.float64)
+        ret_mean = R.mean(axis=0)
         self._last_ret_mean = ret_mean   # dipakai train() menghitung r_star pretrain
         if not self._fixed_ret_best:
             self._ret_best = np.maximum(self._ret_best, ret_mean)
         if self.beta_mode != "gap_ratio":
             return np.full(K, 1.0 / K, dtype=np.float64)
-        gap = (self._ret_best - ret_mean) / (np.abs(self._ret_best) + 1e-8)
+
+        if self.beta_denom == "ret_std":
+            # Penyebut berbasis simpangan-baku return (2026-09-12) -- pola PERSIS sama
+            # `MasterHybridPPOTrainer._compute_beta`. Lihat catatan lengkap di sana:
+            # penyebut lama `|r_star|` meledak bila suatu aliran reratanya mendekati nol
+            # (mis. `use_delta_gini`, deret teleskopik), sehingga `beta` melompat
+            # 0,25<->1,00 hanya krn derau. `std(return)` kebal-skala sama spt `|r_star|`
+            # (bila seluruh aliran diskalakan c, r_star/ret_mean/std ikut c, gap tak
+            # berubah) TAPI tak pernah mendekati nol selama aliran itu membawa sinyal.
+            std = R.std(axis=0)
+            if self._ret_std_ema is None:
+                self._ret_std_ema = std.copy()
+            else:
+                self._ret_std_ema = 0.8 * self._ret_std_ema + 0.2 * std
+            denom = np.maximum(self._ret_std_ema, 1e-8)
+        else:
+            denom = np.abs(self._ret_best) + 1e-8
+
+        gap = (self._ret_best - ret_mean) / denom
         gap = np.clip(gap, 0.0, 10.0)
         z = gap / max(self.beta_sigma, 1e-8)
         z -= z.max()
@@ -438,7 +491,9 @@ class MasterPurePPOTrainer:
         sim = self._fresh_sim()
         agent = MasterPurePPORolloutAgent(self.actor, self.critic, sim, self.rc,
                                           equity_calc=self.equity_calc,
-                                          stream_select=self.stream_select)
+                                          stream_select=self.stream_select,
+                                          accept_stream=self.accept_stream,
+                                          pure_streams=self.pure_streams)
         step = 0
         for _ in range(n_updates):
             it = self._it_global
