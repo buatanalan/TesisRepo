@@ -1,0 +1,137 @@
+{
+  "tag_arm": "master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_pure3",
+  "horizon": "90d",
+  "punya_atensi": true,
+  "delta_eta": 0.5,
+  "fitur_keadaan": [
+    3,
+    4,
+    5,
+    6
+  ],
+  "langkah_sampel": 10,
+  "per_checkpoint": [
+    {
+      "ckpt": 0,
+      "n_sampel": 1671,
+      "M1_rasio_silang": 1.8868716131844134,
+      "M2_laju_pembalikan": 0.002284061440255336,
+      "M3_silang_rerata": -0.0009298383449770779,
+      "M3_sendiri_rerata": -0.013559312205321982,
+      "M3_frac_arah_benar": 0.8871898442008078,
+      "M3_frac_bermakna": 0.3457011769399561,
+      "M5_kesesuaian_wait": 0.4398361028909629,
+      "M5_n_pasangan": 21965,
+      "M4_gate": 0.20205575227737427,
+      "M4_rasio_residu": 17.340901854686006,
+      "tanpa_atensi_M1_rasio_silang": 0.02189988966457826,
+      "tanpa_atensi_M2_laju_pembalikan": 0.0,
+      "tanpa_atensi_M3_silang_rerata": -0.00011258256883053349,
+      "tanpa_atensi_M3_sendiri_rerata": -0.00717081081842249,
+      "tanpa_atensi_M3_frac_arah_benar": 0.8630688683044704,
+      "tanpa_atensi_M3_frac_bermakna": 0.7429682824655894
+    },
+    {
+      "ckpt": 1,
+      "n_sampel": 1671,
+      "M1_rasio_silang": 0.07905623115018551,
+      "M2_laju_pembalikan": 0.00220426890085777,
+      "M3_silang_rerata": 0.0014336867638433167,
+      "M3_sendiri_rerata": -0.030741852318391327,
+      "M3_frac_arah_benar": 0.429422642284775,
+      "M3_frac_bermakna": 0.9708757231198883,
+      "M5_kesesuaian_wait": 0.9185908117114973,
+      "M5_n_pasangan": 21005,
+      "M4_gate": 0.144933819770813,
+      "M4_rasio_residu": 0.20720467681677165,
+      "tanpa_atensi_M1_rasio_silang": 0.0011781404148377987,
+      "tanpa_atensi_M2_laju_pembalikan": 0.0,
+      "tanpa_atensi_M3_silang_rerata": -6.3814549788062786e-06,
+      "tanpa_atensi_M3_sendiri_rerata": -0.028620145537231155,
+      "tanpa_atensi_M3_frac_arah_benar": 0.8155773106824071,
+      "tanpa_atensi_M3_frac_bermakna": 0.6927987233193696
+    },
+    {
+      "ckpt": 2,
+      "n_sampel": 1671,
+      "M1_rasio_silang": 0.07590993737707905,
+      "M2_laju_pembalikan": 0.0005385996409335727,
+      "M3_silang_rerata": -0.002248584684813316,
+      "M3_sendiri_rerata": -0.048578479676455705,
+      "M3_frac_arah_benar": 0.9580376427028695,
+      "M3_frac_bermakna": 0.9697785757031717,
+      "M5_kesesuaian_wait": 0.6779439252336449,
+      "M5_n_pasangan": 21400,
+      "M4_gate": 0.14156505465507507,
+      "M4_rasio_residu": 0.16900325520605045,
+      "tanpa_atensi_M1_rasio_silang": 0.0006134885019435299,
+      "tanpa_atensi_M2_laju_pembalikan": 9.97406742469579e-06,
+      "tanpa_atensi_M3_silang_rerata": -2.4402391186029578e-05,
+      "tanpa_atensi_M3_sendiri_rerata": -0.05002076072842567,
+      "tanpa_atensi_M3_frac_arah_benar": 0.7369545859305432,
+      "tanpa_atensi_M3_frac_bermakna": 0.5600438858966686
+    }
+  ],
+  "ringkas": {
+    "M1_rasio_silang": {
+      "mean": 0.6806125939038926,
+      "sd": 0.8529548995454291
+    },
+    "M2_laju_pembalikan": {
+      "mean": 0.0016756433273488929,
+      "sd": 0.0008046709352062635
+    },
+    "M3_silang_rerata": {
+      "mean": -0.0005815787553156924,
+      "sd": 0.001523317500663446
+    },
+    "M3_sendiri_rerata": {
+      "mean": -0.03095988140005634,
+      "sd": 0.014297346492809223
+    },
+    "M3_frac_arah_benar": {
+      "mean": 0.7582167097294841,
+      "sd": 0.23428473663226426
+    },
+    "M3_frac_bermakna": {
+      "mean": 0.7621184919210053,
+      "sd": 0.2944518478972222
+    },
+    "M5_kesesuaian_wait": {
+      "mean": 0.6787902799453683,
+      "sd": 0.19545170766147868
+    },
+    "M4_gate": {
+      "mean": 0.16285154223442078,
+      "sd": 0.027755656581680364
+    },
+    "M4_rasio_residu": {
+      "mean": 5.905703262236276,
+      "sd": 8.085921508965503
+    },
+    "tanpa_atensi_M1_rasio_silang": {
+      "mean": 0.007897172860453196,
+      "sd": 0.009904099029125217
+    },
+    "tanpa_atensi_M2_laju_pembalikan": {
+      "mean": 3.3246891415652636e-06,
+      "sd": 4.701820474676158e-06
+    },
+    "tanpa_atensi_M3_silang_rerata": {
+      "mean": -4.778880499845645e-05,
+      "sd": 4.640303444884781e-05
+    },
+    "tanpa_atensi_M3_sendiri_rerata": {
+      "mean": -0.028603905694693104,
+      "sd": 0.017493422566244903
+    },
+    "tanpa_atensi_M3_frac_arah_benar": {
+      "mean": 0.8052002549724735,
+      "sd": 0.052006188853366025
+    },
+    "tanpa_atensi_M3_frac_bermakna": {
+      "mean": 0.6652702972272092,
+      "sd": 0.07717380556190294
+    }
+  }
+}

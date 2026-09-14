@@ -1,0 +1,81 @@
+{
+  "tag_arm": "master_hybrid_ppo_dgr_90d_cwtfail120pen-2_preffeat_pairout_noattn_pure3",
+  "horizon": "90d",
+  "punya_atensi": false,
+  "delta_eta": 0.5,
+  "fitur_keadaan": [
+    3,
+    4,
+    5,
+    6
+  ],
+  "langkah_sampel": 10,
+  "per_checkpoint": [
+    {
+      "ckpt": 0,
+      "n_sampel": 1671,
+      "M1_rasio_silang": 0.0008423445070643653,
+      "M2_laju_pembalikan": 0.0,
+      "M3_silang_rerata": -1.0449091573917424e-05,
+      "M3_sendiri_rerata": -0.012388126588874589,
+      "M3_frac_arah_benar": 0.9035891089108911,
+      "M3_frac_bermakna": 0.8059046479154199,
+      "M5_kesesuaian_wait": 0.4934526005164146,
+      "M5_n_pasangan": 21688
+    },
+    {
+      "ckpt": 1,
+      "n_sampel": 1671,
+      "M1_rasio_silang": 0.0008451242795694395,
+      "M2_laju_pembalikan": 0.0,
+      "M3_silang_rerata": -1.94921928902136e-06,
+      "M3_sendiri_rerata": -0.04563103256190747,
+      "M3_frac_arah_benar": 0.5597880928355197,
+      "M3_frac_bermakna": 0.39537203271494115,
+      "M5_kesesuaian_wait": 0.6300468177814861,
+      "M5_n_pasangan": 21573
+    },
+    {
+      "ckpt": 2,
+      "n_sampel": 1671,
+      "M1_rasio_silang": 0.0008451993357516009,
+      "M2_laju_pembalikan": 0.0,
+      "M3_silang_rerata": -9.72214707595467e-06,
+      "M3_sendiri_rerata": -0.018858955541093608,
+      "M3_frac_arah_benar": 1.0,
+      "M3_frac_bermakna": 0.3618591661679633,
+      "M5_kesesuaian_wait": 0.5117552334943639,
+      "M5_n_pasangan": 21735
+    }
+  ],
+  "ringkas": {
+    "M1_rasio_silang": {
+      "mean": 0.0008442227074618019,
+      "sd": 1.3284416703587797e-06
+    },
+    "M2_laju_pembalikan": {
+      "mean": 0.0,
+      "sd": 0.0
+    },
+    "M3_silang_rerata": {
+      "mean": -7.373485979631152e-06,
+      "sd": 3.847000036731977e-06
+    },
+    "M3_sendiri_rerata": {
+      "mean": -0.02562603823062522,
+      "sd": 0.014390222501828457
+    },
+    "M3_frac_arah_benar": {
+      "mean": 0.8211257339154702,
+      "sd": 0.18893876779541358
+    },
+    "M3_frac_bermakna": {
+      "mean": 0.5210452822661081,
+      "sd": 0.20189010493276638
+    },
+    "M5_kesesuaian_wait": {
+      "mean": 0.5450848839307548,
+      "sd": 0.06054003769530485
+    }
+  }
+}
